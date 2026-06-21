@@ -1,0 +1,13 @@
+{
+  "name": "CyberAgent",
+  "short_name": "CyberAgent",
+  "description": "Agente de ciberseguridad — notificaciones",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080c0f",
+  "theme_color": "#00d9ff",
+  "icons": [
+    { "src": "/static/icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

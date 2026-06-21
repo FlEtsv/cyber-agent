@@ -16,6 +16,8 @@ from app.ollama_client import AgentWorker, OLLAMA_MODEL, SYSTEM_PROMPT
 from app.consciousness.system_context import build_system_prompt
 from app.consciousness import decision_log
 from app.finetune import collector
+from app.api import alert_sender
+from app.api.approval_poller import ApprovalPoller
 from app import database as db
 
 # ── Default permission levels per tool ────────────────────────────────────
@@ -73,6 +75,7 @@ class MainWindow(QMainWindow):
         self._pending_tools: dict[str, dict] = {}  # tool_id -> {name, args}
         self._update_local: str = ""
         self._update_remote: str = ""
+        self._approval_pollers: dict[str, ApprovalPoller] = {}
 
         self._build_ui()
         self._load_conversations()
@@ -490,6 +493,26 @@ class MainWindow(QMainWindow):
             event["id"], event["name"], event["args"], event["dangerous"]
         )
 
+    # Palabras clave que indican posible amenaza en resultados de herramientas
+    _THREAT_KEYWORDS = [
+        "mimikatz", "lsass", "credential", "sam dump", "hashdump",
+        "reverse shell", "meterpreter", "netcat", "powershell -enc",
+        "bypass amsi", "disable defender", "Add-MpPreference -ExclusionPath",
+        "wget http", "curl http", "invoke-expression", "iex(", "downloadstring",
+    ]
+
+    def _check_threat(self, result: dict, tool_name: str):
+        if not alert_sender.cloud_configured():
+            return
+        import json as _json
+        result_str = _json.dumps(result, ensure_ascii=False).lower()
+        hits = [k for k in self._THREAT_KEYWORDS if k.lower() in result_str]
+        if hits:
+            alert_sender.send_threat_alert(
+                title="🔴 CyberAgent — Amenaza detectada",
+                body=f"Tool: {tool_name} | Indicadores: {', '.join(hits[:3])}",
+            )
+
     def _on_tool_result(self, event: dict):
         self.chat.set_tool_result(event["id"], event["result"])
         pending = self._pending_tools.pop(event["id"], None)
@@ -498,17 +521,43 @@ class MainWindow(QMainWindow):
                 self.active_conv, pending["name"], pending["args"],
                 event["result"], approved=True,
             )
+            self._check_threat(event["result"], pending["name"])
 
     def _on_need_approval(self, event: dict):
-        pass  # ToolCard ya tiene los botones visibles
+        # ToolCard ya tiene los botones visibles en el chat.
+        # Además enviamos push notification al móvil si Cloud Run está configurado.
+        if alert_sender.cloud_configured():
+            token = alert_sender.request_approval(
+                event["id"], event["name"], event["args"]
+            )
+            if token:
+                poller = ApprovalPoller(event["id"], token)
+                poller.decided.connect(self._on_cloud_approval)
+                self._approval_pollers[event["id"]] = poller
+                poller.start()
+
+    def _on_cloud_approval(self, tool_id: str, approved: bool):
+        """Respuesta de aprobación que llegó desde el móvil vía Cloud Run."""
+        self._approval_pollers.pop(tool_id, None)
+        if approved:
+            self._on_tool_approved(tool_id, "", False)
+        else:
+            self._on_tool_rejected(tool_id)
 
     def _on_tool_approved(self, tool_id: str, tool_name: str, always: bool):
+        # Cancela el poller si el usuario aprobó desde la UI del PC
+        poller = self._approval_pollers.pop(tool_id, None)
+        if poller:
+            poller.stop()
         if always:
             self.trusted_tools.add(tool_name)
         if self.worker:
             self.worker.approve(True)
 
     def _on_tool_rejected(self, tool_id: str):
+        poller = self._approval_pollers.pop(tool_id, None)
+        if poller:
+            poller.stop()
         self.chat.set_tool_cancelled(tool_id)
         pending = self._pending_tools.pop(tool_id, None)
         if pending and self.active_conv:

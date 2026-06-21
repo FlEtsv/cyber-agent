@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080c0f">
+<title>CyberAgent — Notificaciones</title>
+<link rel="manifest" href="/static/manifest.json">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #080c0f;
+    color: #c9d1d9;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .card {
+    background: #0d1117;
+    border: 1px solid #1e2d3d;
+    border-radius: 12px;
+    padding: 32px 28px;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+  }
+  h1 { color: #00d9ff; font-size: 22px; letter-spacing: 2px; margin-bottom: 8px; }
+  .sub { color: #4a5568; font-size: 12px; margin-bottom: 28px; }
+  .status {
+    background: #080c0f;
+    border: 1px solid #1e2d3d;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+    color: #4a5568;
+    margin-bottom: 20px;
+    min-height: 48px;
+    text-align: left;
+  }
+  .status.ok  { border-color: #00ff88; color: #00ff88; }
+  .status.err { border-color: #ff4466; color: #ff4466; }
+  btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #00d9ff;
+    border-radius: 8px;
+    background: rgba(0,217,255,0.08);
+    color: #00d9ff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    transition: background .2s;
+  }
+  button { all: unset; display: block; width: 100%; padding: 14px;
+    border: 1px solid #00d9ff; border-radius: 8px;
+    background: rgba(0,217,255,0.08); color: #00d9ff;
+    font-family: inherit; font-size: 14px; font-weight: bold;
+    cursor: pointer; letter-spacing: 1px; margin-bottom: 12px;
+    text-align: center; }
+  button:hover  { background: rgba(0,217,255,0.18); }
+  button:disabled { border-color: #1e2d3d; color: #2a3a4a; cursor: default; background: transparent; }
+  .test-btn { border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.06); }
+  .test-btn:hover { background: rgba(0,255,136,0.14); }
+  .footer { margin-top: 20px; font-size: 11px; color: #2a3a4a; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚡ CYBERAGENT</h1>
+  <p class="sub">Panel de notificaciones push</p>
+  <div class="status" id="status">Iniciando servicio worker...</div>
+  <button id="sub-btn" onclick="subscribe()">🔔  Activar notificaciones</button>
+  <button class="test-btn" id="test-btn" onclick="testNotify()" disabled>
+    🧪  Enviar notificación de prueba
+  </button>
+  <p class="footer">Abre esta página una vez desde tu móvil para activar las alertas.</p>
+</div>
+
+<script>
+const VAPID_PUBLIC = "{{ vapid_public }}";
+let swReg = null;
+
+async function init() {
+  const st = document.getElementById('status');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    st.textContent = '✗ Tu browser no soporta push notifications.';
+    st.className = 'status err';
+    return;
+  }
+  try {
+    swReg = await navigator.serviceWorker.register('/static/sw.js');
+    await navigator.serviceWorker.ready;
+    const existing = await swReg.pushManager.getSubscription();
+    if (existing) {
+      await sendSubscription(existing);
+      st.textContent = '✓ Notificaciones activas.';
+      st.className = 'status ok';
+      document.getElementById('sub-btn').disabled = true;
+      document.getElementById('test-btn').disabled = false;
+    } else {
+      st.textContent = 'Pulsa el botón para activar notificaciones.';
+    }
+  } catch(e) {
+    st.textContent = '✗ Error: ' + e.message;
+    st.className = 'status err';
+  }
+}
+
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function subscribe() {
+  const st = document.getElementById('status');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') {
+    st.textContent = '✗ Permiso denegado.';
+    st.className = 'status err';
+    return;
+  }
+  try {
+    const sub = await swReg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+    });
+    await sendSubscription(sub);
+    st.textContent = '✓ Notificaciones activadas correctamente.';
+    st.className = 'status ok';
+    document.getElementById('sub-btn').disabled = true;
+    document.getElementById('test-btn').disabled = false;
+  } catch(e) {
+    st.textContent = '✗ Error al suscribir: ' + e.message;
+    st.className = 'status err';
+  }
+}
+
+async function sendSubscription(sub) {
+  await fetch('/subscribe', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(sub.toJSON()),
+  });
+}
+
+async function testNotify() {
+  const r = await fetch('/notify', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Secret': prompt('Secret:')},
+    body: JSON.stringify({
+      type: 'info',
+      title: '⚡ CyberAgent — Prueba',
+      body:  'Las notificaciones funcionan correctamente.',
+    }),
+  });
+  const d = await r.json();
+  document.getElementById('status').textContent = d.ok ? '✓ Notificación enviada.' : '✗ ' + JSON.stringify(d);
+}
+
+init();
+</script>
+</body>
+</html>
