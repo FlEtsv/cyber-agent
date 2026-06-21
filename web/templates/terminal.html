@@ -72,8 +72,12 @@ async function connect() {
   try {
     // Obtener token de un solo uso de Cloud Run → PC
     const tokenResp = await fetch('/api/terminal/token', { method: 'POST' });
-    if (!tokenResp.ok) throw new Error('No se pudo obtener token de terminal');
+    if (!tokenResp.ok) {
+      const err = await tokenResp.json().catch(() => ({}));
+      throw new Error(err.detail || `Error ${tokenResp.status} — PC no disponible o túnel no activo`);
+    }
     const { token, ws_url } = await tokenResp.json();
+    if (!ws_url) throw new Error('Túnel Cloudflare no registrado — arranca la app en el PC');
 
     const wsUrl = `${ws_url}/terminal?token=${token}`;
     const ws = new WebSocket(wsUrl);

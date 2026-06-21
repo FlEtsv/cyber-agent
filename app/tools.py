@@ -1,4 +1,4 @@
-import subprocess, os, json, shutil
+import subprocess, os, json, shutil, sys
 from datetime import datetime
 
 TOOLS_SCHEMA = [
@@ -269,7 +269,7 @@ def _run_python(code: str, timeout: int = 30) -> dict:
         tmp = f.name
     try:
         r = subprocess.run(
-            ["python", tmp],
+            [sys.executable, tmp],
             capture_output=True, text=True,
             timeout=timeout, encoding="utf-8", errors="replace",
         )
@@ -321,7 +321,7 @@ def _install_package(package: str, manager: str, version: str = "") -> dict:
         pkg = f"{package} --version {version}"
 
     cmds = {
-        "pip":    ["python", "-m", "pip", "install", "--upgrade", pkg],
+        "pip":    [sys.executable, "-m", "pip", "install", "--upgrade", pkg],
         "winget": ["winget", "install", "--id", package, "--accept-package-agreements",
                    "--accept-source-agreements", "-e"],
         "npm":    ["npm", "install", "-g", pkg],
@@ -353,7 +353,7 @@ def _install_package(package: str, manager: str, version: str = "") -> dict:
 
 def _uninstall_package(package: str, manager: str) -> dict:
     cmds = {
-        "pip":    ["python", "-m", "pip", "uninstall", "-y", package],
+        "pip":    [sys.executable, "-m", "pip", "uninstall", "-y", package],
         "winget": ["winget", "uninstall", "--id", package, "-e"],
         "npm":    ["npm", "uninstall", "-g", package],
         "choco":  ["choco", "uninstall", package, "-y"],
@@ -396,7 +396,7 @@ def _system_info(section: str = "all") -> dict:
         try:
             import psutil
             vm = psutil.virtual_memory()
-            disk = psutil.disk_usage("/")
+            disk = psutil.disk_usage(os.path.abspath(os.sep))
             result["hardware"] = {
                 "cpu_cores":    psutil.cpu_count(),
                 "cpu_percent":  psutil.cpu_percent(interval=1),

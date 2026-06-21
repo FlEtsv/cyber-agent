@@ -123,25 +123,27 @@ def main():
     except Exception as e:
         print(f"[api] No se pudo iniciar servidor: {e}")
 
-    # ── Cloudflare Tunnel ─────────────────────────────────────────────────
+    # ── Cloudflare Tunnel — en hilo separado para no bloquear la UI ──────
     def _start_tunnel():
-        try:
-            from app.api.tunnel import TunnelManager
-            tm = TunnelManager(local_port=8765)
-            url = tm.start(wait_secs=20)
-            if url:
-                print(f"[tunnel] ✓ {url}")
-                tray.showMessage(
-                    "CyberAgent — Túnel activo",
-                    f"Acceso web: {url}",
-                    QSystemTrayIcon.Information, 6000,
-                )
-            else:
-                print("[tunnel] cloudflared no disponible — instala con: winget install Cloudflare.cloudflared")
-        except Exception as e:
-            print(f"[tunnel] Error: {e}")
+        import threading
+        def _run():
+            try:
+                from app.api.tunnel import TunnelManager
+                tm = TunnelManager(local_port=8765)
+                url = tm.start(wait_secs=20)
+                if url:
+                    print(f"[tunnel] ✓ {url}")
+                    tray.showMessage(
+                        "CyberAgent — Túnel activo",
+                        f"Acceso web: {url}",
+                        QSystemTrayIcon.Information, 6000,
+                    )
+                else:
+                    print("[tunnel] cloudflared no disponible — instala: winget install Cloudflare.cloudflared")
+            except Exception as e:
+                print(f"[tunnel] Error: {e}")
+        threading.Thread(target=_run, daemon=True, name="tunnel-starter").start()
 
-    # Arrancar túnel 5 s después del inicio para no bloquear la UI
     QTimer.singleShot(5000, _start_tunnel)
 
     tray.show()

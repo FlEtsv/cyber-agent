@@ -78,6 +78,7 @@ class MainWindow(QMainWindow):
         self._update_local: str = ""
         self._update_remote: str = ""
         self._approval_pollers: dict[str, ApprovalPoller] = {}
+        self._threat_detectors: list = []
 
         self._build_ui()
         self._load_conversations()
@@ -495,13 +496,20 @@ class MainWindow(QMainWindow):
             event["id"], event["name"], event["args"], event["dangerous"]
         )
 
+    _SKIP_THREAT = {"read_file", "list_directory", "list_processes", "system_info"}
+
     def _check_threat(self, result: dict, tool_name: str):
+        if tool_name in self._SKIP_THREAT:
+            return
         from app.consciousness.threat_detector import ThreatDetector
         detector = ThreatDetector(tool_name, result, parent=self)
         detector.threat_found.connect(self._on_threat_found)
-        detector.start()
-        self._threat_detectors = getattr(self, "_threat_detectors", [])
+        detector.finished.connect(
+            lambda d=detector: self._threat_detectors.remove(d)
+            if d in self._threat_detectors else None
+        )
         self._threat_detectors.append(detector)
+        detector.start()
 
     def _on_threat_found(self, title: str, body: str, severity: str):
         if alert_sender.cloud_configured():

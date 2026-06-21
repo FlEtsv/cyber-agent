@@ -1,30 +1,34 @@
-import os
+import os, threading
 from app.rag.knowledge_base import get_all_documents
 
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "chroma")
 
 _collection = None
+_lock = threading.Lock()
 
 
 def _get_collection():
     global _collection
     if _collection is not None:
         return _collection
-    try:
-        import chromadb
-        from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
-        client = chromadb.PersistentClient(path=CHROMA_PATH)
-        ef = DefaultEmbeddingFunction()  # all-MiniLM-L6-v2 via onnxruntime, sin scipy
-        _collection = client.get_or_create_collection(
-            name="cyberagent_kb",
-            embedding_function=ef,
-            metadata={"hnsw:space": "cosine"},
-        )
-        if _collection.count() == 0:
-            _index_documents(_collection)
-    except Exception as e:
-        print(f"[RAG] ChromaDB init error: {e}")
-        _collection = None
+    with _lock:
+        if _collection is not None:  # double-check after acquiring lock
+            return _collection
+        try:
+            import chromadb
+            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+            client = chromadb.PersistentClient(path=CHROMA_PATH)
+            ef = DefaultEmbeddingFunction()  # all-MiniLM-L6-v2 via onnxruntime, sin scipy
+            _collection = client.get_or_create_collection(
+                name="cyberagent_kb",
+                embedding_function=ef,
+                metadata={"hnsw:space": "cosine"},
+            )
+            if _collection.count() == 0:
+                _index_documents(_collection)
+        except Exception as e:
+            print(f"[RAG] ChromaDB init error: {e}")
+            _collection = None
     return _collection
 
 

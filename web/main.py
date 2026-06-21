@@ -236,8 +236,8 @@ async def api_chat_stream(session_id: str):
                 f"{tunnel}/chat/{session_id}/stream",
                 headers={**_pc_headers(), "Accept": "text/event-stream"},
             ) as resp:
-                async for line in resp.aiter_lines():
-                    yield line + "\n"
+                async for chunk in resp.aiter_text():
+                    yield chunk
 
     return StreamingResponse(
         _proxy(),
