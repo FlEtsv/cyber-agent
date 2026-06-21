@@ -195,7 +195,10 @@ class AgentWorker(QThread):
                                 tool_calls_raw[idx] = {"name": "", "args_str": ""}
                             if fn.get("name"):
                                 tool_calls_raw[idx]["name"] = fn["name"]
-                            tool_calls_raw[idx]["args_str"] += fn.get("arguments", "")
+                            args = fn.get("arguments", "")
+                            if isinstance(args, dict):
+                                args = json.dumps(args, ensure_ascii=False)
+                            tool_calls_raw[idx]["args_str"] += args
 
                         if chunk.get("done"):
                             break
