@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Extract version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          Write-Host "Building version: $version"
+          [System.IO.File]::WriteAllText("version.txt", $version)
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build CyberAgent.exe
+        shell: pwsh
+        run: pyinstaller CyberAgent.spec --noconfirm
+
+      - name: Verify CyberAgent build
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\CyberAgent\CyberAgent.exe")) {
+            Write-Error "CyberAgent.exe not found — build failed"
+            exit 1
+          }
+          Write-Host "✓ CyberAgent.exe built successfully"
+
+      - name: Build CyberAgentInstaller.exe
+        shell: pwsh
+        run: |
+          Push-Location installer
+          pyinstaller CyberAgentInstaller.spec --noconfirm
+          Pop-Location
+
+      - name: Verify Installer build
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "installer\dist\CyberAgentInstaller\CyberAgentInstaller.exe")) {
+            Write-Error "CyberAgentInstaller.exe not found — build failed"
+            exit 1
+          }
+          Write-Host "✓ CyberAgentInstaller.exe built successfully"
+
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          $ver = "${{ env.VERSION }}"
+          Compress-Archive -Path dist\CyberAgent     -DestinationPath "CyberAgent-$ver-windows.zip"
+          Compress-Archive -Path installer\dist\CyberAgentInstaller -DestinationPath "CyberAgentInstaller-$ver-windows.zip"
+          Write-Host "✓ Packages created"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "CyberAgent v${{ env.VERSION }}"
+          body: |
+            ## CyberAgent v${{ env.VERSION }}
+
+            ### Instalación limpia
+            1. Descarga `CyberAgentInstaller-${{ env.VERSION }}-windows.zip`
+            2. Extrae la carpeta y ejecuta `CyberAgentInstaller.exe`
+            3. El instalador descarga y configura todo automáticamente
+
+            ### Actualización desde la app
+            La app detecta nuevas versiones en cada arranque y ofrece actualizar con un clic.
+
+            ### Requisitos
+            - Windows 10/11 x64
+            - **Ollama** corriendo en `localhost:11434`
+            - Modelo: `ollama pull cyber-coder:latest`
+
+          files: |
+            CyberAgent-${{ env.VERSION }}-windows.zip
+            CyberAgentInstaller-${{ env.VERSION }}-windows.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false

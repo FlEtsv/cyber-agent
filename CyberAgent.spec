@@ -1,100 +1,92 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""
-PyInstaller spec file para CyberAgent.
-Genera dist/CyberAgent/CyberAgent.exe con Python embebido.
-"""
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-datas     = []
-binaries  = []
+datas         = []
+binaries      = []
 hiddenimports = []
 
-# ── Recopilar PySide6 completo ─────────────────────────────────────────────
+# ── PySide6 completo ──────────────────────────────────────────────────────────
 for pkg in ('PySide6',):
     d, b, h = collect_all(pkg)
-    datas        += d
-    binaries     += b
-    hiddenimports += h
+    datas += d; binaries += b; hiddenimports += h
 
-# ── Otros paquetes ─────────────────────────────────────────────────────────
-for pkg in ('markdown', 'psutil', 'httpx', 'Pygments', 'certifi', 'httpcore', 'anyio', 'sniffio', 'h11', 'idna'):
+# ── Paquetes de red / misc ────────────────────────────────────────────────────
+for pkg in ('markdown', 'psutil', 'httpx', 'Pygments', 'certifi',
+            'httpcore', 'anyio', 'sniffio', 'h11', 'idna'):
     try:
         d, b, h = collect_all(pkg)
-        datas        += d
-        binaries     += b
-        hiddenimports += h
+        datas += d; binaries += b; hiddenimports += h
     except Exception:
         pass
 
-# ── Módulos de la app ──────────────────────────────────────────────────────
+# ── FastAPI / Uvicorn ─────────────────────────────────────────────────────────
+for pkg in ('fastapi', 'starlette', 'uvicorn'):
+    try:
+        d, b, h = collect_all(pkg)
+        datas += d; binaries += b; hiddenimports += h
+    except Exception:
+        pass
+
+# ── qrcode + Pillow ───────────────────────────────────────────────────────────
+for pkg in ('qrcode', 'PIL'):
+    try:
+        d, b, h = collect_all(pkg)
+        datas += d; binaries += b; hiddenimports += h
+    except Exception:
+        pass
+
+# ── Archivos de datos de la app ───────────────────────────────────────────────
+import os
+datas += [('version.txt', '.')]
+if os.path.isfile('cyber_agent.manifest'):
+    datas += [('cyber_agent.manifest', '.')]
+
+# ── Módulos de la app ─────────────────────────────────────────────────────────
 hiddenimports += [
-    'app',
-    'app.database',
-    'app.tools',
-    'app.ollama_client',
-    'app.styles',
-    'app.widgets',
-    'app.widgets.main_window',
-    'app.widgets.chat_panel',
-    'app.widgets.tool_card',
-    'app.widgets.terminal_panel',
-    'app.widgets.references_panel',
-    'app.rag',
-    'app.rag.knowledge_base',
-    'app.consciousness',
-    'app.consciousness.system_context',
+    # core
+    'app', 'app.database', 'app.tools', 'app.ollama_client',
+    'app.styles', 'app.autostart', 'app.updater',
+    # widgets
+    'app.widgets', 'app.widgets.main_window', 'app.widgets.chat_panel',
+    'app.widgets.tool_card', 'app.widgets.terminal_panel',
+    'app.widgets.references_panel', 'app.widgets.agent_panel',
+    'app.widgets.finetune_dialog', 'app.widgets.mobile_dialog',
+    'app.widgets.update_dialog',
+    # rag
+    'app.rag', 'app.rag.knowledge_base', 'app.rag.retriever',
+    # consciousness
+    'app.consciousness', 'app.consciousness.system_context',
+    'app.consciousness.decision_log', 'app.consciousness.threat_detector',
+    # api
+    'app.api', 'app.api.server', 'app.api.agent_runner',
+    'app.api.tunnel', 'app.api.alert_sender', 'app.api.approval_poller',
+    # finetune
+    'app.finetune', 'app.finetune.collector',
+    # uvicorn internals
+    'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto',
+    'uvicorn.loops.asyncio', 'uvicorn.protocols', 'uvicorn.protocols.http',
+    'uvicorn.protocols.http.auto', 'uvicorn.protocols.http.h11_impl',
+    'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto',
+    'uvicorn.protocols.websockets.websockets_impl',
+    'uvicorn.lifespan', 'uvicorn.lifespan.off', 'uvicorn.lifespan.on',
+    # qrcode
+    'qrcode', 'qrcode.image', 'qrcode.image.pil', 'qrcode.constants',
     # stdlib que PyInstaller a veces pierde
-    'sqlite3',
-    'json',
-    'subprocess',
-    'threading',
-    'socket',
-    'urllib.request',
-    'tempfile',
-    'pathlib',
-    'platform',
-    'shutil',
-    'datetime',
-    're',
-    'os',
+    'sqlite3', 'json', 'subprocess', 'threading', 'socket',
+    'urllib.request', 'tempfile', 'pathlib', 'platform',
+    'shutil', 'datetime', 're', 'os', 'winreg', 'ctypes',
+    'zipfile', 'webbrowser',
 ]
 
-# ── Excluir lo que NO necesitamos (reduce tamaño significativamente) ───────
+# ── Excluir paquetes pesados no necesarios ────────────────────────────────────
 excludes = [
-    'chromadb',
-    'sentence_transformers',
-    'torch',
-    'torchvision',
-    'torchaudio',
-    'numpy',
-    'scipy',
-    'sklearn',
-    'pandas',
-    'matplotlib',
-    'IPython',
-    'notebook',
-    'jupyter',
-    'sympy',
-    'networkx',
-    'tensorflow',
-    'keras',
-    'transformers',
-    'tokenizers',
-    'huggingface_hub',
-    'boto3',
-    'botocore',
-    'aws',
-    'google',
-    'azure',
-    'tk',
-    'tkinter',
-    'wx',
-    'gtk',
-    'PyQt5',
-    'PyQt6',
-    'test',
-    'tests',
-    'unittest',
+    'chromadb', 'sentence_transformers', 'torch', 'torchvision', 'torchaudio',
+    'numpy', 'scipy', 'sklearn', 'pandas', 'matplotlib',
+    'IPython', 'notebook', 'jupyter', 'sympy', 'networkx',
+    'tensorflow', 'keras', 'transformers', 'tokenizers', 'huggingface_hub',
+    'boto3', 'botocore', 'google', 'azure',
+    'tk', 'tkinter', 'wx', 'gtk', 'PyQt5', 'PyQt6',
+    'test', 'tests', 'unittest',
 ]
 
 a = Analysis(
@@ -126,7 +118,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     icon=None,
-    uac_admin=True,          # solicita permisos de Administrador en Windows
+    uac_admin=True,
     manifest='cyber_agent.manifest',
 )
 

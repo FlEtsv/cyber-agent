@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit,
+    QApplication,
 )
 from PySide6.QtCore import Qt
 
@@ -15,14 +16,16 @@ class UpdateDialog(QDialog):
     def __init__(self, local: str, remote_info: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle("🔄 Actualización disponible")
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(540)
         self.setStyleSheet(
             "QDialog { background: #080c0f; color: #c9d1d9; font-family: monospace; }"
         )
-        self._worker = None
+        self._worker  = None
+        self._zip     = None
         self._build(local, remote_info)
 
     def _build(self, local: str, remote_info: str):
+        from app.updater import is_frozen
         lay = QVBoxLayout(self)
         lay.setSpacing(10)
         lay.setContentsMargins(20, 20, 20, 16)
@@ -41,7 +44,7 @@ class UpdateDialog(QDialog):
 
         self.log = QTextEdit()
         self.log.setReadOnly(True)
-        self.log.setMinimumHeight(120)
+        self.log.setMinimumHeight(140)
         self.log.setStyleSheet(
             "background: #0d1117; border: 1px solid #1e2d3d; border-radius: 5px;"
             " color: #00ff88; font-family: monospace; font-size: 11px; padding: 6px;"
@@ -50,16 +53,17 @@ class UpdateDialog(QDialog):
 
         btn_row = QHBoxLayout()
 
-        self.update_btn = QPushButton("⬇  Actualizar ahora")
+        lbl = "⬇  Descargar e instalar" if is_frozen() else "⬇  Actualizar ahora"
+        self.update_btn = QPushButton(lbl)
         self.update_btn.setStyleSheet(_BTN.format(bg="#0d1a2d", border="#00d9ff"))
         self.update_btn.clicked.connect(self._do_update)
         btn_row.addWidget(self.update_btn)
 
-        self.restart_btn = QPushButton("🔁  Reiniciar")
-        self.restart_btn.setStyleSheet(_BTN.format(bg="#0d1a1a", border="#00ff88"))
-        self.restart_btn.setEnabled(False)
-        self.restart_btn.clicked.connect(self._restart)
-        btn_row.addWidget(self.restart_btn)
+        self.apply_btn = QPushButton("🔁  Aplicar y reiniciar")
+        self.apply_btn.setStyleSheet(_BTN.format(bg="#0d1a1a", border="#00ff88"))
+        self.apply_btn.setEnabled(False)
+        self.apply_btn.clicked.connect(self._apply_and_restart)
+        btn_row.addWidget(self.apply_btn)
 
         btn_row.addStretch()
 
@@ -75,25 +79,49 @@ class UpdateDialog(QDialog):
         lay.addLayout(btn_row)
 
     def _do_update(self):
-        from app.updater import Updater
+        from app.updater import is_frozen, Updater, ReleaseUpdater
         self.update_btn.setEnabled(False)
         self.log.clear()
-        self.log.append("Actualizando desde GitHub...")
-        self._worker = Updater()
-        self._worker.progress.connect(self.log.append)
-        self._worker.done.connect(self._on_done)
-        self._worker.failed.connect(self._on_failed)
+
+        if is_frozen():
+            self._worker = ReleaseUpdater()
+            self._worker.progress.connect(self._on_progress)
+            self._worker.ready.connect(self._on_zip_ready)
+            self._worker.failed.connect(self._on_failed)
+        else:
+            self._worker = Updater()
+            self._worker.progress.connect(self._on_progress)
+            self._worker.done.connect(self._on_source_done)
+            self._worker.failed.connect(self._on_failed)
+
         self._worker.start()
 
-    def _on_done(self, new_sha: str):
-        self.log.append(f"\n✓ Versión actualizada a: {new_sha}")
-        self.restart_btn.setEnabled(True)
+    def _on_progress(self, msg: str):
+        self.log.append(msg)
+        self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
+
+    def _on_zip_ready(self, zip_path: str):
+        self._zip = zip_path
+        self.log.append("\n✓ Descarga completada. Pulsa 'Aplicar y reiniciar' para instalar.")
+        self.apply_btn.setEnabled(True)
+
+    def _on_source_done(self, new_ver: str):
+        self.log.append(f"\n✓ Versión actualizada: {new_ver}")
+        self.apply_btn.setText("🔁  Reiniciar")
+        self.apply_btn.setEnabled(True)
+        self._zip = None
 
     def _on_failed(self, err: str):
         self.log.append(f"\n[ERROR]\n{err}")
-        self.log.append("\nIntenta manualmente: git pull origin master")
         self.update_btn.setEnabled(True)
 
-    def _restart(self):
-        from app.updater import restart
-        restart()
+    def _apply_and_restart(self):
+        from app.updater import is_frozen, apply_frozen_update, restart
+        self.apply_btn.setEnabled(False)
+        if is_frozen() and self._zip:
+            self.log.append("\nAplicando actualización y reiniciando...")
+            QApplication.processEvents()
+            apply_frozen_update(self._zip)
+            QApplication.quit()
+        else:
+            restart()
