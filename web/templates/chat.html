@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberAgent — Chat</title>
+<style>
+  :root { --bg:#080c0f; --panel:#0d1117; --border:#1e2d3d; --cyan:#00d9ff; --green:#00ff88; --red:#ff4466; --text:#c9d1d9; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; height:100dvh; display:flex; flex-direction:column; }
+  nav { background:var(--panel); border-bottom:1px solid var(--border); padding:10px 16px; display:flex; align-items:center; gap:12px; }
+  nav a { color:var(--text); text-decoration:none; padding:4px 10px; border-radius:4px; font-size:13px; }
+  nav a:hover, nav a.active { color:var(--cyan); border-bottom:2px solid var(--cyan); }
+  nav .logo { color:var(--cyan); font-weight:bold; font-size:16px; margin-right:auto; }
+  #messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .bubble { max-width:85%; padding:10px 14px; border-radius:10px; font-size:13px; line-height:1.5; word-break:break-word; white-space:pre-wrap; }
+  .bubble.user { align-self:flex-end; background:#1e2d3d; color:var(--text); border:1px solid var(--border); }
+  .bubble.assistant { align-self:flex-start; background:var(--panel); color:var(--text); border:1px solid var(--border); }
+  .bubble.tool { align-self:flex-start; background:#0a1628; border:1px solid var(--cyan); color:var(--cyan); font-size:12px; max-width:90%; }
+  .bubble.error { align-self:flex-start; background:#1a0a0a; border:1px solid var(--red); color:var(--red); }
+  .tool-header { font-weight:bold; margin-bottom:4px; }
+  .approve-row { display:flex; gap:8px; margin-top:8px; }
+  .approve-row button { padding:4px 14px; border-radius:4px; border:none; cursor:pointer; font-size:12px; font-family:inherit; }
+  .btn-approve { background:var(--green); color:#000; }
+  .btn-reject  { background:var(--red);   color:#fff; }
+  #input-area { background:var(--panel); border-top:1px solid var(--border); padding:12px 16px; display:flex; gap:10px; }
+  #input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:10px 12px; font-family:inherit; font-size:13px; resize:none; min-height:44px; max-height:120px; }
+  #input:focus { outline:none; border-color:var(--cyan); }
+  #send-btn { background:var(--cyan); color:#000; border:none; border-radius:6px; padding:10px 20px; font-weight:bold; font-size:13px; cursor:pointer; font-family:inherit; }
+  #send-btn:disabled { opacity:0.4; cursor:default; }
+  .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; background:var(--green); margin-right:4px; }
+  .status-dot.thinking { background:var(--cyan); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  ::-webkit-scrollbar { width:6px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="logo">⚡ CYBER AGENT</span>
+  <a href="/">🔔 Notificaciones</a>
+  <a href="/chat" class="active">💬 Chat</a>
+  <a href="/terminal">⚡ Terminal</a>
+  <span id="status-indicator"><span class="status-dot" id="status-dot"></span><span id="status-text">conectado</span></span>
+</nav>
+
+<div id="messages"></div>
+
+<div id="input-area">
+  <textarea id="input" placeholder="Escribe al agente... (Enter envía · Shift+Enter nueva línea)" rows="1"></textarea>
+  <button id="send-btn">Enviar →</button>
+</div>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const inputEl    = document.getElementById('input');
+const sendBtn    = document.getElementById('send-btn');
+const statusDot  = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+
+let messages = [];         // historial
+let sessionId = null;      // sesión actual
+let streaming = false;
+let pendingTools = {};     // tool_id → {session_id, bubble}
+
+function scrollBottom() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addBubble(role, text='') {
+  const div = document.createElement('div');
+  div.className = `bubble ${role}`;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addToolBubble(tool_id, name, args, dangerous) {
+  const div = document.createElement('div');
+  div.className = 'bubble tool';
+  const argsStr = JSON.stringify(args, null, 2);
+  div.innerHTML = `<div class="tool-header">${dangerous ? '⚠️' : '🔧'} ${name}</div><pre style="font-size:11px;color:#aaa;max-height:120px;overflow:auto">${escHtml(argsStr)}</pre>`;
+  if (dangerous) {
+    const row = document.createElement('div');
+    row.className = 'approve-row';
+    const appBtn = document.createElement('button');
+    appBtn.className = 'btn-approve'; appBtn.textContent = '✓ Aprobar';
+    const rejBtn = document.createElement('button');
+    rejBtn.className = 'btn-reject'; rejBtn.textContent = '✗ Rechazar';
+    appBtn.onclick = () => { approveTool(tool_id, true);  row.remove(); };
+    rejBtn.onclick = () => { approveTool(tool_id, false); row.remove(); };
+    row.appendChild(appBtn); row.appendChild(rejBtn);
+    div.appendChild(row);
+  }
+  messagesEl.appendChild(div);
+  scrollBottom();
+  pendingTools[tool_id] = { bubble: div };
+  return div;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function approveTool(tool_id, approved) {
+  if (!sessionId) return;
+  await fetch(`/api/chat/${sessionId}/approve/${tool_id}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({approved}),
+  });
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text || streaming) return;
+  inputEl.value = '';
+  streaming = true;
+  sendBtn.disabled = true;
+  statusDot.className = 'status-dot thinking';
+  statusText.textContent = 'pensando...';
+
+  messages.push({role: 'user', content: text});
+  addBubble('user', text);
+
+  try {
+    // 1. Iniciar sesión
+    const startResp = await fetch('/api/chat/start', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({messages}),
+    });
+    if (!startResp.ok) throw new Error(`Error ${startResp.status}`);
+    const {session_id} = await startResp.json();
+    sessionId = session_id;
+
+    // 2. SSE stream
+    const es = new EventSource(`/api/chat/${session_id}/stream`);
+    let assistantBubble = null;
+    let fullResponse    = '';
+
+    es.onmessage = (e) => {
+      const evt = JSON.parse(e.data);
+      if (evt.type === 'token') {
+        if (!assistantBubble) assistantBubble = addBubble('assistant');
+        fullResponse += evt.data;
+        assistantBubble.textContent = fullResponse;
+        scrollBottom();
+      } else if (evt.type === 'tool_call') {
+        const d = evt.data;
+        addToolBubble(d.id, d.name, d.args, d.dangerous);
+      } else if (evt.type === 'tool_result') {
+        const tb = pendingTools[evt.data.id]?.bubble;
+        if (tb) {
+          const res = evt.data.result;
+          const preview = JSON.stringify(res, null, 1).slice(0, 200);
+          const p = document.createElement('div');
+          p.style.cssText = 'font-size:11px;color:#00ff88;margin-top:4px;opacity:0.8';
+          p.textContent = '↳ ' + preview;
+          tb.appendChild(p);
+        }
+      } else if (evt.type === 'need_approval') {
+        statusText.textContent = '⏳ esperando aprobación...';
+      } else if (evt.type === 'done') {
+        es.close();
+        if (fullResponse) messages.push({role:'assistant', content: fullResponse});
+        _endStreaming();
+      } else if (evt.type === 'error') {
+        es.close();
+        addBubble('error', '❌ ' + evt.data);
+        _endStreaming();
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      _endStreaming();
+    };
+
+  } catch(err) {
+    addBubble('error', '❌ ' + err.message);
+    _endStreaming();
+  }
+}
+
+function _endStreaming() {
+  streaming = false;
+  sendBtn.disabled = false;
+  statusDot.className = 'status-dot';
+  statusText.textContent = 'conectado';
+  pendingTools = {};
+  sessionId = null;
+}
+
+// Enter envía, Shift+Enter nueva línea
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+// Auto-resize textarea
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+});
+
+// Saludo inicial
+addBubble('assistant', '⚡ CyberAgent listo. ¿Qué necesitas?');
+</script>
+</body>
+</html>

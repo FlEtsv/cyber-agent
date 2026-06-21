@@ -18,20 +18,24 @@ from app.database import init_db
 from app.widgets.main_window import MainWindow
 from app.updater import UpdateChecker
 
-def make_tray_icon():
+
+def _make_icon(alert: bool = False) -> QIcon:
+    """Icono de tray — azul normal, rojo pulsante cuando hay aprobación pendiente."""
     pix = QPixmap(32, 32)
     pix.fill(Qt.transparent)
-    painter = QPainter(pix)
-    painter.setRenderHint(QPainter.Antialiasing)
-    painter.setBrush(QColor("#00d9ff"))
-    painter.setPen(Qt.NoPen)
-    painter.drawEllipse(4, 4, 24, 24)
-    painter.setPen(QColor("#080c0f"))
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    color = QColor("#ff4466") if alert else QColor("#00d9ff")
+    p.setBrush(color)
+    p.setPen(Qt.NoPen)
+    p.drawEllipse(4, 4, 24, 24)
+    p.setPen(QColor("#080c0f"))
     f = QFont("Arial", 14, QFont.Bold)
-    painter.setFont(f)
-    painter.drawText(pix.rect(), Qt.AlignCenter, "⚡")
-    painter.end()
+    p.setFont(f)
+    p.drawText(pix.rect(), Qt.AlignCenter, "⚡")
+    p.end()
     return QIcon(pix)
+
 
 def main():
     app = QApplication(sys.argv)
@@ -44,9 +48,11 @@ def main():
     window = MainWindow()
     window.show()
 
-    # System tray
-    icon = make_tray_icon()
-    tray = QSystemTrayIcon(icon, app)
+    # ── Tray ──────────────────────────────────────────────────────────────
+    _icon_normal = _make_icon(False)
+    _icon_alert  = _make_icon(True)
+
+    tray = QSystemTrayIcon(_icon_normal, app)
     tray.setToolTip("CyberAgent — activo")
 
     menu = QMenu()
@@ -56,14 +62,36 @@ def main():
     quit_action   = menu.addAction("Salir")
     tray.setContextMenu(menu)
 
-    show_action.triggered.connect(lambda: window.hide() if window.isVisible() else window.show())
+    show_action.triggered.connect(
+        lambda: window.hide() if window.isVisible() else window.show()
+    )
     quit_action.triggered.connect(app.quit)
     tray.activated.connect(lambda reason: (
         window.hide() if window.isVisible() else window.show()
     ) if reason == QSystemTrayIcon.Trigger else None)
 
-    # ── Auto-updater ──────────────────────────────────────────────────
-    _checker: list = []  # keep reference alive
+    # ── Icono dinámico ─────────────────────────────────────────────────────
+    _blink_timer = QTimer()
+    _blink_state = [False]
+
+    def _set_tray_alert(pending: bool):
+        if pending:
+            _blink_timer.start(700)
+            tray.setToolTip("CyberAgent — ⚠️ Aprobación pendiente")
+        else:
+            _blink_timer.stop()
+            tray.setIcon(_icon_normal)
+            tray.setToolTip("CyberAgent — activo")
+
+    def _blink():
+        _blink_state[0] = not _blink_state[0]
+        tray.setIcon(_icon_alert if _blink_state[0] else _icon_normal)
+
+    _blink_timer.timeout.connect(_blink)
+    window.notification_pending.connect(_set_tray_alert)
+
+    # ── Auto-updater ──────────────────────────────────────────────────────
+    _checker: list = []
 
     def _run_checker():
         checker = UpdateChecker()
@@ -82,15 +110,43 @@ def main():
         checker.start()
 
     update_action.triggered.connect(_run_checker)
-
-    # Check on startup after 3 s, then every 30 min
     QTimer.singleShot(3000, _run_checker)
     periodic = QTimer()
     periodic.timeout.connect(_run_checker)
     periodic.start(30 * 60 * 1000)
 
+    # ── Servidor API local ────────────────────────────────────────────────
+    try:
+        from app.api.server import start_server
+        start_server(port=8765)
+        print("[api] Servidor local iniciado en localhost:8765")
+    except Exception as e:
+        print(f"[api] No se pudo iniciar servidor: {e}")
+
+    # ── Cloudflare Tunnel ─────────────────────────────────────────────────
+    def _start_tunnel():
+        try:
+            from app.api.tunnel import TunnelManager
+            tm = TunnelManager(local_port=8765)
+            url = tm.start(wait_secs=20)
+            if url:
+                print(f"[tunnel] ✓ {url}")
+                tray.showMessage(
+                    "CyberAgent — Túnel activo",
+                    f"Acceso web: {url}",
+                    QSystemTrayIcon.Information, 6000,
+                )
+            else:
+                print("[tunnel] cloudflared no disponible — instala con: winget install Cloudflare.cloudflared")
+        except Exception as e:
+            print(f"[tunnel] Error: {e}")
+
+    # Arrancar túnel 5 s después del inicio para no bloquear la UI
+    QTimer.singleShot(5000, _start_tunnel)
+
     tray.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

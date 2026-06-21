@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QTextEdit, QSizePolicy, QStackedWidget,
     QFrame,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 
 from .chat_panel import ChatPanel
@@ -52,6 +52,8 @@ TOOL_ICONS = {
 
 
 class MainWindow(QMainWindow):
+    notification_pending = Signal(bool)  # True = hay aprobación pendiente
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("⚡ CyberAgent")
@@ -493,25 +495,17 @@ class MainWindow(QMainWindow):
             event["id"], event["name"], event["args"], event["dangerous"]
         )
 
-    # Palabras clave que indican posible amenaza en resultados de herramientas
-    _THREAT_KEYWORDS = [
-        "mimikatz", "lsass", "credential", "sam dump", "hashdump",
-        "reverse shell", "meterpreter", "netcat", "powershell -enc",
-        "bypass amsi", "disable defender", "Add-MpPreference -ExclusionPath",
-        "wget http", "curl http", "invoke-expression", "iex(", "downloadstring",
-    ]
-
     def _check_threat(self, result: dict, tool_name: str):
-        if not alert_sender.cloud_configured():
-            return
-        import json as _json
-        result_str = _json.dumps(result, ensure_ascii=False).lower()
-        hits = [k for k in self._THREAT_KEYWORDS if k.lower() in result_str]
-        if hits:
-            alert_sender.send_threat_alert(
-                title="🔴 CyberAgent — Amenaza detectada",
-                body=f"Tool: {tool_name} | Indicadores: {', '.join(hits[:3])}",
-            )
+        from app.consciousness.threat_detector import ThreatDetector
+        detector = ThreatDetector(tool_name, result, parent=self)
+        detector.threat_found.connect(self._on_threat_found)
+        detector.start()
+        self._threat_detectors = getattr(self, "_threat_detectors", [])
+        self._threat_detectors.append(detector)
+
+    def _on_threat_found(self, title: str, body: str, severity: str):
+        if alert_sender.cloud_configured():
+            alert_sender.send_threat_alert(title=title, body=body)
 
     def _on_tool_result(self, event: dict):
         self.chat.set_tool_result(event["id"], event["result"])
@@ -524,6 +518,7 @@ class MainWindow(QMainWindow):
             self._check_threat(event["result"], pending["name"])
 
     def _on_need_approval(self, event: dict):
+        self.notification_pending.emit(True)
         # ToolCard ya tiene los botones visibles en el chat.
         # Además enviamos push notification al móvil si Cloud Run está configurado.
         if alert_sender.cloud_configured():
@@ -545,10 +540,11 @@ class MainWindow(QMainWindow):
             self._on_tool_rejected(tool_id)
 
     def _on_tool_approved(self, tool_id: str, tool_name: str, always: bool):
-        # Cancela el poller si el usuario aprobó desde la UI del PC
         poller = self._approval_pollers.pop(tool_id, None)
         if poller:
             poller.stop()
+        if not self._approval_pollers:
+            self.notification_pending.emit(False)
         if always:
             self.trusted_tools.add(tool_name)
         if self.worker:
@@ -558,6 +554,8 @@ class MainWindow(QMainWindow):
         poller = self._approval_pollers.pop(tool_id, None)
         if poller:
             poller.stop()
+        if not self._approval_pollers:
+            self.notification_pending.emit(False)
         self.chat.set_tool_cancelled(tool_id)
         pending = self._pending_tools.pop(tool_id, None)
         if pending and self.active_conv:

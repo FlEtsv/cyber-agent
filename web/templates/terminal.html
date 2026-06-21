@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberAgent — Terminal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"/>
+<style>
+  :root { --bg:#080c0f; --panel:#0d1117; --border:#1e2d3d; --cyan:#00d9ff; --green:#00ff88; --red:#ff4466; --text:#c9d1d9; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; height:100dvh; display:flex; flex-direction:column; }
+  nav { background:var(--panel); border-bottom:1px solid var(--border); padding:10px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+  nav a { color:var(--text); text-decoration:none; padding:4px 10px; border-radius:4px; font-size:13px; }
+  nav a:hover, nav a.active { color:var(--cyan); border-bottom:2px solid var(--cyan); }
+  nav .logo { color:var(--cyan); font-weight:bold; font-size:16px; margin-right:auto; }
+  #status-bar { background:#0a1628; border-bottom:1px solid var(--border); padding:4px 16px; font-size:12px; color:var(--cyan); flex-shrink:0; }
+  #terminal-container { flex:1; overflow:hidden; padding:8px; }
+  .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; }
+  .status-dot.connected  { background:var(--green); }
+  .status-dot.connecting { background:var(--cyan); animation:pulse 1s infinite; }
+  .status-dot.error      { background:var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
+</head>
+<body>
+<nav>
+  <span class="logo">⚡ CYBER AGENT</span>
+  <a href="/">🔔 Notificaciones</a>
+  <a href="/chat">💬 Chat</a>
+  <a href="/terminal" class="active">⚡ Terminal</a>
+</nav>
+<div id="status-bar">
+  <span class="status-dot connecting" id="status-dot"></span>
+  <span id="status-text">Conectando al PC...</span>
+</div>
+<div id="terminal-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<script>
+const statusDot  = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+
+const term = new Terminal({
+  theme: {
+    background: '#080c0f',
+    foreground: '#c9d1d9',
+    cursor:     '#00d9ff',
+    selection:  '#1e2d3d',
+    black:      '#080c0f',
+    brightBlack:'#4a5568',
+    cyan:       '#00d9ff',
+    green:      '#00ff88',
+    red:        '#ff4466',
+    yellow:     '#ffd700',
+    white:      '#c9d1d9',
+  },
+  fontFamily: "'Courier New', monospace",
+  fontSize: 14,
+  cursorBlink: true,
+  allowTransparency: false,
+  scrollback: 5000,
+});
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal-container'));
+fitAddon.fit();
+
+window.addEventListener('resize', () => fitAddon.fit());
+
+async function connect() {
+  try {
+    // Obtener token de un solo uso de Cloud Run → PC
+    const tokenResp = await fetch('/api/terminal/token', { method: 'POST' });
+    if (!tokenResp.ok) throw new Error('No se pudo obtener token de terminal');
+    const { token, ws_url } = await tokenResp.json();
+
+    const wsUrl = `${ws_url}/terminal?token=${token}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      statusDot.className = 'status-dot connected';
+      statusText.textContent = 'Conectado al PC · PowerShell';
+      term.write('\x1b[32m✓ Terminal conectada al PC\x1b[0m\r\n');
+    };
+
+    ws.onmessage = (e) => term.write(e.data);
+
+    ws.onclose = (e) => {
+      statusDot.className = 'status-dot error';
+      statusText.textContent = `Desconectado (${e.code}) — recargando en 5s...`;
+      term.write('\r\n\x1b[31m× Conexión cerrada. Reconectando...\x1b[0m\r\n');
+      setTimeout(connect, 5000);
+    };
+
+    ws.onerror = () => {
+      statusDot.className = 'status-dot error';
+      statusText.textContent = 'Error de conexión';
+    };
+
+    term.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+      }
+    });
+
+  } catch (err) {
+    statusDot.className = 'status-dot error';
+    statusText.textContent = 'Error: ' + err.message;
+    term.write(`\r\n\x1b[31m× ${err.message}\x1b[0m\r\n`);
+    setTimeout(connect, 8000);
+  }
+}
+
+connect();
+</script>
+</body>
+</html>

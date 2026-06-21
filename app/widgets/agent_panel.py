@@ -230,14 +230,24 @@ class DecisionLogPanel(QWidget):
         hdr_row = QHBoxLayout()
         hdr_row.addWidget(_hdr("📊 Decision Log — herramientas usadas"))
         hdr_row.addStretch()
+
+        _btn_style = (
+            "QPushButton { background: transparent; border: 1px solid #1e2d3d;"
+            " border-radius: 4px; color: #4a5568; font-size: 11px; padding: 0 6px; }"
+            "QPushButton:hover { border-color: #00d9ff; color: #00d9ff; }"
+        )
+
+        csv_btn = QPushButton("📥 CSV")
+        csv_btn.setFixedHeight(24)
+        csv_btn.setToolTip("Exportar a CSV")
+        csv_btn.setStyleSheet(_btn_style)
+        csv_btn.clicked.connect(self._export_csv)
+        hdr_row.addWidget(csv_btn)
+
         refresh_btn = QPushButton("🔄")
         refresh_btn.setFixedSize(28, 24)
         refresh_btn.setToolTip("Actualizar")
-        refresh_btn.setStyleSheet(
-            "QPushButton { background: transparent; border: 1px solid #1e2d3d;"
-            " border-radius: 4px; color: #4a5568; }"
-            "QPushButton:hover { border-color: #00d9ff; color: #00d9ff; }"
-        )
+        refresh_btn.setStyleSheet(_btn_style)
         refresh_btn.clicked.connect(self.refresh)
         hdr_row.addWidget(refresh_btn)
         lay.addLayout(hdr_row)
@@ -326,6 +336,41 @@ class DecisionLogPanel(QWidget):
             self.table.scrollToBottom()
         except Exception as e:
             self.stat_lbl.setText(f"Error cargando log: {e}")
+
+    def _export_csv(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        import csv, json as _json
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar Decision Log", "decision_log.csv",
+            "CSV (*.csv);;Todos (*)",
+        )
+        if not path:
+            return
+        try:
+            from app.consciousness.decision_log import get_recent_decisions
+            rows = get_recent_decisions(limit=10000)
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["id", "tool_name", "args", "result", "approved", "created_at"])
+                for r in rows:
+                    try:
+                        args = _json.loads(r.get("args_json") or "{}")
+                        args_str = _json.dumps(args, ensure_ascii=False)
+                    except Exception:
+                        args_str = r.get("args_json", "")
+                    try:
+                        res = _json.loads(r.get("result_json") or "{}")
+                        res_str = _json.dumps(res, ensure_ascii=False)
+                    except Exception:
+                        res_str = r.get("result_json", "")
+                    w.writerow([
+                        r.get("id"), r.get("tool_name"), args_str,
+                        res_str, r.get("approved", 0), r.get("created_at", ""),
+                    ])
+            QMessageBox.information(self, "Exportado", f"{len(rows)} entradas → {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
 
 # ══════════════════════════════════════════════════════════════════════════
