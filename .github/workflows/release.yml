@@ -48,7 +48,7 @@ jobs:
           }
           Write-Host "✓ CyberAgent.exe built successfully"
 
-      - name: Build CyberAgentInstaller.exe
+      - name: Build CyberAgentInstaller.exe (onefile)
         shell: pwsh
         run: |
           Push-Location installer
@@ -58,19 +58,22 @@ jobs:
       - name: Verify Installer build
         shell: pwsh
         run: |
-          if (-not (Test-Path "installer\dist\CyberAgentInstaller\CyberAgentInstaller.exe")) {
+          if (-not (Test-Path "installer\dist\CyberAgentInstaller.exe")) {
             Write-Error "CyberAgentInstaller.exe not found — build failed"
             exit 1
           }
-          Write-Host "✓ CyberAgentInstaller.exe built successfully"
+          $size = [math]::Round((Get-Item "installer\dist\CyberAgentInstaller.exe").Length / 1MB, 1)
+          Write-Host "✓ CyberAgentInstaller.exe built ($size MB)"
 
       - name: Package artifacts
         shell: pwsh
         run: |
           $ver = "${{ env.VERSION }}"
-          Compress-Archive -Path dist\CyberAgent     -DestinationPath "CyberAgent-$ver-windows.zip"
-          Compress-Archive -Path installer\dist\CyberAgentInstaller -DestinationPath "CyberAgentInstaller-$ver-windows.zip"
-          Write-Host "✓ Packages created"
+          # Agente principal (directorio → zip)
+          Compress-Archive -Path dist\CyberAgent -DestinationPath "CyberAgent-$ver-windows.zip"
+          # Instalador: un solo exe, se publica directo
+          Copy-Item "installer\dist\CyberAgentInstaller.exe" "CyberAgentInstaller-$ver.exe"
+          Write-Host "✓ Packages ready"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -80,22 +83,21 @@ jobs:
           body: |
             ## CyberAgent v${{ env.VERSION }}
 
-            ### Instalación limpia
-            1. Descarga `CyberAgentInstaller-${{ env.VERSION }}-windows.zip`
-            2. Extrae la carpeta y ejecuta `CyberAgentInstaller.exe`
-            3. El instalador descarga y configura todo automáticamente
+            ### Instalación
+            1. Descarga **`CyberAgentInstaller-${{ env.VERSION }}.exe`** — un solo archivo
+            2. Ejecútalo (pide permisos de administrador automáticamente)
+            3. El instalador descarga e instala CyberAgent, configura Ollama y crea el acceso directo
 
-            ### Actualización desde la app
-            La app detecta nuevas versiones en cada arranque y ofrece actualizar con un clic.
+            ### Actualización automática
+            La app detecta nuevas versiones en cada arranque y actualiza con un clic desde la bandeja del sistema.
 
             ### Requisitos
             - Windows 10/11 x64
-            - **Ollama** corriendo en `localhost:11434`
-            - Modelo: `ollama pull cyber-coder:latest`
+            - Sin dependencias adicionales — el instalador lo gestiona todo
 
           files: |
             CyberAgent-${{ env.VERSION }}-windows.zip
-            CyberAgentInstaller-${{ env.VERSION }}-windows.zip
+            CyberAgentInstaller-${{ env.VERSION }}.exe
           generate_release_notes: true
           draft: false
           prerelease: false
