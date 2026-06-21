@@ -9,8 +9,13 @@ from PySide6.QtGui import QKeyEvent
 from .chat_panel import ChatPanel
 from .terminal_panel import TerminalPanel
 from .references_panel import ReferencesDialog
+from .agent_panel import AgentPanel
+from .finetune_dialog import FineTuneDialog
+from .update_dialog import UpdateDialog
 from app.ollama_client import AgentWorker, OLLAMA_MODEL, SYSTEM_PROMPT
 from app.consciousness.system_context import build_system_prompt
+from app.consciousness import decision_log
+from app.finetune import collector
 from app import database as db
 
 # ── Default permission levels per tool ────────────────────────────────────
@@ -63,6 +68,11 @@ class MainWindow(QMainWindow):
         self._perm_btns: dict[str, QPushButton] = {}
 
         self._refs_dialog: ReferencesDialog | None = None
+        self._ft_dialog: FineTuneDialog | None = None
+        self._update_dialog: UpdateDialog | None = None
+        self._pending_tools: dict[str, dict] = {}  # tool_id -> {name, args}
+        self._update_local: str = ""
+        self._update_remote: str = ""
 
         self._build_ui()
         self._load_conversations()
@@ -168,8 +178,20 @@ class MainWindow(QMainWindow):
         refs_btn.clicked.connect(self._open_references)
         lay.addWidget(refs_btn)
 
+        export_btn = QPushButton("📤  Exportar dataset")
+        export_btn.setObjectName("btn_refs")
+        export_btn.clicked.connect(self._export_finetune)
+        lay.addWidget(export_btn)
+
+        ft_btn = QPushButton("🎓  Fine-tuning QLoRA")
+        ft_btn.setObjectName("btn_refs")
+        ft_btn.clicked.connect(self._open_finetune)
+        lay.addWidget(ft_btn)
+
         self.status_lbl = QLabel("● daemon activo · localhost:11434")
         self.status_lbl.setObjectName("status_bar")
+        self.status_lbl.setCursor(Qt.PointingHandCursor)
+        self.status_lbl.mousePressEvent = self._on_status_click
         lay.addWidget(self.status_lbl)
 
         return sidebar
@@ -202,8 +224,15 @@ class MainWindow(QMainWindow):
         self.tab_terminal.setChecked(False)
         self.tab_terminal.clicked.connect(lambda: self._switch_tab(1))
 
+        self.tab_agent = QPushButton("🧠  Agente")
+        self.tab_agent.setObjectName("tab_btn")
+        self.tab_agent.setCheckable(True)
+        self.tab_agent.setChecked(False)
+        self.tab_agent.clicked.connect(lambda: self._switch_tab(2))
+
         tlay.addWidget(self.tab_chat)
         tlay.addWidget(self.tab_terminal)
+        tlay.addWidget(self.tab_agent)
         tlay.addStretch()
 
         self.model_status = QLabel("● modelo listo")
@@ -228,6 +257,10 @@ class MainWindow(QMainWindow):
         self.terminal = TerminalPanel()
         self.stack.addWidget(self.terminal)
 
+        # Page 2: Agent panel (RAG + Decision Log)
+        self.agent_panel = AgentPanel()
+        self.stack.addWidget(self.agent_panel)
+
         lay.addWidget(self.stack, 1)
         return container
 
@@ -241,6 +274,7 @@ class MainWindow(QMainWindow):
         self.chat = ChatPanel()
         self.chat.tool_approved.connect(self._on_tool_approved)
         self.chat.tool_rejected.connect(self._on_tool_rejected)
+        self.chat.message_rated.connect(self._on_message_rated)
         lay.addWidget(self.chat, 1)
 
         # Input bar
@@ -305,10 +339,12 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(idx)
         self.tab_chat.setChecked(idx == 0)
         self.tab_terminal.setChecked(idx == 1)
-        self.tab_chat.setObjectName("tab_btn_active" if idx == 0 else "tab_btn")
-        self.tab_terminal.setObjectName("tab_btn_active" if idx == 1 else "tab_btn")
-        self.tab_chat.setStyle(self.tab_chat.style())
-        self.tab_terminal.setStyle(self.tab_terminal.style())
+        self.tab_agent.setChecked(idx == 2)
+        for i, btn in enumerate([self.tab_chat, self.tab_terminal, self.tab_agent]):
+            btn.setObjectName("tab_btn_active" if i == idx else "tab_btn")
+            btn.setStyle(btn.style())
+        if idx == 2:
+            self.agent_panel.refresh_log()
 
     # ════════════════════════════════════════════════════════════════════
     # PERMISSIONS
@@ -366,7 +402,7 @@ class MainWindow(QMainWindow):
             return
         self.active_conv = self._convs[row]["id"]
         msgs = db.get_messages(self.active_conv)
-        self.chat.load_messages(msgs)
+        self.chat.load_messages(msgs, conv_id=self.active_conv)
 
     def _new_conversation(self):
         conv_id = db.create_conversation()
@@ -449,12 +485,19 @@ class MainWindow(QMainWindow):
         self.chat.append_token(token)
 
     def _on_tool_call(self, event: dict):
+        self._pending_tools[event["id"]] = {"name": event["name"], "args": event["args"]}
         self.chat.add_tool_card(
             event["id"], event["name"], event["args"], event["dangerous"]
         )
 
     def _on_tool_result(self, event: dict):
         self.chat.set_tool_result(event["id"], event["result"])
+        pending = self._pending_tools.pop(event["id"], None)
+        if pending and self.active_conv:
+            decision_log.log_decision(
+                self.active_conv, pending["name"], pending["args"],
+                event["result"], approved=True,
+            )
 
     def _on_need_approval(self, event: dict):
         pass  # ToolCard ya tiene los botones visibles
@@ -467,14 +510,21 @@ class MainWindow(QMainWindow):
 
     def _on_tool_rejected(self, tool_id: str):
         self.chat.set_tool_cancelled(tool_id)
+        pending = self._pending_tools.pop(tool_id, None)
+        if pending and self.active_conv:
+            decision_log.log_decision(
+                self.active_conv, pending["name"], pending["args"],
+                {}, approved=False,
+            )
         if self.worker:
             self.worker.approve(False)
 
     def _on_finished(self, full: str):
-        self.chat.finish_streaming()
-        self._response_bubble = None
+        msg_id = None
         if full and self.active_conv:
-            db.save_message(self.active_conv, "assistant", full)
+            msg_id = db.save_message(self.active_conv, "assistant", full)
+        self.chat.finish_streaming(msg_id=msg_id, conv_id=self.active_conv)
+        self._response_bubble = None
         self._end_streaming()
         self._load_conversations()
         self.model_status.setText("● modelo listo")
@@ -508,3 +558,74 @@ class MainWindow(QMainWindow):
         else:
             self.trust_btn.setText("🛡  Supervisado")
             self.trusted_tools.clear()
+
+    # ════════════════════════════════════════════════════════════════════
+    # RATING & FINE-TUNE
+    # ════════════════════════════════════════════════════════════════════
+
+    # ════════════════════════════════════════════════════════════════════
+    # AUTO-UPDATE
+    # ════════════════════════════════════════════════════════════════════
+
+    def notify_update_available(self, local: str, remote_info: str):
+        self._update_local  = local
+        self._update_remote = remote_info
+        self.status_lbl.setText("🔄  Actualización disponible — click para instalar")
+        self.status_lbl.setStyleSheet(
+            "color: #00d9ff; font-size: 11px; padding: 8px 12px; cursor: pointer;"
+        )
+
+    def notify_up_to_date(self, sha: str):
+        self.status_lbl.setText(f"● daemon activo · {sha}")
+        self.status_lbl.setStyleSheet("")
+
+    def _on_status_click(self, _event=None):
+        if not self._update_local:
+            return
+        if self._update_dialog is None:
+            self._update_dialog = UpdateDialog(self._update_local, self._update_remote, self)
+        self._update_dialog.show()
+        self._update_dialog.raise_()
+        self._update_dialog.activateWindow()
+
+    def _on_message_rated(self, message_id: int, conv_id: int, rating: int):
+        try:
+            collector.rate_message(message_id, conv_id, rating)
+            stats = collector.get_stats()
+            self.status_lbl.setText(
+                f"● daemon activo · 👍{stats['positivos']} 👎{stats['negativos']}"
+            )
+        except Exception as e:
+            print(f"[rating] Error: {e}")
+
+    def _open_finetune(self):
+        if self._ft_dialog is None:
+            self._ft_dialog = FineTuneDialog(self)
+        self._ft_dialog.show()
+        self._ft_dialog.raise_()
+        self._ft_dialog.activateWindow()
+
+    def _export_finetune(self):
+        from PySide6.QtWidgets import QMessageBox, QFileDialog
+        stats = collector.get_stats()
+        if stats["positivos"] == 0:
+            QMessageBox.information(
+                self, "Sin datos",
+                "No hay respuestas con 👍 para exportar.\n"
+                "Dale thumbs up a las respuestas que quieras incluir.",
+            )
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Guardar dataset JSONL", "finetune.jsonl",
+            "JSONL Files (*.jsonl);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            out, count = collector.export_jsonl(path)
+            QMessageBox.information(
+                self, "Exportado",
+                f"Dataset exportado: {count} pares conversacionales\n{out}",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))

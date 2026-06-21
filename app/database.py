@@ -25,6 +25,22 @@ def init_db():
                 tool_data TEXT,
                 created_at TEXT DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS decision_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER,
+                tool_name TEXT NOT NULL,
+                args_json TEXT,
+                result_json TEXT,
+                approved INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS message_ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id INTEGER NOT NULL UNIQUE,
+                conversation_id INTEGER,
+                rating INTEGER NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """)
 
 def create_conversation(title="Nueva conversación"):

@@ -49,6 +49,23 @@ class AgentWorker(QThread):
         self._approved        = None
         self._stop            = False
 
+    def _build_system_with_rag(self) -> str:
+        last_user = ""
+        for m in reversed(self.messages):
+            if m["role"] == "user":
+                last_user = m["content"]
+                break
+        if not last_user:
+            return self.system_prompt
+        try:
+            from app.rag.retriever import retrieve_context
+            ctx = retrieve_context(last_user, n=3)
+            if ctx:
+                return self.system_prompt + f"\n\n## CONTEXTO RELEVANTE (Knowledge Base)\n{ctx}"
+        except Exception:
+            pass
+        return self.system_prompt
+
     def approve(self, approved: bool):
         self._approved = approved
         if self._approval_event:
@@ -59,7 +76,8 @@ class AgentWorker(QThread):
 
     def run(self):
         try:
-            history = [{"role": "system", "content": self.system_prompt}] + list(self.messages)
+            system = self._build_system_with_rag()
+            history = [{"role": "system", "content": system}] + list(self.messages)
             full    = ""
 
             for iteration in range(15):

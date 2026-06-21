@@ -1,6 +1,7 @@
 import markdown, re
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                                QFrame, QTextBrowser, QScrollArea, QSizePolicy, QSpacerItem)
+                                QFrame, QTextBrowser, QScrollArea, QSizePolicy,
+                                QSpacerItem, QPushButton)
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QTextCursor
 from .tool_card import ToolCard
@@ -28,17 +29,24 @@ def md_to_html(text):
     return MD_STYLE + html
 
 class MessageBubble(QFrame):
+    rated = Signal(int)  # 1 = thumbs up, -1 = thumbs down
+
     def __init__(self, role, content="", parent=None):
         super().__init__(parent)
         self.role = role
         self._content = content
+        self._message_id = None
         self._build()
 
     def _build(self):
         self.setObjectName("msg_user" if self.role == "user" else "msg_assistant")
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(10)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(4)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(10)
 
         # Avatar
         avatar = QLabel("TÚ" if self.role == "user" else "AI")
@@ -70,15 +78,90 @@ class MessageBubble(QFrame):
         self.content_widget.document().setDocumentMargin(8)
 
         if self.role == "user":
-            lay.addStretch()
-            lay.addWidget(self.content_widget)
-            lay.addWidget(avatar)
+            row.addStretch()
+            row.addWidget(self.content_widget)
+            row.addWidget(avatar)
         else:
-            lay.addWidget(avatar)
-            lay.addWidget(self.content_widget)
+            row.addWidget(avatar)
+            row.addWidget(self.content_widget)
+
+        outer.addLayout(row)
+
+        # Rating bar (only for assistant)
+        if self.role == "assistant":
+            self._rating_row = QWidget()
+            rlay = QHBoxLayout(self._rating_row)
+            rlay.setContentsMargins(42, 0, 0, 0)
+            rlay.setSpacing(4)
+
+            self._btn_up   = QPushButton("👍")
+            self._btn_down = QPushButton("👎")
+            for btn in (self._btn_up, self._btn_down):
+                btn.setFixedSize(28, 22)
+                btn.setEnabled(False)
+                btn.setStyleSheet(
+                    "QPushButton { background: transparent; border: 1px solid #1e2d3d;"
+                    " border-radius: 4px; color: #4a5568; font-size: 11px; }"
+                    "QPushButton:hover:enabled { border-color: #00d9ff; color: #c9d1d9; }"
+                    "QPushButton:disabled { color: #2a3a4a; border-color: #111; }"
+                )
+
+            self._btn_up.clicked.connect(self._rate_up)
+            self._btn_down.clicked.connect(self._rate_down)
+
+            rlay.addWidget(self._btn_up)
+            rlay.addWidget(self._btn_down)
+            rlay.addStretch()
+            outer.addWidget(self._rating_row)
+        else:
+            self._btn_up = self._btn_down = None
 
         if self._content:
             self.set_content(self._content)
+
+    def set_message_id(self, msg_id: int, existing_rating: int = None):
+        self._message_id = msg_id
+        if self._btn_up:
+            self._btn_up.setEnabled(True)
+            self._btn_down.setEnabled(True)
+        if existing_rating == 1:
+            self._apply_style(self._btn_up, True)
+            self._apply_style(self._btn_down, False)
+            self._btn_up.setEnabled(False)
+            self._btn_down.setEnabled(False)
+        elif existing_rating == -1:
+            self._apply_style(self._btn_up, False)
+            self._apply_style(self._btn_down, True)
+            self._btn_up.setEnabled(False)
+            self._btn_down.setEnabled(False)
+
+    def _rate_up(self):
+        self._emit_rating(1)
+
+    def _rate_down(self):
+        self._emit_rating(-1)
+
+    def _emit_rating(self, rating: int):
+        self._btn_up.setEnabled(False)
+        self._btn_down.setEnabled(False)
+        self._apply_style(self._btn_up, rating == 1)
+        self._apply_style(self._btn_down, rating == -1)
+        self.rated.emit(rating)
+
+    @staticmethod
+    def _apply_style(btn: QPushButton, active: bool):
+        if active:
+            btn.setStyleSheet(
+                "QPushButton { background: rgba(0,217,255,0.15); border: 1px solid #00d9ff;"
+                " border-radius: 4px; color: #00d9ff; font-size: 11px; }"
+                "QPushButton:disabled { background: rgba(0,217,255,0.15); border: 1px solid #00d9ff;"
+                " border-radius: 4px; color: #00d9ff; font-size: 11px; }"
+            )
+        else:
+            btn.setStyleSheet(
+                "QPushButton:disabled { color: #2a3a4a; border: 1px solid #111;"
+                " border-radius: 4px; background: transparent; font-size: 11px; }"
+            )
 
     def set_content(self, text):
         self._content = text
@@ -107,11 +190,13 @@ class MessageBubble(QFrame):
 class ChatPanel(QWidget):
     tool_approved = Signal(str, str, bool)  # tool_id, name, always
     tool_rejected = Signal(str)
+    message_rated = Signal(int, int, int)   # message_id, conv_id, rating
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tool_cards: dict[str, ToolCard] = {}
         self._current_bubble: MessageBubble | None = None
+        self._current_conv_id: int | None = None
         self._build()
 
     def _build(self):
@@ -141,11 +226,24 @@ class ChatPanel(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-    def load_messages(self, messages):
+    def load_messages(self, messages, conv_id: int = None):
         self.clear()
+        self._current_conv_id = conv_id
+        try:
+            from app.finetune.collector import get_rating
+            _get_rating = get_rating
+        except Exception:
+            _get_rating = lambda _: None
         for m in messages:
             if m["role"] in ("user", "assistant"):
-                self.add_message(m["role"], m["content"], streaming=False)
+                msg_id = m.get("id")
+                existing = _get_rating(msg_id) if msg_id and m["role"] == "assistant" else None
+                bubble = self.add_message(m["role"], m["content"], streaming=False)
+                if msg_id and m["role"] == "assistant":
+                    bubble.set_message_id(msg_id, existing)
+                    bubble.rated.connect(
+                        lambda r, mid=msg_id, cid=conv_id: self.message_rated.emit(mid, cid, r)
+                    )
 
     def add_message(self, role, content="", streaming=False):
         bubble = MessageBubble(role, content)
@@ -160,7 +258,12 @@ class ChatPanel(QWidget):
             self._current_bubble.append_token(token)
             self._scroll_bottom()
 
-    def finish_streaming(self):
+    def finish_streaming(self, msg_id: int = None, conv_id: int = None):
+        if self._current_bubble and msg_id:
+            self._current_bubble.set_message_id(msg_id)
+            self._current_bubble.rated.connect(
+                lambda r, mid=msg_id, cid=conv_id: self.message_rated.emit(mid, cid, r)
+            )
         self._current_bubble = None
 
     def add_tool_card(self, tool_id, name, args, dangerous):
