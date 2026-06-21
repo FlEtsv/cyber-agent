@@ -91,11 +91,17 @@ class AgentWorker(QThread):
                     break
 
                 # Append assistant message with tool calls
+                def _parse_args(s):
+                    try:
+                        return json.loads(s) if s.strip() else {}
+                    except (json.JSONDecodeError, ValueError):
+                        return {}
+
                 history.append({
                     "role":    "assistant",
                     "content": content,
                     "tool_calls": [
-                        {"function": {"name": v["name"], "arguments": v["args_str"]}}
+                        {"function": {"name": v["name"], "arguments": _parse_args(v["args_str"])}}
                         for v in tool_calls_raw.values()
                     ],
                 })
