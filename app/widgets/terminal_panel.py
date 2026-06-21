@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QFrame, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QEvent
-from PySide6.QtGui import QFont, QTextCursor, QTextOption, QKeyEvent
+from PySide6.QtGui import QFont, QTextCursor, QTextOption
 
 ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 CWD_MARKER = "__CYBERAGENT_CWD__:"
@@ -95,7 +95,6 @@ class TerminalPanel(QWidget):
         self._cwd = os.path.expanduser("~")
         self._shell = "powershell"
         self._worker: TerminalWorker | None = None
-        self._pending_lines: list[str] = []
         self._build()
 
     # ── UI ────────────────────────────────────────────────────────────────
@@ -154,7 +153,7 @@ class TerminalPanel(QWidget):
         self.output = QPlainTextEdit()
         self.output.setObjectName("terminal_output")
         self.output.setReadOnly(True)
-        self.output.setWordWrapMode(QTextOption.NoWrap)
+        self.output.setWordWrapMode(QTextOption.WrapMode.NoWrap)
         font = QFont("Cascadia Code", 11)
         if not font.exactMatch():
             font = QFont("Consolas", 11)

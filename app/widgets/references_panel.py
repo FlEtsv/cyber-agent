@@ -8,8 +8,7 @@ Dialogo flotante con:
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QListWidget, QListWidgetItem, QTabWidget,
-    QWidget, QTextEdit, QSplitter, QComboBox, QFrame,
-    QScrollArea, QSizePolicy,
+    QWidget, QTextEdit, QSplitter,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont

@@ -1,15 +1,16 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QTextEdit, QSizePolicy, QStackedWidget,
-    QFrame, QComboBox,
+    QFrame,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QKeyEvent, QFont
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeyEvent
 
 from .chat_panel import ChatPanel
 from .terminal_panel import TerminalPanel
 from .references_panel import ReferencesDialog
-from app.ollama_client import AgentWorker, OLLAMA_MODEL
+from app.ollama_client import AgentWorker, OLLAMA_MODEL, SYSTEM_PROMPT
+from app.consciousness.system_context import build_system_prompt
 from app import database as db
 
 # ── Default permission levels per tool ────────────────────────────────────
@@ -423,6 +424,7 @@ class MainWindow(QMainWindow):
             trusted_tools    = self.trusted_tools,
             session_trust    = self.session_trust,
             tool_permissions = self.tool_permissions,
+            system_prompt    = build_system_prompt(SYSTEM_PROMPT),
         )
         self.worker.token.connect(self._on_token)
         self.worker.tool_call.connect(self._on_tool_call)
