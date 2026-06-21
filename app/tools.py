@@ -161,13 +161,21 @@ def execute_tool(name: str, args: dict) -> dict:
 
 # ── Implementaciones ───────────────────────────────────────────────────────
 
+_PATH_REFRESH = (
+    "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine')"
+    " + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); "
+)
+
 def _shell(command: str, shell_type: str = "powershell", timeout: int = 60) -> dict:
     if shell_type == "bash":
         cmd = ["wsl", "-d", "Ubuntu-24.04", "--", "bash", "-c", command]
     elif shell_type == "cmd":
         cmd = ["cmd.exe", "/c", command]
     else:
-        cmd = ["powershell", "-NoProfile", "-NonInteractive", "-Command", command]
+        # Refresca PATH desde el registro en cada comando para ver herramientas
+        # recién instaladas (winget actualiza el registro, no el proceso actual)
+        cmd = ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+               _PATH_REFRESH + command]
     try:
         r = subprocess.run(
             cmd, capture_output=True, text=True,
@@ -322,8 +330,9 @@ def _install_package(package: str, manager: str, version: str = "") -> dict:
 
     cmds = {
         "pip":    [sys.executable, "-m", "pip", "install", "--upgrade", pkg],
-        "winget": ["winget", "install", "--id", package, "--accept-package-agreements",
-                   "--accept-source-agreements", "-e"],
+        "winget": ["winget", "install", package,
+                   "--accept-package-agreements", "--accept-source-agreements",
+                   "--silent", "--disable-interactivity"],
         "npm":    ["npm", "install", "-g", pkg],
         "choco":  ["choco", "install", package, "-y"],
         "apt":    ["wsl", "-d", "Ubuntu-24.04", "--", "bash", "-c",
@@ -354,7 +363,7 @@ def _install_package(package: str, manager: str, version: str = "") -> dict:
 def _uninstall_package(package: str, manager: str) -> dict:
     cmds = {
         "pip":    [sys.executable, "-m", "pip", "uninstall", "-y", package],
-        "winget": ["winget", "uninstall", "--id", package, "-e"],
+        "winget": ["winget", "uninstall", package, "--silent", "--disable-interactivity"],
         "npm":    ["npm", "uninstall", "-g", package],
         "choco":  ["choco", "uninstall", package, "-y"],
         "apt":    ["wsl", "-d", "Ubuntu-24.04", "--", "bash", "-c",
