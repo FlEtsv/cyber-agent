@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Database (datos locales del usuario)
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Model files (demasiado grandes para git)
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+models/
+
+# Data directory (knowledge base vectors, fine-tuning data)
+data/vectors/
+data/finetuning/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Windows specific
+*.bat.bak
+
+# Secrets / credentials
+.env
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# Temp
+tmp/
+temp/
+*.tmp
