@@ -1,10 +1,46 @@
-import os, sys
+import os, sys, subprocess
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QFileDialog,
     QComboBox, QFrame,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QProcess
+
+_FT_DEPS = ["unsloth", "trl", "peft", "accelerate", "datasets", "bitsandbytes"]
+_FT_PIP  = ["unsloth[colab-new]", "trl", "peft", "accelerate", "datasets", "bitsandbytes"]
+
+
+def _ft_deps_installed() -> bool:
+    for pkg in _FT_DEPS:
+        try:
+            __import__(pkg)
+        except ImportError:
+            return False
+    return True
+
+
+class DepsInstallWorker(QThread):
+    log    = Signal(str)
+    done   = Signal()
+    failed = Signal(str)
+
+    def run(self):
+        cmd = [sys.executable, "-m", "pip", "install"] + _FT_PIP + ["--quiet", "--progress-bar", "off"]
+        self.log.emit(f"Instalando: {' '.join(_FT_PIP)}\n\n")
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace",
+            )
+            for line in proc.stdout:
+                self.log.emit(line)
+            proc.wait()
+            if proc.returncode == 0:
+                self.done.emit()
+            else:
+                self.failed.emit(f"pip salió con código {proc.returncode}")
+        except Exception as e:
+            self.failed.emit(str(e))
 
 BASE_DIR = os.path.join(os.path.dirname(__file__), "..", "..")
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -96,11 +132,12 @@ class FineTuneDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("🎓 Fine-tuning QLoRA")
-        self.setMinimumSize(640, 600)
+        self.setMinimumSize(640, 640)
         self.setStyleSheet(
             "QDialog { background: #080c0f; color: #c9d1d9; font-family: monospace; }"
         )
-        self._worker = None
+        self._worker     = None
+        self._deps_worker = None
         self._build()
 
     def _build(self):
@@ -113,12 +150,37 @@ class FineTuneDialog(QDialog):
         title.setStyleSheet("color: #00d9ff; font-size: 14px; font-weight: bold; padding-bottom: 4px;")
         lay.addWidget(title)
 
-        req = QLabel(
-            "Requiere: pip install unsloth trl peft accelerate datasets bitsandbytes\n"
-            "GPU VRAM: ~10 GB para modelos 7B con 4-bit"
+        # ── Dependencias ───────────────────────────────────────────────
+        self._deps_banner = QFrame()
+        self._deps_banner.setStyleSheet(
+            "QFrame { background: #1a0f00; border: 1px solid #ffd700;"
+            " border-radius: 6px; padding: 4px; }"
         )
-        req.setStyleSheet("color: #4a5568; font-size: 11px;")
-        lay.addWidget(req)
+        deps_lay = QHBoxLayout(self._deps_banner)
+        deps_lay.setContentsMargins(10, 6, 10, 6)
+
+        self._deps_lbl = QLabel(
+            "⚠️  Dependencias de entrenamiento no instaladas  "
+            "(unsloth, trl, peft, accelerate, datasets, bitsandbytes)\n"
+            "    GPU VRAM necesaria: ~10 GB para modelos 7B · Tiempo estimado de instalación: 5-15 min"
+        )
+        self._deps_lbl.setStyleSheet("color: #ffd700; font-size: 11px;")
+        self._deps_lbl.setWordWrap(True)
+        deps_lay.addWidget(self._deps_lbl, 1)
+
+        self._install_btn = QPushButton("📦 Instalar ahora")
+        self._install_btn.setStyleSheet(
+            "QPushButton { background: #2a1a00; border: 1px solid #ffd700; border-radius: 5px;"
+            " color: #ffd700; padding: 6px 14px; font-size: 12px; }"
+            "QPushButton:hover { background: rgba(255,215,0,0.12); }"
+            "QPushButton:disabled { color: #4a3a00; border-color: #2a1a00; }"
+        )
+        self._install_btn.clicked.connect(self._install_deps)
+        deps_lay.addWidget(self._install_btn)
+
+        lay.addWidget(self._deps_banner)
+        self._deps_banner.setVisible(not _ft_deps_installed())
+
         lay.addWidget(_sep())
 
         # JSONL path
@@ -294,3 +356,26 @@ class FineTuneDialog(QDialog):
     def _reset_btns(self):
         self.train_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+
+    # ── Instalación de dependencias ────────────────────────────────────────
+    def _install_deps(self):
+        self._install_btn.setEnabled(False)
+        self._install_btn.setText("⏳ Instalando...")
+        self._deps_lbl.setText("Instalando dependencias de entrenamiento — esto puede tardar varios minutos...")
+        self.log_box.clear()
+        self.log_box.append("📦 Instalando: unsloth trl peft accelerate datasets bitsandbytes\n")
+        self._deps_worker = DepsInstallWorker()
+        self._deps_worker.log.connect(self._on_log)
+        self._deps_worker.done.connect(self._on_deps_done)
+        self._deps_worker.failed.connect(self._on_deps_failed)
+        self._deps_worker.start()
+
+    def _on_deps_done(self):
+        self.log_box.append("\n✓ Dependencias instaladas correctamente.")
+        self._deps_banner.setVisible(False)
+
+    def _on_deps_failed(self, err: str):
+        self.log_box.append(f"\n[ERROR] {err}")
+        self._deps_lbl.setText("⚠️  La instalación falló — revisa el log")
+        self._install_btn.setEnabled(True)
+        self._install_btn.setText("📦 Reintentar")

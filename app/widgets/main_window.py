@@ -12,6 +12,7 @@ from .references_panel import ReferencesDialog
 from .agent_panel import AgentPanel
 from .finetune_dialog import FineTuneDialog
 from .update_dialog import UpdateDialog
+from .mobile_dialog import MobileSubscribeDialog
 from app.ollama_client import AgentWorker, OLLAMA_MODEL, SYSTEM_PROMPT
 from app.consciousness.system_context import build_system_prompt
 from app.consciousness import decision_log
@@ -19,6 +20,7 @@ from app.finetune import collector
 from app.api import alert_sender
 from app.api.approval_poller import ApprovalPoller
 from app import database as db
+from app import autostart
 
 # ── Default permission levels per tool ────────────────────────────────────
 DEFAULT_PERMISSIONS = {
@@ -74,6 +76,7 @@ class MainWindow(QMainWindow):
         self._refs_dialog: ReferencesDialog | None = None
         self._ft_dialog: FineTuneDialog | None = None
         self._update_dialog: UpdateDialog | None = None
+        self._mobile_dialog: MobileSubscribeDialog | None = None
         self._pending_tools: dict[str, dict] = {}  # tool_id -> {name, args}
         self._update_local: str = ""
         self._update_remote: str = ""
@@ -193,6 +196,26 @@ class MainWindow(QMainWindow):
         ft_btn.setObjectName("btn_refs")
         ft_btn.clicked.connect(self._open_finetune)
         lay.addWidget(ft_btn)
+
+        lay.addWidget(self._separator())
+
+        # ── Automatización ────────────────────────────────────────────
+        mobile_btn = QPushButton("📱  Activar móvil (QR)")
+        mobile_btn.setObjectName("btn_refs")
+        mobile_btn.clicked.connect(self._open_mobile_dialog)
+        lay.addWidget(mobile_btn)
+
+        self.autostart_btn = QPushButton()
+        self.autostart_btn.setObjectName("btn_refs")
+        self._refresh_autostart_btn()
+        self.autostart_btn.clicked.connect(self._toggle_autostart)
+        lay.addWidget(self.autostart_btn)
+
+        nssm_btn = QPushButton("⚙️  Instalar servicio Win")
+        nssm_btn.setObjectName("btn_refs")
+        nssm_btn.setToolTip("Instala CyberAgent como servicio Windows via NSSM (requiere Admin)")
+        nssm_btn.clicked.connect(self._install_nssm_service)
+        lay.addWidget(nssm_btn)
 
         self.status_lbl = QLabel("● daemon activo · localhost:11434")
         self.status_lbl.setObjectName("status_bar")
@@ -684,3 +707,49 @@ class MainWindow(QMainWindow):
             )
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+
+    # ════════════════════════════════════════════════════════════════════
+    # AUTOMATIZACIÓN
+    # ════════════════════════════════════════════════════════════════════
+
+    def _open_mobile_dialog(self):
+        if self._mobile_dialog is None:
+            self._mobile_dialog = MobileSubscribeDialog(self)
+        self._mobile_dialog.show()
+        self._mobile_dialog.raise_()
+        self._mobile_dialog.activateWindow()
+
+    def _refresh_autostart_btn(self):
+        enabled = autostart.is_enabled()
+        self.autostart_btn.setText(
+            "🟢  Inicio automático ON" if enabled else "⚪  Inicio automático OFF"
+        )
+
+    def _toggle_autostart(self):
+        from PySide6.QtWidgets import QMessageBox
+        try:
+            now_on = autostart.toggle()
+            self._refresh_autostart_btn()
+            msg = (
+                "✓ CyberAgent arrancará automáticamente con Windows."
+                if now_on else
+                "✓ Inicio automático desactivado."
+            )
+            self.status_lbl.setText(msg)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"No se pudo modificar el registro:\n{e}")
+
+    def _install_nssm_service(self):
+        import os, ctypes
+        ps1 = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "autostart_nssm.ps1")
+        )
+        if not os.path.isfile(ps1):
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "No encontrado", f"Script no encontrado:\n{ps1}")
+            return
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", "powershell",
+            f'-ExecutionPolicy Bypass -NoExit -File "{ps1}"',
+            None, 1,
+        )
