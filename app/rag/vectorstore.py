@@ -12,11 +12,9 @@ def _get_collection():
         return _collection
     try:
         import chromadb
-        from chromadb.utils import embedding_functions
+        from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
         client = chromadb.PersistentClient(path=CHROMA_PATH)
-        ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        ef = DefaultEmbeddingFunction()  # all-MiniLM-L6-v2 via onnxruntime, sin scipy
         _collection = client.get_or_create_collection(
             name="cyberagent_kb",
             embedding_function=ef,
