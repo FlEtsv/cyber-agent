@@ -1,4 +1,4 @@
-import subprocess, os
+import subprocess, os, sys
 import httpx
 from PySide6.QtCore import QThread, Signal
 
@@ -6,6 +6,10 @@ REPO     = "FlEtsv/cyber-agent"
 BRANCH   = "master"
 API_URL  = f"https://api.github.com/repos/{REPO}/commits/{BRANCH}"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REQ_FILE = os.path.join(BASE_DIR, "requirements.txt")
+
+# Pip del venv actual (el mismo intérprete que corre la app)
+_PIP = [sys.executable, "-m", "pip"]
 
 
 def _git(*args, timeout=10) -> tuple[int, str]:
@@ -62,15 +66,32 @@ class Updater(QThread):
     failed   = Signal(str)
 
     def run(self):
+        # 1. git pull
         self.progress.emit("⬇  Descargando cambios de GitHub...")
         code, out = _git("pull", "origin", BRANCH, "--ff-only", timeout=60)
-        if code == 0:
-            self.progress.emit(out)
-            self.progress.emit("\n✓ Actualización aplicada.")
-            new_sha = local_sha()
-            self.done.emit(new_sha)
-        else:
+        if code != 0:
             self.failed.emit(out)
+            return
+        self.progress.emit(out or "Código actualizado.")
+
+        # 2. pip install -r requirements.txt (instala nuevas deps de la implementación)
+        if os.path.isfile(REQ_FILE):
+            self.progress.emit("\n📦  Instalando/actualizando dependencias...")
+            try:
+                r = subprocess.run(
+                    _PIP + ["install", "-r", REQ_FILE, "--quiet"],
+                    capture_output=True, text=True, timeout=180,
+                )
+                if r.returncode == 0:
+                    self.progress.emit("✓ Dependencias OK.")
+                else:
+                    # No es fatal — avisamos pero continuamos
+                    self.progress.emit(f"⚠ pip warning:\n{(r.stdout + r.stderr).strip()}")
+            except Exception as e:
+                self.progress.emit(f"⚠ pip error: {e}")
+
+        self.progress.emit("\n✓ Actualización completa.")
+        self.done.emit(local_sha())
 
 
 # ── Restart helper ────────────────────────────────────────────────────────
