@@ -753,3 +753,8 @@ class MainWindow(QMainWindow):
             f'-ExecutionPolicy Bypass -NoExit -File "{ps1}"',
             None, 1,
         )
+
+    def closeEvent(self, event):
+        """X oculta la ventana en bandeja — no cierra la app."""
+        event.ignore()
+        self.hide()

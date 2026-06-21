@@ -1,7 +1,18 @@
-import sys, os
+import sys, os, ctypes
 sys.path.insert(0, os.path.dirname(__file__))
 
-# Carga .env si existe (variables para Cloud Run notifications)
+# ── Instancia única: mutex con nombre ────────────────────────────────────────
+_MUTEX_NAME = "Global\\CyberAgent_SingleInstance_v1"
+_mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, _MUTEX_NAME)
+if ctypes.windll.kernel32.GetLastError() == 183:   # ERROR_ALREADY_EXISTS
+    # Traer la ventana existente al frente y salir
+    hwnd = ctypes.windll.user32.FindWindowW(None, "CyberAgent")
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, 9)        # SW_RESTORE
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
+    sys.exit(0)
+
+# Carga .env
 _env_file = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.isfile(_env_file):
     for _line in open(_env_file):
@@ -20,7 +31,6 @@ from app.updater import UpdateChecker
 
 
 def _make_icon(alert: bool = False) -> QIcon:
-    """Icono de tray — azul normal, rojo pulsante cuando hay aprobación pendiente."""
     pix = QPixmap(32, 32)
     pix.fill(Qt.transparent)
     p = QPainter(pix)
@@ -40,15 +50,16 @@ def _make_icon(alert: bool = False) -> QIcon:
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("CyberAgent")
-    app.setQuitOnLastWindowClosed(False)
+    app.setQuitOnLastWindowClosed(False)   # X solo oculta, no cierra la app
     app.setStyleSheet(QSS)
 
     init_db()
 
     window = MainWindow()
-    window.show()
+    # ── Arranca en bandeja, sin ventana visible ───────────────────────────────
+    # window.show() — eliminado: solo abre desde el tray
 
-    # ── Tray ──────────────────────────────────────────────────────────────
+    # ── Tray ──────────────────────────────────────────────────────────────────
     _icon_normal = _make_icon(False)
     _icon_alert  = _make_icon(True)
 
@@ -56,21 +67,30 @@ def main():
     tray.setToolTip("CyberAgent — activo")
 
     menu = QMenu()
-    show_action   = menu.addAction("Mostrar / Ocultar")
-    update_action = menu.addAction("🔄 Buscar actualización")
+    show_action   = menu.addAction("⚡  Abrir CyberAgent")
+    update_action = menu.addAction("🔄  Buscar actualización")
     menu.addSeparator()
-    quit_action   = menu.addAction("Salir")
+    quit_action   = menu.addAction("✕  Salir")
     tray.setContextMenu(menu)
 
-    show_action.triggered.connect(
-        lambda: window.hide() if window.isVisible() else window.show()
-    )
-    quit_action.triggered.connect(app.quit)
-    tray.activated.connect(lambda reason: (
-        window.hide() if window.isVisible() else window.show()
-    ) if reason == QSystemTrayIcon.Trigger else None)
+    def _toggle_window():
+        if window.isVisible():
+            window.hide()
+        else:
+            window.show()
+            window.raise_()
+            window.activateWindow()
 
-    # ── Icono dinámico ─────────────────────────────────────────────────────
+    show_action.triggered.connect(_toggle_window)
+    quit_action.triggered.connect(app.quit)
+
+    # Clic izquierdo en tray → mostrar/ocultar
+    tray.activated.connect(
+        lambda reason: _toggle_window()
+        if reason == QSystemTrayIcon.Trigger else None
+    )
+
+    # ── Icono dinámico (parpadeo rojo en aprobación pendiente) ─────────────
     _blink_timer = QTimer()
     _blink_state = [False]
 
@@ -90,7 +110,7 @@ def main():
     _blink_timer.timeout.connect(_blink)
     window.notification_pending.connect(_set_tray_alert)
 
-    # ── Auto-updater ──────────────────────────────────────────────────────
+    # ── Auto-updater ──────────────────────────────────────────────────────────
     _checker: list = []
 
     def _run_checker():
@@ -99,9 +119,9 @@ def main():
             lambda loc, rem: (
                 window.notify_update_available(loc, rem),
                 tray.showMessage(
-                    "CyberAgent — Actualización",
-                    f"Nueva versión disponible: {rem}",
-                    QSystemTrayIcon.Information, 5000,
+                    "CyberAgent — Actualización disponible",
+                    f"Nueva versión: {rem}",
+                    QSystemTrayIcon.Information, 6000,
                 ),
             )
         )
@@ -115,15 +135,14 @@ def main():
     periodic.timeout.connect(_run_checker)
     periodic.start(30 * 60 * 1000)
 
-    # ── Servidor API local ────────────────────────────────────────────────
+    # ── Servidor API local ────────────────────────────────────────────────────
     try:
         from app.api.server import start_server
         start_server(port=8765)
-        print("[api] Servidor local iniciado en localhost:8765")
     except Exception as e:
         print(f"[api] No se pudo iniciar servidor: {e}")
 
-    # ── Cloudflare Tunnel — en hilo separado para no bloquear la UI ──────
+    # ── Cloudflare Tunnel ─────────────────────────────────────────────────────
     def _start_tunnel():
         import threading
         def _run():
@@ -132,14 +151,11 @@ def main():
                 tm = TunnelManager(local_port=8765)
                 url = tm.start(wait_secs=20)
                 if url:
-                    print(f"[tunnel] ✓ {url}")
                     tray.showMessage(
                         "CyberAgent — Túnel activo",
                         f"Acceso web: {url}",
                         QSystemTrayIcon.Information, 6000,
                     )
-                else:
-                    print("[tunnel] cloudflared no disponible — instala: winget install Cloudflare.cloudflared")
             except Exception as e:
                 print(f"[tunnel] Error: {e}")
         threading.Thread(target=_run, daemon=True, name="tunnel-starter").start()
@@ -147,6 +163,14 @@ def main():
     QTimer.singleShot(5000, _start_tunnel)
 
     tray.show()
+
+    # Notificación de bienvenida
+    tray.showMessage(
+        "CyberAgent activo",
+        "Clic en el icono para abrir · Clic derecho para opciones",
+        QSystemTrayIcon.Information, 3000,
+    )
+
     sys.exit(app.exec())
 
 
