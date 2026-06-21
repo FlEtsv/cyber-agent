@@ -13,11 +13,16 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("cyberagent")
 
 # ── Config (env vars en Cloud Run) ────────────────────────────────────────
+import base64
+
 SECRET        = os.environ.get("SECRET", "change-me-in-cloud-run")
-VAPID_PRIVATE = os.environ.get("VAPID_PRIVATE", "")
 VAPID_PUBLIC  = os.environ.get("VAPID_PUBLIC", "")
 VAPID_EMAIL   = os.environ.get("VAPID_EMAIL", "stevenflet13@gmail.com")
 VAPID_CLAIMS  = {"sub": f"mailto:{VAPID_EMAIL}"}
+
+# Clave privada guardada en base64 para evitar problemas con newlines en env vars
+_vapid_b64    = os.environ.get("VAPID_PRIVATE_B64", "")
+VAPID_PRIVATE = base64.b64decode(_vapid_b64).decode() if _vapid_b64 else ""
 
 app = FastAPI(title="CyberAgent Notifications")
 app.mount("/static", StaticFiles(directory="static"), name="static")
