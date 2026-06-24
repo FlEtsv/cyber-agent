@@ -623,6 +623,28 @@ TOOLS_SCHEMA = [
                        "La conversación actual terminará; la nueva instancia arrancará fresca.",
         "parameters": {"type": "object", "properties": {}, "required": []}
     }},
+    # ── Watch mode (WATCH-001) ─────────────────────────────────────────────────
+    {"type": "function", "function": {
+        "name": "start_screenshot_watch",
+        "description": "Activa el modo vigilancia: captura la pantalla del PC automáticamente cada N segundos "
+                       "y envía cada captura al chat en tiempo real. Útil para supervisión remota desde iPhone, "
+                       "monitoreo de procesos largos o seguimiento visual de tareas. "
+                       "El servidor gestiona el bucle; el agente sigue libre para responder durante la vigilancia.",
+        "parameters": {"type": "object", "properties": {
+            "interval_sec": {"type": "integer",
+                             "description": "Segundos entre capturas (mín 2, máx 60, default 5)"},
+            "duration_sec":  {"type": "integer",
+                             "description": "Duración total de la vigilancia en segundos (mín 5, máx 600, default 60)"},
+            "monitor":       {"type": "integer",
+                             "description": "Índice del monitor a capturar (0=principal, default 0)"},
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "stop_screenshot_watch",
+        "description": "Detiene el modo vigilancia activo antes de que expire su duración. "
+                       "Úsalo si ya tienes suficiente información o si el usuario pide parar.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    }},
 ] + MOBILE_TOOLS_SCHEMA
 
 DANGEROUS_TOOLS = {"shell", "write_file", "run_python", "install_package",
@@ -923,6 +945,19 @@ def execute_tool(name: str, args: dict) -> dict:
             "list_self_files":      lambda: _sa_module().list_self_files(),
             "syntax_check":         lambda: _sa_module().syntax_check(args["path"]),
             "restart_self":         lambda: _sa_module().restart_self(),
+            # Watch mode (WATCH-001) — returns config; server drives the loop
+            "start_screenshot_watch": lambda: {
+                "watch_started": True,
+                "interval_sec":  max(2, min(60,  int(args.get("interval_sec",  5)))),
+                "duration_sec":  max(5, min(600, int(args.get("duration_sec",  60)))),
+                "monitor":       int(args.get("monitor", 0)),
+                "message": (
+                    f"Modo vigilancia activado: captura cada "
+                    f"{max(2, min(60, int(args.get('interval_sec', 5))))}s "
+                    f"durante {max(5, min(600, int(args.get('duration_sec', 60))))}s"
+                ),
+            },
+            "stop_screenshot_watch": lambda: {"watch_stopped": True},
         }
         all_tools = {**dispatch, **superagent}
         if name in all_tools:

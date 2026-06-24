@@ -1,5 +1,5 @@
 """CyberAgent Web Server — FastAPI + WebSocket + PWA + Auth."""
-import asyncio, json, os, threading
+import asyncio, json, os, threading, base64
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Response, Cookie
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
@@ -193,6 +193,48 @@ async def _describe_image(b64: str) -> str:
         return f"[imagen adjunta — error: {e}]"
 
 
+# ── Watch mode (WATCH-001) ────────────────────────────────────────────────────
+
+async def _watch_loop(ws: WebSocket, interval: int, duration: int, monitor: int,
+                      stop_event: asyncio.Event):
+    """Captures screenshots every `interval` seconds and streams them to the client."""
+    from app.tools import execute_tool
+    seq   = 0
+    start = asyncio.get_event_loop().time()
+    try:
+        while not stop_event.is_set():
+            elapsed = asyncio.get_event_loop().time() - start
+            if elapsed >= duration:
+                break
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: execute_tool("screenshot_pc", {"monitor": monitor})
+            )
+            if "screenshot_base64" in result:
+                await ws.send_json({
+                    "type": "screenshot",
+                    "data": {
+                        "b64":     result["screenshot_base64"],
+                        "fmt":     result.get("format", "jpeg"),
+                        "size":    result.get("size", ""),
+                        "monitor": monitor,
+                        "seq":     seq,
+                        "elapsed": int(elapsed),
+                        "duration": duration,
+                    },
+                })
+                seq += 1
+            await asyncio.wait_for(stop_event.wait(), timeout=interval)
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        pass
+    except Exception:
+        pass
+    finally:
+        try:
+            await ws.send_json({"type": "watch_ended", "data": {"frames": seq}})
+        except Exception:
+            pass
+
+
 # ── Device context ────────────────────────────────────────────────────────────
 
 def _detect_device(request: Request) -> dict:
@@ -232,6 +274,8 @@ async def websocket_chat(ws: WebSocket):
     agent_q: asyncio.Queue = asyncio.Queue()
     runner    = None
     conv      : list[dict] = []
+    _watch_stop: asyncio.Event | None = None
+    _watch_task: asyncio.Task | None  = None
 
     # Detect device from WS headers
     ua         = ws.headers.get("user-agent", "").lower()
@@ -246,8 +290,37 @@ async def websocket_chat(ws: WebSocket):
     })
 
     try:
+        async def _start_watch(interval: int, duration: int, monitor: int):
+            nonlocal _watch_stop, _watch_task
+            if _watch_task and not _watch_task.done():
+                _watch_stop.set()
+                await asyncio.sleep(0)
+            _watch_stop = asyncio.Event()
+            _watch_task = asyncio.create_task(
+                _watch_loop(ws, interval, duration, monitor, _watch_stop)
+            )
+
+        async def _stop_watch():
+            nonlocal _watch_stop, _watch_task
+            if _watch_stop:
+                _watch_stop.set()
+
         async for data in ws.iter_json():
             t = data.get("type")
+
+            # Watch mode: client-initiated
+            if t == "watch_start":
+                await _start_watch(
+                    int(data.get("interval_sec", 5)),
+                    int(data.get("duration_sec", 60)),
+                    int(data.get("monitor", 0)),
+                )
+                await ws.send_json({"type": "status", "data": "Modo vigilancia iniciado."})
+                continue
+
+            if t == "watch_stop":
+                await _stop_watch()
+                continue
 
             if t == "message":
                 content = data.get("content", "").strip()
@@ -327,6 +400,21 @@ async def websocket_chat(ws: WebSocket):
 
                         if q_task in done:
                             evt = q_task.result()
+                            # Watch events: start/stop the loop without forwarding raw config
+                            if evt["type"] == "watch_config":
+                                cfg = evt.get("data", {})
+                                await _start_watch(
+                                    cfg.get("interval_sec", 5),
+                                    cfg.get("duration_sec", 60),
+                                    cfg.get("monitor", 0),
+                                )
+                                await ws.send_json({"type": "status", "data": cfg.get("message", "Vigilancia activada.")})
+                                q_task = asyncio.create_task(agent_q.get())
+                                continue
+                            if evt["type"] == "watch_stop":
+                                await _stop_watch()
+                                q_task = asyncio.create_task(agent_q.get())
+                                continue
                             await ws.send_json(evt)
                             if evt["type"] in ("done", "error"):
                                 if evt["type"] == "done" and evt.get("data"):
@@ -375,6 +463,10 @@ async def websocket_chat(ws: WebSocket):
     finally:
         if runner:
             runner.stop()
+        if _watch_stop:
+            _watch_stop.set()
+        if _watch_task and not _watch_task.done():
+            _watch_task.cancel()
 
 
 # ── Terminal WebSocket ────────────────────────────────────────────────────────

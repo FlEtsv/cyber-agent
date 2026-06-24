@@ -67,6 +67,9 @@ class CyberAgent {
     this.reconnectNoticeTimer = null;
     this.connectionBanner = null;
     this.pcOnline = true;
+    this._watchContainer = null;
+    this._watchFramesEl  = null;
+    this._watchCounterEl = null;
     this.report = {
       startedAt: new Date().toISOString(),
       messages: [],
@@ -203,6 +206,14 @@ class CyberAgent {
         this._setStatus('thinking', data);
         break;
 
+      case 'screenshot':
+        this._handleWatchFrame(data);
+        break;
+
+      case 'watch_ended':
+        this._endWatchMode(data?.frames ?? 0);
+        break;
+
       case 'done':
         this._finalizeAIBubble();
         this._endStreaming();
@@ -216,6 +227,65 @@ class CyberAgent {
         this._addErrorMsg(data);
         this._endStreaming();
         break;
+    }
+  }
+
+  // ── Watch mode ──────────────────────────────────────────────────────────────
+
+  _handleWatchFrame(data) {
+    if (!this._watchContainer) {
+      // First frame: create the watch container in the chat
+      const wrap = document.createElement('div');
+      wrap.className = 'msg watch-mode';
+      wrap.innerHTML = `
+        <div class="watch-header">
+          <span class="watch-icon">&#x1F4F7;</span>
+          <span class="watch-label">Modo Vigilancia</span>
+          <button class="watch-stop-btn" title="Detener vigilancia">&#x23F9;</button>
+          <span class="watch-counter">0 capturas</span>
+        </div>
+        <div class="watch-frames"></div>
+      `;
+      wrap.querySelector('.watch-stop-btn').addEventListener('click', () => {
+        this._send({ type: 'watch_stop' });
+      });
+      this._watchContainer = wrap;
+      this._watchFramesEl = wrap.querySelector('.watch-frames');
+      this._watchCounterEl = wrap.querySelector('.watch-counter');
+      this.msgsEl.appendChild(wrap);
+    }
+
+    const { b64, fmt, size, seq, elapsed, duration } = data;
+    const img = document.createElement('img');
+    img.src = `data:image/${fmt || 'jpeg'};base64,${b64}`;
+    img.className = 'watch-frame';
+    img.title = `#${seq + 1} · ${size} · +${elapsed}s`;
+    img.loading = 'lazy';
+
+    // Keep only last 6 frames visible for performance
+    this._watchFramesEl.appendChild(img);
+    const frames = this._watchFramesEl.querySelectorAll('.watch-frame');
+    if (frames.length > 6) frames[0].remove();
+
+    const count = (seq + 1);
+    const pct   = duration ? Math.min(100, Math.round(elapsed / duration * 100)) : 0;
+    this._watchCounterEl.textContent = `${count} captura${count !== 1 ? 's' : ''} · ${pct}%`;
+    this._scrollBottom();
+  }
+
+  _endWatchMode(frames) {
+    if (this._watchContainer) {
+      const hdr = this._watchContainer.querySelector('.watch-header');
+      if (hdr) {
+        hdr.querySelector('.watch-stop-btn')?.remove();
+        const lbl = hdr.querySelector('.watch-label');
+        if (lbl) lbl.textContent = 'Vigilancia finalizada';
+        const ctr = hdr.querySelector('.watch-counter');
+        if (ctr) ctr.textContent = `${frames} capturas`;
+      }
+      this._watchContainer = null;
+      this._watchFramesEl  = null;
+      this._watchCounterEl = null;
     }
   }
 

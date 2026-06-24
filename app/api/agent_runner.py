@@ -272,6 +272,12 @@ class AgentRunner:
                     self._q.put({"type": "tool_result",
                                  "data": {"id": tid, "result": result}})
 
+                    # Watch mode: emit config so the server can start the screenshot loop
+                    if result.get("watch_started"):
+                        self._q.put({"type": "watch_config", "data": result})
+                    if result.get("watch_stopped"):
+                        self._q.put({"type": "watch_stop", "data": {}})
+
                     if result.get("cancelled"):
                         history.append({
                             "role": "user",
