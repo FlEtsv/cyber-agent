@@ -147,7 +147,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 `[CODEX] INFRA-001 — Listener read-only de TASKBOARD.md — Commit: 831bae3 — Fecha: 2026-06-24 22:14`
 [codex] OBJ-IO-001 — Formalizar el objetivo global enorme de la app iOS nativa híbrida — Commit: 1e4a9cb — Fecha: 2026-06-24 23:27
 [codex] AUDIT-001 — Dashboard de actividad del agente en tab Agente: métricas de herramientas, errores y tiempos medios — Commit: 9b6fa02 — Fecha: 2026-06-24 23:34
-[codex] IOS-UI-001 — RootView + MainTabView iOS con tabs Chat/Dispositivos/Ajustes y tema GitHub dark. Validación Swift pendiente: `swift` no disponible en Windows — Commit: PENDIENTE — Fecha: 2026-06-24 23:43
+[codex] IOS-UI-001 — RootView + MainTabView iOS con tabs Chat/Dispositivos/Ajustes y tema GitHub dark. Validación Swift pendiente: `swift` no disponible en Windows — Commit: 2996577 — Fecha: 2026-06-24 23:43
 [claude] B001+B007 — Backoff exponencial (5→10→20→40→60s) + cleanup runners al desconectar — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B002 — CORS dinámico _DynamicCORS lee env por req (no import-time) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
