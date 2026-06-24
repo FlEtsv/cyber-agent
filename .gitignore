@@ -34,6 +34,8 @@ data/taskboard_listener*.json
 *.pt
 *.ckpt
 models/
+!ios/**/Models/
+!ios/**/Models/*.swift
 
 # Data directory (knowledge base vectors, fine-tuning data)
 data/vectors/
