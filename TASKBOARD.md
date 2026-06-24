@@ -61,7 +61,6 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 [claude] F003 — Segunda modelo en model_router (routing real entre fast/power) — Archivos: `app/model_router.py` — Fecha: 2026-06-24 22:09
-`[CODEX] INFRA-001 — Implementar listener read-only de TASKBOARD.md — Archivos: scripts/taskboard_listener.py, docs/TASKBOARD_LISTENER.md, .gitignore — Fecha: 2026-06-24 22:06`
 
 ---
 
@@ -70,7 +69,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Mover aquí desde EN PROGRESO al terminar.
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
-*(vacío)*
+`[CODEX] INFRA-001 — Listener read-only de TASKBOARD.md — Commit: 831bae3 — Fecha: 2026-06-24 22:14`
 
 ---
 
