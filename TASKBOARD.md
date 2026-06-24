@@ -170,9 +170,9 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [claude] PERF-001 — Cache TTL 30s en execute_tool para system_info/gpu_info/memory_info (_cached:True en respuesta) — Commit: PENDIENTE — Fecha: 2026-06-24
 [claude] TEST-002 — 35 nuevos tests: test_tool_router.py (keyword/always/route_tools) + test_model_router.py (score/route). 47/47 pasan — Commit: PENDIENTE — Fecha: 2026-06-24
 [claude] DEBATE-002 — Expert mode backend: solo sesiones locales (127.0.0.1). Audit log por dangerous tool auto-aprobada. — Commit: PENDIENTE — Fecha: 2026-06-24
-[claude] IOS-001..009 — Backend iOS completo: Package.swift, Models, Auth, Relay, BLE/GPS/USB, LLM local, Network, Permissions, ChatViewModel, DeviceManager, OfflineAgentRunner — Commit: PENDIENTE — Fecha: 2026-06-25
-[claude] IOS-APP-GUIDE — Guía de usuario iOS completa en docs/IOS_APP_GUIDE.md — Commit: PENDIENTE — Fecha: 2026-06-25
-[claude] WATCH-001 — Modo vigilancia screenshots: tools.py (start/stop_screenshot_watch), agent_runner.py (watch_config event), server.py (async watch loop), app.js (watch frame render), style.css (watch UI), ios/build_and_deploy.sh, Desktop/CyberAgent_iOS_Deploy.bat — Commit: PENDIENTE — Fecha: 2026-06-25
+[claude] IOS-001..009 — Backend iOS completo: Package.swift, Models, Auth, Relay, BLE/GPS/USB, LLM local, Network, Permissions, ChatViewModel, DeviceManager, OfflineAgentRunner — Commit: 531865e (parcial, ver commits previos para archivos anteriores) — Fecha: 2026-06-25
+[claude] IOS-APP-GUIDE — Guía de usuario iOS completa en docs/IOS_APP_GUIDE.md — Commit: 531865e — Fecha: 2026-06-25
+[claude] WATCH-001 — Modo vigilancia screenshots: tools.py (start/stop_screenshot_watch), agent_runner.py (watch_config event), server.py (async watch loop), app.js (watch frame render), style.css (watch UI), ios/build_and_deploy.sh, Desktop/CyberAgent_iOS_Deploy.bat — Commit: 531865e — Fecha: 2026-06-25
 
 ---
 
