@@ -60,7 +60,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] F003 — Segunda modelo en model_router (routing real entre fast/power) — Archivos: `app/model_router.py` — Fecha: 2026-06-24 22:09
+`[CODEX] B004+B005+B006 — Reconexión frontend, limpieza de estado WS y banners PC/reconectando — Archivos: app/web/static/app.js, app/web/static/style.css, relay/web/app.js, relay/web/style.css — Fecha: 2026-06-24 22:15`
 
 ---
 
@@ -70,6 +70,10 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
 `[CODEX] INFRA-001 — Listener read-only de TASKBOARD.md — Commit: 831bae3 — Fecha: 2026-06-24 22:14`
+[claude] B001+B007 — Backoff exponencial (5→10→20→40→60s) + cleanup runners al desconectar — Commit: c842ed7 — Fecha: 2026-06-24 22:20
+[claude] B002 — CORS dinámico _DynamicCORS lee env por req (no import-time) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
+[claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
+[claude] F003 — FAST_MODEL/POWER_MODEL configurables via CYBERAGENT_*_MODEL env — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 
 ---
 
