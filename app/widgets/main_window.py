@@ -10,6 +10,7 @@ from .chat_panel import ChatPanel
 from .terminal_panel import TerminalPanel
 from .references_panel import ReferencesDialog
 from .agent_panel import AgentPanel
+from .tools_panel import ToolsPanel
 from .finetune_dialog import FineTuneDialog
 from .update_dialog import UpdateDialog
 from .mobile_dialog import MobileSubscribeDialog
@@ -360,9 +361,16 @@ class MainWindow(QMainWindow):
         self.tab_agent.setChecked(False)
         self.tab_agent.clicked.connect(lambda: self._switch_tab(2))
 
+        self.tab_tools = QPushButton("Herramientas")
+        self.tab_tools.setObjectName("tab_btn")
+        self.tab_tools.setCheckable(True)
+        self.tab_tools.setChecked(False)
+        self.tab_tools.clicked.connect(lambda: self._switch_tab(3))
+
         tlay.addWidget(self.tab_chat)
         tlay.addWidget(self.tab_terminal)
         tlay.addWidget(self.tab_agent)
+        tlay.addWidget(self.tab_tools)
         tlay.addStretch()
 
         self.model_status = QLabel("● modelo listo")
@@ -390,6 +398,10 @@ class MainWindow(QMainWindow):
         # Page 2: Agent panel (RAG + Decision Log)
         self.agent_panel = AgentPanel()
         self.stack.addWidget(self.agent_panel)
+
+        # Page 3: Tools catalog
+        self.tools_panel = ToolsPanel()
+        self.stack.addWidget(self.tools_panel)
 
         lay.addWidget(self.stack, 1)
         return container
@@ -470,13 +482,16 @@ class MainWindow(QMainWindow):
         self.tab_chat.setChecked(idx == 0)
         self.tab_terminal.setChecked(idx == 1)
         self.tab_agent.setChecked(idx == 2)
-        for i, btn in enumerate([self.tab_chat, self.tab_terminal, self.tab_agent]):
+        self.tab_tools.setChecked(idx == 3)
+        tabs = [self.tab_chat, self.tab_terminal, self.tab_agent, self.tab_tools]
+        for i, btn in enumerate(tabs):
             btn.setObjectName("tab_btn_active" if i == idx else "tab_btn")
             btn.setStyle(btn.style())
         if idx == 2:
             self.agent_panel.refresh_log()
         if hasattr(self, "workspace_route"):
-            self.workspace_route.setText(["Vista: Chat", "Vista: Terminal", "Vista: Agente"][idx])
+            routes = ["Vista: Chat", "Vista: Terminal", "Vista: Agente", "Vista: Herramientas"]
+            self.workspace_route.setText(routes[idx])
 
     # ════════════════════════════════════════════════════════════════════
     # PERMISSIONS

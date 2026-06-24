@@ -123,6 +123,8 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: 3cc9d5b (integrado en mejoras web) — Fecha: 2026-06-24 23:20
 [codex] TOOL-001 — Catálogo hacking/tools: TOOL_CATEGORIES, DANGEROUS_TOOLS, ACTIVE_SECURITY_TOOLS, SENSITIVE_ACCESS_TOOLS, TOOL_USE_GUIDES en tools.py + docs/TOOLS.md — Commit: bbaff5b (integrado) — Fecha: 2026-06-24
 [claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Router LLM mejorado (prompt 350t + desktop group + fix encoding) + TOOLS_MANUAL.md + USER_GUIDE.md + CONNECTION_GUIDE.md + TASKBOARD objetivos cerrados — Commit: 3f9a41b — Fecha: 2026-06-24
+[codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: PENDIENTE (verificado OK) — Fecha: 2026-06-24
+[claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay — verificado implementado en 777592d — Commit: 777592d — Fecha: 2026-06-24
 
 ---
 

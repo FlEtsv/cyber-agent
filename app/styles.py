@@ -283,6 +283,113 @@ QLabel#model_status {
     padding: 4px 10px;
 }
 
+/* Tools catalog */
+QWidget#tools_catalog_page {
+    background: #0b0d10;
+}
+QWidget#tools_catalog_header {
+    background: transparent;
+}
+QLabel#tools_catalog_title {
+    color: #edf2f7;
+    font-size: 18px;
+    font-weight: 700;
+}
+QLabel#tools_catalog_subtitle,
+QLabel#tools_catalog_summary {
+    color: #8f9aa8;
+    font-size: 12px;
+}
+QPushButton#tools_manual_btn {
+    background: rgba(79, 183, 197, 0.10);
+    border: 1px solid rgba(79, 183, 197, 0.38);
+    border-radius: 6px;
+    color: #8ce8f1;
+    padding: 8px 13px;
+    font-weight: 600;
+}
+QPushButton#tools_manual_btn:hover {
+    background: rgba(79, 183, 197, 0.18);
+    border-color: #8ce8f1;
+}
+QWidget#tools_catalog_controls {
+    background: transparent;
+}
+QLineEdit#tools_search,
+QComboBox#tools_filter_combo {
+    background: #10151b;
+    border: 1px solid #303946;
+    border-radius: 6px;
+    color: #edf2f7;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+QLineEdit#tools_search:focus,
+QComboBox#tools_filter_combo:hover {
+    border-color: #4fb7c5;
+}
+QComboBox#tools_filter_combo::drop-down {
+    border: none;
+    width: 20px;
+}
+QComboBox#tools_filter_combo QAbstractItemView {
+    background: #10151b;
+    border: 1px solid #303946;
+    color: #edf2f7;
+    selection-background-color: rgba(79, 183, 197, 0.14);
+}
+QListWidget#tools_list {
+    background: #10151b;
+    border: 1px solid #303946;
+    border-radius: 8px;
+    padding: 6px;
+    outline: none;
+}
+QListWidget#tools_list::item {
+    border-radius: 5px;
+    color: #a5afbc;
+    padding: 8px 10px;
+    margin: 1px 0;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+}
+QListWidget#tools_list::item:hover {
+    background: rgba(255,255,255,0.035);
+    color: #edf2f7;
+}
+QListWidget#tools_list::item:selected {
+    background: rgba(79, 183, 197, 0.11);
+    border: 1px solid rgba(79, 183, 197, 0.25);
+    color: #8ce8f1;
+}
+QFrame#tools_detail {
+    background: #10151b;
+    border: 1px solid #303946;
+    border-radius: 8px;
+}
+QLabel#tools_detail_name {
+    color: #edf2f7;
+    font-size: 16px;
+    font-weight: 700;
+}
+QLabel#tools_detail_badges {
+    color: #8f9aa8;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+}
+QLabel#tools_detail_guide {
+    color: #a5afbc;
+    font-size: 12px;
+}
+QTextEdit#tools_detail_desc {
+    background: #0b0d10;
+    border: 1px solid #26313d;
+    border-radius: 6px;
+    color: #d7dee7;
+    font-size: 12px;
+    padding: 10px;
+}
+
 /* ══════════════════════════════════════════════════════
    CHAT AREA
 ══════════════════════════════════════════════════════ */

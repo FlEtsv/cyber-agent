@@ -7,6 +7,12 @@ const TOOL_ICONS = {
   uninstall_package:'remove', system_info:'info',
 };
 
+const CATEGORY_ICONS = {
+  core:'core', web:'web', files:'file', system:'sys', desktop:'desk',
+  network:'net', forensics:'lab', encode:'enc', rag:'rag',
+  self:'self', mobile:'mob', other:'tool',
+};
+
 // â”€â”€ Markdown renderer (via marked CDN) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderMd(text) {
   if (!text) return '';
@@ -379,6 +385,8 @@ class CyberAgent {
     const { actionsSection, actionsList, toggle } = this.currentBubble;
 
     const icon = TOOL_ICONS[name] || 'tool';
+    const category = meta.category || 'tool';
+    const categoryIcon = CATEGORY_ICONS[category] || 'tool';
     const argsPreview = Object.entries(args || {})
       .map(([k,v]) => `${k}=${JSON.stringify(v).slice(0,30)}`)
       .join('  ').slice(0, 60);
@@ -387,7 +395,7 @@ class CyberAgent {
     row.className = 'tool-row';
     row.innerHTML = `
       <span class="tool-row-name">${icon}  ${escHtml(name)}</span>
-      <span class="tool-row-meta ${meta.risk === 'high' ? 'high' : 'low'}">${escHtml(meta.category || 'tool')} · ${escHtml(meta.risk || 'low')}</span>
+      <span class="tool-row-meta ${meta.risk === 'high' ? 'high' : 'low'}">${escHtml(categoryIcon)} · ${escHtml(category)} · ${escHtml(meta.risk || 'low')}</span>
       <span class="tool-row-args">${escHtml(argsPreview)}</span>
       <span class="tool-row-status pending">...</span>
     `;
