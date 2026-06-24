@@ -24,6 +24,9 @@ env/
 *.log
 logs/
 
+# Local taskboard listener runtime state
+data/taskboard_listener*.json
+
 # Model files (demasiado grandes para git)
 *.gguf
 *.safetensors

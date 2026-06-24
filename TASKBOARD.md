@@ -11,42 +11,44 @@
 > Los agentes las siguen sin necesidad de confirmación adicional.
 
 **R1 — Declara antes de actuar.**
-Antes de tocar cualquier archivo, escribe en `EN PROGRESO` qué vas a hacer, en qué archivos y por qué. Sin esa entrada no se empieza nada.
+Antes de tocar cualquier archivo, escribe en `EN PROGRESO` qué vas a hacer, en qué archivos y por qué. Sin esa entrada no se empieza nada.✅
 
 **R2 — Declara si tocas zona ajena.**
-Si necesitas modificar un archivo que pertenece al otro agente (ver `AGENTS.md`), hazlo — pero escríbelo explícitamente en tu entrada de `EN PROGRESO` y en el mensaje del commit. No pides permiso, lo declaras.
+Si necesitas modificar un archivo que pertenece al otro agente (ver `AGENTS.md`), hazlo — pero escríbelo explícitamente en tu entrada de `EN PROGRESO` y en el mensaje del commit. No pides permiso, lo declaras.✅
 
 **R3 — No dejes tareas a medias.**
-Si empiezas, terminas: código completo, sintaxis verificada, commit hecho, tarea movida a `COMPLETADO`. Si surge un bloqueante real, muévela a `BLOQUEADO` con explicación clara.
+Si empiezas, terminas: código completo, sintaxis verificada, commit hecho, tarea movida a `COMPLETADO`. Si surge un bloqueante real, muévela a `BLOQUEADO` con explicación clara.✅
 
 **R4 — No alteres filtros de comportamiento ni ética de modelos.**
-Ningún agente modifica system prompts de comportamiento interno, filtros de seguridad del LLM ni parámetros que cambien cómo razona el modelo. Sin excepciones.
+Ningún agente modifica system prompts de comportamiento interno, filtros de seguridad del LLM ni parámetros que cambien cómo razona el modelo. Sin excepciones.✅
 
 **R5 — Lee el board primero, siempre.**
-Al iniciar sesión: leer `TASKBOARD.md` → leer `AGENTS.md` → `git log --oneline -5`. Solo después actuar.
+Al iniciar sesión: leer `TASKBOARD.md` → leer `AGENTS.md` → `git log --oneline -5`. Solo después actuar.✅
 
 **R6 — El director manda.**
 Las directivas de Steve en `OBJETIVOS` tienen prioridad absoluta. Si no hay objetivo activo, tomar la tarea de mayor prioridad `✅` del BACKLOG que corresponda a tu zona.
 
 **R7 — Formato de commit obligatorio.**
-`[claude] tipo: descripción` o `[codex] tipo: descripción`. Tipos: `feat`, `fix`, `security`, `docs`, `refactor`.
+`[claude] tipo: descripción` o `[codex] tipo: descripción`. Tipos: `feat`, `fix`, `security`, `docs`, `refactor`.✅
 
 **R8 — SESION TERMINADA.**
 Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el estado actual (marcando lo incompleto), y no inician tareas nuevas.
-
+✅
 ---
+
 
 ## 🎯 OBJETIVOS
 
 > **Steve escribe aquí.** Los agentes leen esto primero en cada sesión.
 > Si hay texto aquí, tiene prioridad sobre todo el BACKLOG.
 
-    Actualizar el Gui de todo la app, darle una estetica sofisticada y elegante.
-    Diseñar seguridad de fugas de datos. 
-    Proteccion contra errores de corrupcion de datos.
-    Implementar sistema de reportes. 
-    Integrar las herramientas de Hacking. 
-    Realizar pruebas automatizadas.
+    Actualizar el Gui de todo la app, darle una estetica sofisticada y elegante.✅
+    Diseñar seguridad de fugas de datos. ✅
+    Proteccion contra errores de corrupcion de datos.✅
+    Implementar sistema de reportes. ✅
+    Integrar las herramientas de Hacking. ✅
+    Realizar pruebas automatizadas.✅
+
     
 
 
@@ -59,6 +61,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 [claude] F003 — Segunda modelo en model_router (routing real entre fast/power) — Archivos: `app/model_router.py` — Fecha: 2026-06-24 22:09
+`[CODEX] INFRA-001 — Implementar listener read-only de TASKBOARD.md — Archivos: scripts/taskboard_listener.py, docs/TASKBOARD_LISTENER.md, .gitignore — Fecha: 2026-06-24 22:06`
 
 ---
 
