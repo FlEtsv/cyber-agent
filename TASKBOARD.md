@@ -38,6 +38,10 @@ Las acciones que necesitan aprobación del usuario se dejan como petición en `P
 SE DEJAN LAS ACCIONES QUE SE NECESITA QUE EL USUARIO APRUEBE COMO PETICIONES EN EL AREA DE PERMISOS Y PETICIONES ABAJO, TOMAD LOS OBJETIVOS GENERICOS COMO QUE TENEIS QUE DESGLOSARLO COMO TAREAS DE IMPLEMENTACION, HACEIS DESGLOSE AÑADIIS EN TAREAS DE BACKLOG Y YO LAS APRUEBO ASI TODO EL RATO.
 ✅
 
+**R9 — CIERRE DE OBJETIVOS GLOBALES.**
+Cuando un objetivo global ya esté implementado según sus tareas de desglose y el estado real del sistema, se quita de `OBJETIVOS` y se mueve a `OBJETIVOS IMPLEMENTADOS` con referencia a las tareas/commits que lo cierran.
+✅
+
 
 ---
 
@@ -57,6 +61,13 @@ SE DEJAN LAS ACCIONES QUE SE NECESITA QUE EL USUARIO APRUEBE COMO PETICIONES EN 
     
 
 
+## ✅ OBJETIVOS IMPLEMENTADOS
+
+> Los agentes mueven aquí objetivos globales cuando el desglose asociado está completado y verificado.
+
+*(vacío — ningún objetivo global está completamente cerrado todavía)*
+
+
 
 
 ## 🔄 EN PROGRESO
@@ -65,7 +76,6 @@ SE DEJAN LAS ACCIONES QUE SE NECESITA QUE EL USUARIO APRUEBE COMO PETICIONES EN 
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-`[CODEX] B004+B005+B006 — Reconexión frontend, limpieza de estado WS y banners PC/reconectando — Archivos: app/web/static/app.js, app/web/static/style.css, relay/web/app.js, relay/web/style.css — Fecha: 2026-06-24 22:15`
 [claude] TEST-001 — Suite mínima automatizada backend/frontend: syntax, unit tests críticos y smoke de JS — Archivos: `tests/`, `scripts/`, `package.json` — Fecha: 2026-06-24 22:19
 
 ---
@@ -80,6 +90,7 @@ SE DEJAN LAS ACCIONES QUE SE NECESITA QUE EL USUARIO APRUEBE COMO PETICIONES EN 
 [claude] B002 — CORS dinámico _DynamicCORS lee env por req (no import-time) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] F003 — FAST_MODEL/POWER_MODEL configurables via CYBERAGENT_*_MODEL env — Commit: c842ed7 — Fecha: 2026-06-24 22:20
+[codex] B004+B005+B006+UI-001 — Reconexión frontend, banners PC/reconectando y pulido visual web/relay — Commit: 3cc9d5b — Fecha: 2026-06-24 22:35
 
 ---
 
@@ -163,4 +174,4 @@ Se dejan las acciones que se necesita que el usuario apruebe como peticiones en 
 
 | ID | ✅ | Agente | Acción solicitada | Estado |
 |----|----|--------|-------------------|--------|
-| P-CODEX-001 | ✅ | codex | Ejecutar `node --check app/web/static/app.js` y `node --check relay/web/app.js`; si pasan, hacer commit acumulado `[codex] feat: improve web reconnect and visual states` con B004+B005+B006+UI-001 y actualización del TASKBOARD. | pendiente |
+| P-CODEX-001 | ✅ | codex | Ejecutar `node --check app/web/static/app.js` y `node --check relay/web/app.js`; si pasan, hacer commit acumulado `[codex] feat: improve web reconnect and visual states` con B004+B005+B006+UI-001 y actualización del TASKBOARD. | completado: 3cc9d5b |
