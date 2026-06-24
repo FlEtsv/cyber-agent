@@ -125,7 +125,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Router LLM mejorado (prompt 350t + desktop group + fix encoding) + TOOLS_MANUAL.md + USER_GUIDE.md + CONNECTION_GUIDE.md + TASKBOARD objetivos cerrados — Commit: 3f9a41b — Fecha: 2026-06-24
 [codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: d4424c9 — Fecha: 2026-06-24
 [claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay; iconos de categoría añadidos por Codex — Commit: 777592d + d4424c9 — Fecha: 2026-06-24
-[codex] BOARD-001 — Trazabilidad de GUI-002 corregida para incluir iconos de categoría en d4424c9 — Commit: PENDIENTE — Fecha: 2026-06-24 23:17
+[codex] BOARD-001 — Trazabilidad de GUI-002 corregida para incluir iconos de categoría en d4424c9 — Commit: 7a75dc1 — Fecha: 2026-06-24 23:17
 
 ---
 
