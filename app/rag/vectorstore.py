@@ -19,13 +19,17 @@ def _get_collection():
             from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
             client = chromadb.PersistentClient(path=CHROMA_PATH)
             ef = DefaultEmbeddingFunction()  # all-MiniLM-L6-v2 via onnxruntime, sin scipy
-            _collection = client.get_or_create_collection(
+            col = client.get_or_create_collection(
                 name="cyberagent_kb",
                 embedding_function=ef,
                 metadata={"hnsw:space": "cosine"},
             )
-            if _collection.count() == 0:
-                _index_documents(_collection)
+            _collection = col  # assign before indexing so a failed index doesn't null it
+            if col.count() == 0:
+                try:
+                    _index_documents(col)
+                except Exception as ie:
+                    print(f"[RAG] Index error (non-fatal): {ie}")
         except Exception as e:
             print(f"[RAG] ChromaDB init error: {e}")
             _collection = None
@@ -52,23 +56,24 @@ def search(query: str, n_results: int = 3) -> list[dict]:
     col = _get_collection()
     if col is None:
         return []
-    try:
-        n = min(n_results, col.count())
-        if n == 0:
+    with _lock:
+        try:
+            n = min(n_results, col.count())
+            if n == 0:
+                return []
+            results = col.query(query_texts=[query], n_results=n)
+            out = []
+            for i, doc in enumerate(results["documents"][0]):
+                meta = results["metadatas"][0][i]
+                out.append({
+                    "title": meta["title"],
+                    "content": doc,
+                    "platform": meta["platform"],
+                })
+            return out
+        except Exception as e:
+            print(f"[RAG] Search error: {e}")
             return []
-        results = col.query(query_texts=[query], n_results=n)
-        out = []
-        for i, doc in enumerate(results["documents"][0]):
-            meta = results["metadatas"][0][i]
-            out.append({
-                "title": meta["title"],
-                "content": doc,
-                "platform": meta["platform"],
-            })
-        return out
-    except Exception as e:
-        print(f"[RAG] Search error: {e}")
-        return []
 
 
 def add_document(doc_id: str, title: str, content: str,
@@ -76,18 +81,19 @@ def add_document(doc_id: str, title: str, content: str,
     col = _get_collection()
     if col is None:
         return
-    try:
-        col.upsert(
-            ids=[doc_id],
-            documents=[f"{title}\n\n{content}"],
-            metadatas=[{
-                "title": title,
-                "platform": platform,
-                "tags": ",".join(tags or []),
-            }],
-        )
-    except Exception as e:
-        print(f"[RAG] Add error: {e}")
+    with _lock:
+        try:
+            col.upsert(
+                ids=[doc_id],
+                documents=[f"{title}\n\n{content}"],
+                metadatas=[{
+                    "title": title,
+                    "platform": platform,
+                    "tags": ",".join(tags or []),
+                }],
+            )
+        except Exception as e:
+            print(f"[RAG] Add error: {e}")
 
 
 def reset_index():

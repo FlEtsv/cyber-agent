@@ -144,12 +144,15 @@ class RagPanel(QWidget):
             self.stat_lbl.setText(f"Error: {e}")
 
     def _reindex(self):
+        if self._worker and self._worker.isRunning():
+            return
         self.reindex_btn.setEnabled(False)
         self.reindex_btn.setText("⏳ Indexando...")
         self.stat_lbl.setText("Re-indexando documentos...")
         self._worker = ReindexWorker()
         self._worker.done.connect(self._on_reindex_done)
         self._worker.error.connect(self._on_reindex_error)
+        self._worker.finished.connect(self._worker.deleteLater)
         self._worker.start()
 
     def _on_reindex_done(self, count: int):
@@ -174,9 +177,12 @@ class RagPanel(QWidget):
         platform = self.plat_combo.currentText()
         import hashlib, time
         doc_id = "custom_" + hashlib.md5(f"{title}{time.time()}".encode()).hexdigest()[:8]
+        if self._add_worker and self._add_worker.isRunning():
+            return
         self._add_worker = AddDocWorker(doc_id, title, content, platform)
         self._add_worker.done.connect(self._on_add_done)
         self._add_worker.error.connect(lambda e: self.msg_lbl.setText(f"Error: {e}"))
+        self._add_worker.finished.connect(self._add_worker.deleteLater)
         self._add_worker.start()
 
     def _on_add_done(self):

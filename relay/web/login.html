@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#161b22">
+  <title>CyberAgent - Acceso</title>
+  <link rel="stylesheet" href="/static/login.css">
+</head>
+<body>
+<div id="card">
+  <div class="logo">CA</div>
+  <h1>CyberAgent</h1>
+  <p class="sub" id="card-sub">Tu agente. Tu infraestructura.</p>
+
+  <form id="setup-form" class="hidden">
+    <p class="notice">Primera vez - crea tu cuenta</p>
+    <label>Correo</label>
+    <input id="s-email" type="email" autocomplete="email" required placeholder="tu@correo.com">
+    <label>Contrasena</label>
+    <input id="s-pass" type="password" autocomplete="new-password" required placeholder="minimo 8 caracteres">
+    <label>Confirmar contrasena</label>
+    <input id="s-pass2" type="password" autocomplete="new-password" required placeholder="repite la contrasena">
+    <button type="submit" id="setup-btn">Crear cuenta</button>
+    <p id="setup-err" class="err hidden"></p>
+  </form>
+
+  <div id="qr-step" class="hidden">
+    <p class="notice">Escanea este codigo con Google Authenticator o Authy</p>
+    <div id="qr-img"></div>
+    <p class="qr-hint">Despues de escanear, introduce el codigo de 6 digitos para verificar:</p>
+    <input id="qr-code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" autocomplete="one-time-code">
+    <button id="qr-verify-btn">Verificar y entrar</button>
+    <p id="qr-err" class="err hidden"></p>
+  </div>
+
+  <form id="login-form" class="hidden">
+    <label>Correo</label>
+    <input id="l-email" type="email" autocomplete="email" required placeholder="tu@correo.com">
+    <label>Contrasena</label>
+    <input id="l-pass" type="password" autocomplete="current-password" required placeholder="contrasena">
+    <label id="l-totp-label">Codigo 2FA</label>
+    <input id="l-totp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" autocomplete="one-time-code">
+    <button type="submit" id="login-btn">Entrar</button>
+    <p id="login-err" class="err hidden"></p>
+  </form>
+</div>
+
+<script>
+let totpRequired = false;
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+  });
+  return r.json();
+}
+
+function showErr(el, msg) {
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function configureTotp(required) {
+  totpRequired = !!required;
+  const label = document.getElementById('l-totp-label');
+  const input = document.getElementById('l-totp');
+  label.classList.toggle('hidden', !totpRequired);
+  input.classList.toggle('hidden', !totpRequired);
+  input.required = totpRequired;
+  if (!totpRequired) input.value = '';
+}
+
+async function init() {
+  const res = await fetch('/api/auth/status').then(r => r.json());
+  configureTotp(res.totp_required);
+  if (res.setup_done) {
+    document.getElementById('login-form').classList.remove('hidden');
+  } else {
+    document.getElementById('setup-form').classList.remove('hidden');
+    document.getElementById('card-sub').textContent = 'Configura tu acceso';
+  }
+}
+
+document.getElementById('setup-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('s-email').value.trim();
+  const pass  = document.getElementById('s-pass').value;
+  const pass2 = document.getElementById('s-pass2').value;
+  const err   = document.getElementById('setup-err');
+
+  if (pass !== pass2) return showErr(err, 'Las contrasenas no coinciden');
+  if (pass.length < 8) return showErr(err, 'Minimo 8 caracteres');
+
+  document.getElementById('setup-btn').disabled = true;
+  const res = await post('/api/auth/setup', {email, password: pass});
+  if (res.ok) {
+    document.getElementById('setup-form').classList.add('hidden');
+    document.getElementById('qr-img').innerHTML = res.qr_svg;
+    document.getElementById('qr-step').classList.remove('hidden');
+  } else {
+    showErr(err, res.error || 'Error al crear cuenta');
+    document.getElementById('setup-btn').disabled = false;
+  }
+});
+
+document.getElementById('qr-verify-btn').addEventListener('click', async () => {
+  const code = document.getElementById('qr-code').value.trim();
+  const err  = document.getElementById('qr-err');
+  if (code.length !== 6) return showErr(err, 'Introduce el codigo de 6 digitos');
+
+  const email = document.getElementById('s-email').value.trim();
+  const pass  = document.getElementById('s-pass').value;
+  document.getElementById('qr-verify-btn').disabled = true;
+  const res = await post('/api/auth/login', {email, password: pass, totp: code});
+  if (res.ok) {
+    window.location.href = '/';
+  } else {
+    showErr(err, 'Codigo incorrecto, intentalo de nuevo');
+    document.getElementById('qr-verify-btn').disabled = false;
+  }
+});
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  const totp  = totpRequired ? document.getElementById('l-totp').value.trim() : '';
+  const err   = document.getElementById('login-err');
+
+  document.getElementById('login-btn').disabled = true;
+  const res = await post('/api/auth/login', {email, password: pass, totp});
+  if (res.ok) {
+    window.location.href = '/';
+  } else {
+    showErr(err, res.error || 'Credenciales incorrectas');
+    document.getElementById('login-btn').disabled = false;
+  }
+});
+
+init();
+</script>
+</body>
+</html>

@@ -50,12 +50,15 @@ class TunnelManager:
                 errors="replace",
             )
             url_re = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
-            for line in self._proc.stdout:
-                print(f"[tunnel] {line.rstrip()}")
-                m = url_re.search(line)
-                if m and self._url is None:
-                    self._url = m.group(0)
-                    self._register(self._url)
+            try:
+                for line in self._proc.stdout:
+                    print(f"[tunnel] {line.rstrip()}")
+                    m = url_re.search(line)
+                    if m and self._url is None:
+                        self._url = m.group(0)
+                        self._register(self._url)
+            finally:
+                self._proc.stdout.close()
         except Exception as e:
             print(f"[tunnel] Error: {e}")
 

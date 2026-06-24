@@ -170,6 +170,13 @@ class ReleaseUpdater(QThread):
                                     f"  {pct}%  ({downloaded // 1048576} / {size // 1048576} MB)"
                                 )
 
+            if size and downloaded != size:
+                self.failed.emit(f"Descarga incompleta: {downloaded}/{size} bytes")
+                try:
+                    os.unlink(zip_path)
+                except Exception:
+                    pass
+                return
             self.progress.emit(f"✓  Descargado: {zip_path}")
             self.ready.emit(zip_path)
 
@@ -227,5 +234,12 @@ Start-Process -FilePath $exe
 
 
 def restart():
-    """Reinicia la app (solo modo fuente)."""
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    """Reinicia la app (solo modo fuente) — cierra Qt limpiamente antes de relanzar."""
+    import subprocess
+    subprocess.Popen([sys.executable] + sys.argv)
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app:
+        app.quit()
+    else:
+        sys.exit(0)

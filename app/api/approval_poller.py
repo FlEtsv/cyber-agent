@@ -1,4 +1,4 @@
-import time
+import time, threading
 from PySide6.QtCore import QThread, Signal
 from app.api import alert_sender
 
@@ -15,16 +15,16 @@ class ApprovalPoller(QThread):
 
     def __init__(self, tool_id: str, token: str):
         super().__init__()
-        self.tool_id  = tool_id
-        self.token    = token
-        self._stopped = False
+        self.tool_id    = tool_id
+        self.token      = token
+        self._stop_event = threading.Event()
 
     def stop(self):
-        self._stopped = True
+        self._stop_event.set()
 
     def run(self):
         deadline = time.time() + POLL_TIMEOUT
-        while not self._stopped and time.time() < deadline:
+        while not self._stop_event.is_set() and time.time() < deadline:
             decision = alert_sender.poll_approval(self.token)
             if decision == "approve":
                 self.decided.emit(self.tool_id, True)
@@ -32,7 +32,7 @@ class ApprovalPoller(QThread):
             if decision == "reject":
                 self.decided.emit(self.tool_id, False)
                 return
-            time.sleep(POLL_INTERVAL)
+            self._stop_event.wait(POLL_INTERVAL)  # interruptible sleep
         # Timeout sin respuesta → rechazar por defecto
-        if not self._stopped:
+        if not self._stop_event.is_set():
             self.decided.emit(self.tool_id, False)

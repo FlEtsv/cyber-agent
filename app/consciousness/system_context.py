@@ -62,6 +62,11 @@ def _is_admin() -> bool:
 
 
 def build_system_prompt(base_prompt: str) -> str:
-    """Construye el system prompt con contexto del sistema al inicio."""
+    """Construye el system prompt con contexto del sistema y auto-conciencia."""
     ctx = get_system_context()
-    return f"{base_prompt}\n\n{ctx}"
+    try:
+        from app.consciousness.self_awareness import get_architecture_block
+        arch = "\n\n" + get_architecture_block()
+    except Exception:
+        arch = ""
+    return f"{base_prompt}\n\n{ctx}{arch}"

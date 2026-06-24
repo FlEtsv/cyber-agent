@@ -15,9 +15,11 @@ def is_enabled() -> bool:
     try:
         import winreg
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_KEY, 0, winreg.KEY_READ)
-        winreg.QueryValueEx(key, _REG_NAME)
-        winreg.CloseKey(key)
-        return True
+        try:
+            winreg.QueryValueEx(key, _REG_NAME)
+            return True
+        finally:
+            winreg.CloseKey(key)
     except OSError:
         return False
 
@@ -25,16 +27,20 @@ def is_enabled() -> bool:
 def enable():
     import winreg
     key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_KEY, 0, winreg.KEY_SET_VALUE)
-    winreg.SetValueEx(key, _REG_NAME, 0, winreg.REG_SZ, _cmd())
-    winreg.CloseKey(key)
+    try:
+        winreg.SetValueEx(key, _REG_NAME, 0, winreg.REG_SZ, _cmd())
+    finally:
+        winreg.CloseKey(key)
 
 
 def disable():
     try:
         import winreg
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_KEY, 0, winreg.KEY_SET_VALUE)
-        winreg.DeleteValue(key, _REG_NAME)
-        winreg.CloseKey(key)
+        try:
+            winreg.DeleteValue(key, _REG_NAME)
+        finally:
+            winreg.CloseKey(key)
     except OSError:
         pass
 

@@ -69,7 +69,15 @@ class TerminalWorker(QThread):
                 if self._killed:
                     break
                 self.line_out.emit(line)
-            self._proc.wait()
+            try:
+                self._proc.stdout.close()
+            except Exception:
+                pass
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+                self._proc.wait()
             rc = -1 if self._killed else (self._proc.returncode or 0)
             if self._killed:
                 self.line_out.emit("\n[proceso terminado por el usuario]\n")
@@ -273,6 +281,8 @@ class TerminalPanel(QWidget):
         if rc not in (0, -1):
             self._write(f"[exit {rc}]\n")
         self._write(f"{self.prompt_lbl.text()} ")
+        if self._worker:
+            self._worker.deleteLater()
         self._worker = None
         self.kill_btn.setEnabled(False)
         self.run_btn.setEnabled(True)

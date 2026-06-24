@@ -94,6 +94,11 @@ class TrainWorker(QThread):
         self.epochs = epochs
         self.batch  = batch
         self.lr     = lr
+        self._proc: QProcess | None = None
+
+    def kill_proc(self):
+        if self._proc is not None:
+            self._proc.kill()
 
     def run(self):
         train_script = os.path.join(os.path.dirname(__file__), "..", "finetune", "train.py")
@@ -106,7 +111,8 @@ class TrainWorker(QThread):
             "--batch-size", str(self.batch),
             "--lr",         str(self.lr),
         ]
-        proc = QProcess()
+        self._proc = QProcess()
+        proc = self._proc
         proc.setProcessChannelMode(QProcess.MergedChannels)
 
         all_out = []
@@ -334,6 +340,7 @@ class FineTuneDialog(QDialog):
 
     def _stop_train(self):
         if self._worker and self._worker.isRunning():
+            self._worker.kill_proc()  # kill QProcess child first to prevent orphan
             self._worker.terminate()
             self.log_box.append("\n[DETENIDO por el usuario]")
         self._reset_btns()

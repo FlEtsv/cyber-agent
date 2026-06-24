@@ -1,0 +1,70 @@
+# deploy.ps1 â€” Despliega el relay en Google Cloud Run
+# Uso: .\relay\deploy.ps1 -Project TU_PROJECT_ID
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$Project,
+    [string]$Region = "us-central1",
+    [string]$ServiceName = "cyberagent-relay"
+)
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "`n[1/4] Verificando gcloud..." -ForegroundColor Cyan
+gcloud auth list --filter=status:ACTIVE --format="value(account)" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "No has iniciado sesiÃ³n. Ejecuta: gcloud auth login" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[2/4] Activando APIs necesarias..." -ForegroundColor Cyan
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com `
+    --project=$Project --quiet
+
+Write-Host "[3/4] Construyendo y subiendo imagen..." -ForegroundColor Cyan
+$ImageUrl = "gcr.io/$Project/$ServiceName"
+gcloud builds submit ./relay `
+    --tag=$ImageUrl `
+    --project=$Project
+
+Write-Host "[4/4] Desplegando en Cloud Run..." -ForegroundColor Cyan
+
+# Lee secrets del archivo .env si existen
+$envFile = Join-Path $PSScriptRoot "..\data\relay_secrets.env"
+$envVars = @()
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match "^[^#].*=") { $envVars += $_ }
+    }
+    Write-Host "  Usando variables de $envFile" -ForegroundColor Green
+} else {
+    Write-Host "  AVISO: no se encontrÃ³ data\relay_secrets.env" -ForegroundColor Yellow
+    Write-Host "  Ejecuta primero: python relay\generate_secrets.py --email TU@EMAIL --password TUPASS" -ForegroundColor Yellow
+}
+
+$setEnv = if ($envVars) { "--set-env-vars=" + ($envVars -join ",") } else { "" }
+
+$args = @(
+    "run", "deploy", $ServiceName,
+    "--image=$ImageUrl",
+    "--region=$Region",
+    "--platform=managed",
+    "--allow-unauthenticated",
+    "--min-instances=0",
+    "--max-instances=1",
+    "--memory=256Mi",
+    "--cpu=1",
+    "--timeout=3600",
+    "--project=$Project"
+)
+if ($setEnv) { $args += $setEnv }
+
+& gcloud @args
+
+$url = gcloud run services describe $ServiceName `
+    --region=$Region --project=$Project `
+    --format="value(status.url)"
+
+Write-Host "`nRelay desplegado en: $url" -ForegroundColor Green
+Write-Host "`nAnade esto a tu .env del PC:" -ForegroundColor Cyan
+Write-Host "RELAY_URL=$url"
+Write-Host "RELAY_HOST_SECRET=<el HOST_SECRET que generaste>"

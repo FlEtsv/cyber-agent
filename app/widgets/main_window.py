@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QTextEdit, QSizePolicy, QStackedWidget,
-    QFrame,
+    QFrame, QComboBox, QScrollArea,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
@@ -24,16 +24,69 @@ from app import autostart
 
 # ── Default permission levels per tool ────────────────────────────────────
 DEFAULT_PERMISSIONS = {
-    "shell":             "ask",
-    "write_file":        "ask",
-    "run_python":        "ask",
-    "install_package":   "ask",
-    "uninstall_package": "ask",
-    "read_file":         "auto",
-    "list_directory":    "auto",
-    "web_fetch":         "auto",
-    "list_processes":    "auto",
-    "system_info":       "auto",
+    # — Core (siempre auto) —
+    "shell":                "auto",
+    "write_file":           "auto",
+    "run_python":           "auto",
+    "read_file":            "auto",
+    "list_directory":       "auto",
+    "web_fetch":            "auto",
+    "http_request":         "auto",
+    "search_files":         "auto",
+    "grep_files":           "auto",
+    # — Sistema (read-only, auto) —
+    "list_processes":       "auto",
+    "system_info":          "auto",
+    "memory_info":          "auto",
+    "gpu_info":             "auto",
+    "network_info":         "auto",
+    "env_vars":             "auto",
+    "process_tree":         "auto",
+    "process_info":         "auto",
+    "arp_cache":            "auto",
+    # — Herramientas de análisis (auto) —
+    "hash_file":            "auto",
+    "diff_files":           "auto",
+    "encode_decode":        "auto",
+    "strings_extract":      "auto",
+    "hex_dump":             "auto",
+    "file_entropy":         "auto",
+    "pe_info":              "auto",
+    "file_metadata":        "auto",
+    # — Auditoría web/red (auto) —
+    "web_search":           "auto",
+    "ssl_info":             "auto",
+    "http_headers_check":   "auto",
+    "web_crawl":            "auto",
+    "dns_lookup":           "auto",
+    "whois_lookup":         "auto",
+    "traceroute":           "auto",
+    "banner_grab":          "auto",
+    "ping_sweep":           "auto",
+    "port_scan":            "auto",
+    # — RAG / aprendizaje —
+    "rag_search":           "auto",
+    "rag_add":              "auto",
+    # — Auditoría Windows (auto, read-only) —
+    "registry_query":       "auto",
+    "list_services":        "auto",
+    "check_persistence":    "auto",
+    "network_connections":  "auto",
+    "dir_bruteforce":       "auto",
+    # — Requieren confirmación —
+    "install_package":      "ask",
+    "uninstall_package":    "ask",
+    "kill_process":         "ask",
+    "clipboard_write":      "ask",
+    "windows_notify":       "ask",
+    # — Siempre auto (misc) —
+    "screenshot_pc":        "auto",
+    "clipboard_read":       "auto",
+    "open_browser":         "auto",
+    # — Auto-conciencia y auto-modificación —
+    "list_self_files":      "auto",
+    "syntax_check":         "auto",
+    "restart_self":         "ask",   # reiniciar pide confirmación por seguridad
 }
 
 PERM_LABELS = {"ask": "🔴 Pedir", "auto": "🟢 Auto", "block": "⛔ Bloquear"}
@@ -82,6 +135,7 @@ class MainWindow(QMainWindow):
         self._update_remote: str = ""
         self._approval_pollers: dict[str, ApprovalPoller] = {}
         self._threat_detectors: list = []
+        self.selected_model: str = OLLAMA_MODEL
 
         self._build_ui()
         self._load_conversations()
@@ -101,6 +155,11 @@ class MainWindow(QMainWindow):
         root_lay.addWidget(self._build_sidebar())
         root_lay.addWidget(self._build_main_area(), 1)
 
+    def _on_model_changed(self, index: int):
+        self.selected_model = self._model_ids[index]
+        if hasattr(self, "model_status"):
+            self.model_status.setText(f"● {self.selected_model} listo")
+
     # ── Sidebar ───────────────────────────────────────────────────────
 
     def _build_sidebar(self) -> QWidget:
@@ -116,9 +175,10 @@ class MainWindow(QMainWindow):
         logo.setObjectName("logo")
         lay.addWidget(logo)
 
-        model_lbl = QLabel(f"{OLLAMA_MODEL} · local")
-        model_lbl.setObjectName("model_label")
-        lay.addWidget(model_lbl)
+        self._model_ids = [OLLAMA_MODEL]
+        self.model_badge = QLabel(f"  Modelo activo\n  {OLLAMA_MODEL}")
+        self.model_badge.setObjectName("model_badge")
+        lay.addWidget(self.model_badge)
 
         # Trust toggle
         self.trust_btn = QPushButton("🛡  Supervisado")
@@ -176,7 +236,13 @@ class MainWindow(QMainWindow):
 
             perm_lay.addWidget(row)
 
-        lay.addWidget(perm_widget)
+        perm_scroll = QScrollArea()
+        perm_scroll.setObjectName("perm_scroll")
+        perm_scroll.setWidget(perm_widget)
+        perm_scroll.setWidgetResizable(True)
+        perm_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        perm_scroll.setFrameShape(QFrame.NoFrame)
+        lay.addWidget(perm_scroll, 1)
 
         # ── Bottom buttons ─────────────────────────────────────────────
         sep2 = self._separator()
@@ -216,6 +282,12 @@ class MainWindow(QMainWindow):
         nssm_btn.setToolTip("Instala CyberAgent como servicio Windows via NSSM (requiere Admin)")
         nssm_btn.clicked.connect(self._install_nssm_service)
         lay.addWidget(nssm_btn)
+
+        vram_btn = QPushButton("🎮  Liberar VRAM")
+        vram_btn.setObjectName("btn_free_vram")
+        vram_btn.setToolTip("Descarga el modelo de VRAM para liberar GPU (úsalo antes de jugar)")
+        vram_btn.clicked.connect(self._free_vram)
+        lay.addWidget(vram_btn)
 
         self.status_lbl = QLabel("● daemon activo · localhost:11434")
         self.status_lbl.setObjectName("status_bar")
@@ -457,11 +529,16 @@ class MainWindow(QMainWindow):
         return super().eventFilter(obj, event)
 
     def _send(self):
+        from app.agent_log import log, separator
         text = self.input_box.toPlainText().strip()
         if not text or self._streaming:
             return
         if not self.active_conv:
             self._new_conversation()
+        separator(f"SEND → {text[:60]}")
+        log("INFO", "main_window._send", "Usuario envía mensaje",
+            {"msg": text[:200], "model": self.selected_model,
+             "session_trust": self.session_trust})
 
         self.input_box.clear()
         self._streaming      = True
@@ -485,17 +562,19 @@ class MainWindow(QMainWindow):
 
         self.worker = AgentWorker(
             messages         = history,
-            model            = OLLAMA_MODEL,
+            model            = self.selected_model,
             trusted_tools    = self.trusted_tools,
             session_trust    = self.session_trust,
             tool_permissions = self.tool_permissions,
             system_prompt    = build_system_prompt(SYSTEM_PROMPT),
+            conversation_id  = self.active_conv,
         )
+        _conv_id = self.active_conv  # snapshot — user may switch conversations mid-stream
         self.worker.token.connect(self._on_token)
         self.worker.tool_call.connect(self._on_tool_call)
         self.worker.tool_result.connect(self._on_tool_result)
         self.worker.need_approval.connect(self._on_need_approval)
-        self.worker.finished.connect(self._on_finished)
+        self.worker.finished.connect(lambda full: self._on_finished(full, _conv_id))
         self.worker.error.connect(self._on_error)
         self.worker.start()
 
@@ -509,28 +588,38 @@ class MainWindow(QMainWindow):
 
     def _on_token(self, token: str):
         if self._response_bubble is None:
-            self._response_bubble = self.chat.add_message("assistant", streaming=True)
+            # Reuse bubble created by tool activity (if any), otherwise create fresh
+            self._response_bubble = self.chat.get_or_create_assistant_bubble()
+            from app.agent_log import log
+            log("INFO", "main_window", "Primer token recibido — bubble creado")
         self._current_response += token
         self.chat.append_token(token)
 
     def _on_tool_call(self, event: dict):
         self._pending_tools[event["id"]] = {"name": event["name"], "args": event["args"]}
-        self.chat.add_tool_card(
+        self.chat.add_tool_activity(
             event["id"], event["name"], event["args"], event["dangerous"]
         )
 
-    _SKIP_THREAT = {"read_file", "list_directory", "list_processes", "system_info"}
+    _SKIP_THREAT = {"read_file", "list_directory", "list_processes", "system_info",
+                    "memory_info", "gpu_info", "network_info", "env_vars", "arp_cache"}
+    _MAX_DETECTORS = 3
 
     def _check_threat(self, result: dict, tool_name: str):
         if tool_name in self._SKIP_THREAT:
             return
+        if len(self._threat_detectors) >= self._MAX_DETECTORS:
+            return
         from app.consciousness.threat_detector import ThreatDetector
         detector = ThreatDetector(tool_name, result, parent=self)
         detector.threat_found.connect(self._on_threat_found)
-        detector.finished.connect(
-            lambda d=detector: self._threat_detectors.remove(d)
-            if d in self._threat_detectors else None
-        )
+        def _remove_detector(d=detector):
+            if d in self._threat_detectors:
+                self._threat_detectors.remove(d)
+        detector.finished.connect(_remove_detector)
+        # Safety: force-remove after 60s if thread hangs and never emits finished
+        from PySide6.QtCore import QTimer as _QT
+        _QT.singleShot(60_000, _remove_detector)
         self._threat_detectors.append(detector)
         detector.start()
 
@@ -550,8 +639,7 @@ class MainWindow(QMainWindow):
 
     def _on_need_approval(self, event: dict):
         self.notification_pending.emit(True)
-        # ToolCard ya tiene los botones visibles en el chat.
-        # Además enviamos push notification al móvil si Cloud Run está configurado.
+        self.chat.show_approval(event["id"], event["name"], event["args"], event["dangerous"])
         if alert_sender.cloud_configured():
             token = alert_sender.request_approval(
                 event["id"], event["name"], event["args"]
@@ -571,6 +659,7 @@ class MainWindow(QMainWindow):
             self._on_tool_rejected(tool_id)
 
     def _on_tool_approved(self, tool_id: str, tool_name: str, always: bool):
+        self.chat.hide_approval(tool_id)
         poller = self._approval_pollers.pop(tool_id, None)
         if poller:
             poller.stop()
@@ -597,27 +686,56 @@ class MainWindow(QMainWindow):
         if self.worker:
             self.worker.approve(False)
 
-    def _on_finished(self, full: str):
+    def _on_finished(self, full: str, conv_id: int = None):
+        from app.agent_log import log
+        log("INFO", "main_window._on_finished", "Respuesta completada",
+            {"full_len": len(full), "preview": full[:200] if full else ""})
         msg_id = None
-        if full and self.active_conv:
-            msg_id = db.save_message(self.active_conv, "assistant", full)
-        self.chat.finish_streaming(msg_id=msg_id, conv_id=self.active_conv)
+        save_conv = conv_id or self.active_conv
+        if full and save_conv:
+            msg_id = db.save_message(save_conv, "assistant", full)
+            try:
+                from app.memory import refresh_conversation_memory
+                refresh_conversation_memory(save_conv)
+            except Exception:
+                pass
+        if not self.isVisible():
+            self._end_streaming()
+            return
+        self.chat.finish_streaming(msg_id=msg_id, conv_id=save_conv)
         self._response_bubble = None
         self._end_streaming()
         self._load_conversations()
         self.model_status.setText("● modelo listo")
 
     def _on_error(self, msg: str):
+        if not self.isVisible():
+            return
+        from app.agent_log import log
+        log("ERROR", "main_window._on_error", "Error del agente", {"error": msg[:500]})
+        lower = msg.lower()
+        is_connection = any(
+            marker in lower
+            for marker in ("connecterror", "connecttimeout", "no se puede arrancar ollama", "ollama no responde")
+        )
+        title = "Error de conexion" if is_connection else "Error del agente"
+        hint = (
+            "\n\nVerifica que Ollama esta corriendo: `ollama serve`"
+            if is_connection
+            else "\n\nEl agente encontro un fallo interno. Revisa el bloque anterior y `agent.log`."
+        )
         self.chat.add_message(
             "assistant",
-            f"**Error de conexión:**\n\n```\n{msg}\n```\n\n"
-            "Verifica que Ollama está corriendo: `ollama serve`",
+            f"**{title}:**\n\n```\n{msg}\n```{hint}",
         )
         self._end_streaming()
-        self.model_status.setText("● error — Ollama desconectado")
+        self.model_status.setText("error de conexion" if is_connection else "error del agente")
 
     def _end_streaming(self):
         self._streaming = False
+        if self.worker:
+            self.worker.deleteLater()
+            self.worker = None
         self.stop_btn.hide()
         self.send_btn.show()
         self.input_box.setReadOnly(False)
@@ -738,6 +856,17 @@ class MainWindow(QMainWindow):
             self.status_lbl.setText(msg)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo modificar el registro:\n{e}")
+
+    def _free_vram(self):
+        import subprocess
+        subprocess.run(
+            ["powershell", "-NonInteractive", "-Command",
+             "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue"],
+            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        self.status_lbl.setText("● VRAM liberada — recarga al chatear")
+        if hasattr(self, "model_status"):
+            self.model_status.setText("● modelo descargado")
 
     def _install_nssm_service(self):
         import os, ctypes

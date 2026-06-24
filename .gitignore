@@ -16,6 +16,8 @@ env/
 
 # Database (datos locales del usuario)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # Logs
@@ -33,6 +35,14 @@ models/
 # Data directory (knowledge base vectors, fine-tuning data)
 data/vectors/
 data/finetuning/
+data/chroma/
+data/*.env
+data/*secret*
+data/*credentials*
+data/*totp*
+data/*qr*
+data/learner_log.jsonl
+data/learner_state.json
 
 # OS
 .DS_Store
@@ -50,6 +60,7 @@ desktop.ini
 
 # Secrets / credentials
 .env
+*.env
 *.pem
 *.key
 secrets.json

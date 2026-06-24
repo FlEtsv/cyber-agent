@@ -1,16 +1,22 @@
-import sqlite3, json, os
+import sqlite3, json, os, threading
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "cyberagent.db")
 
+_local = threading.local()
+
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if not getattr(_local, "conn", None):
+        _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True, timeout=10)
+        _local.conn.row_factory = sqlite3.Row
+        _local.conn.execute("PRAGMA journal_mode=WAL")
+    return _local.conn
 
 def init_db():
     with get_conn() as c:
         c.executescript("""
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT DEFAULT 'Nueva conversación',
@@ -40,6 +46,11 @@ def init_db():
                 conversation_id INTEGER,
                 rating INTEGER NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS conversation_memory (
+                conversation_id INTEGER PRIMARY KEY,
+                summary TEXT NOT NULL DEFAULT '',
+                updated_at TEXT DEFAULT (datetime('now'))
             );
         """)
 
@@ -72,5 +83,29 @@ def save_message(conv_id, role, content, tool_data=None):
 
 def delete_conversation(conv_id):
     with get_conn() as c:
+        c.execute("DELETE FROM message_ratings WHERE conversation_id=?", (conv_id,))
+        c.execute("DELETE FROM decision_log WHERE conversation_id=?", (conv_id,))
+        c.execute("DELETE FROM conversation_memory WHERE conversation_id=?", (conv_id,))
         c.execute("DELETE FROM messages WHERE conversation_id=?", (conv_id,))
         c.execute("DELETE FROM conversations WHERE id=?", (conv_id,))
+
+def get_memory_summary(conv_id):
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT summary FROM conversation_memory WHERE conversation_id=?",
+            (conv_id,),
+        ).fetchone()
+        return row["summary"] if row else ""
+
+def save_memory_summary(conv_id, summary):
+    with get_conn() as c:
+        c.execute(
+            """
+            INSERT INTO conversation_memory (conversation_id, summary, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(conversation_id) DO UPDATE SET
+                summary=excluded.summary,
+                updated_at=datetime('now')
+            """,
+            (conv_id, summary),
+        )

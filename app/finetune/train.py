@@ -95,7 +95,7 @@ def train(jsonl_path: str, output_dir: str, model_name: str = DEFAULT_MODEL,
             output_dir=output_dir,
             logging_steps=1,
             save_strategy="epoch",
-            fp16=True,
+            fp16=__import__("torch").cuda.is_available(),
             report_to="none",
         ),
     )
@@ -112,7 +112,7 @@ def train(jsonl_path: str, output_dir: str, model_name: str = DEFAULT_MODEL,
         mf.write(f'FROM {gguf_path}-unsloth.Q4_K_M.gguf\n')
         mf.write('PARAMETER temperature 0.6\n')
         mf.write('PARAMETER top_p 0.9\n')
-        mf.write('PARAMETER num_ctx 8192\n')
+        mf.write('PARAMETER num_ctx 12288\n')
 
     print(f"[train] Modelo guardado en: {gguf_path}")
     print(f"[train] Para importar a Ollama:")

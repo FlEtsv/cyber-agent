@@ -6,7 +6,7 @@ _MUTEX_NAME = "Global\\CyberAgent_SingleInstance_v1"
 _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, _MUTEX_NAME)
 if ctypes.windll.kernel32.GetLastError() == 183:   # ERROR_ALREADY_EXISTS
     # Traer la ventana existente al frente y salir
-    hwnd = ctypes.windll.user32.FindWindowW(None, "CyberAgent")
+    hwnd = ctypes.windll.user32.FindWindowW(None, "⚡ CyberAgent")
     if hwnd:
         ctypes.windll.user32.ShowWindow(hwnd, 9)        # SW_RESTORE
         ctypes.windll.user32.SetForegroundWindow(hwnd)
@@ -15,11 +15,12 @@ if ctypes.windll.kernel32.GetLastError() == 183:   # ERROR_ALREADY_EXISTS
 # Carga .env
 _env_file = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.isfile(_env_file):
-    for _line in open(_env_file):
-        _line = _line.strip()
-        if _line and not _line.startswith("#") and "=" in _line:
-            _k, _v = _line.split("=", 1)
-            os.environ.setdefault(_k.strip(), _v.strip())
+    with open(_env_file, encoding="utf-8") as _fh:
+        for _line in _fh:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip().lstrip("\ufeff"), _v.strip())
 
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
@@ -48,12 +49,18 @@ def _make_icon(alert: bool = False) -> QIcon:
 
 
 def main():
+    from app.agent_log import log, clear as log_clear, separator
+    log_clear()
+    separator("CYBERAGENT STARTUP")
+    log("INFO", "main", "Iniciando CyberAgent", {"python": sys.version})
+
     app = QApplication(sys.argv)
     app.setApplicationName("CyberAgent")
     app.setQuitOnLastWindowClosed(False)   # X solo oculta, no cierra la app
     app.setStyleSheet(QSS)
 
     init_db()
+    log("INFO", "main", "DB inicializada")
 
     window = MainWindow()
     # ── Arranca en bandeja, sin ventana visible ───────────────────────────────
@@ -69,6 +76,7 @@ def main():
     menu = QMenu()
     show_action   = menu.addAction("⚡  Abrir CyberAgent")
     update_action = menu.addAction("🔄  Buscar actualización")
+    vram_action   = menu.addAction("🎮  Liberar VRAM (para jugar)")
     menu.addSeparator()
     quit_action   = menu.addAction("✕  Salir")
     tray.setContextMenu(menu)
@@ -81,7 +89,18 @@ def main():
             window.raise_()
             window.activateWindow()
 
+    def _free_vram_tray():
+        import subprocess
+        subprocess.run(
+            ["powershell", "-NonInteractive", "-Command",
+             "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue"],
+            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        tray.showMessage("CyberAgent", "VRAM liberada — GPU lista para jugar",
+                         QSystemTrayIcon.Information, 3000)
+
     show_action.triggered.connect(_toggle_window)
+    vram_action.triggered.connect(_free_vram_tray)
     quit_action.triggered.connect(app.quit)
 
     # Clic izquierdo en tray → mostrar/ocultar
@@ -126,6 +145,9 @@ def main():
             )
         )
         checker.up_to_date.connect(window.notify_up_to_date)
+        checker.finished.connect(
+            lambda c=checker: _checker.remove(c) if c in _checker else None
+        )
         _checker.append(checker)
         checker.start()
 
@@ -141,6 +163,21 @@ def main():
         start_server(port=8765)
     except Exception as e:
         print(f"[api] No se pudo iniciar servidor: {e}")
+
+    # ── Relay connector (si RELAY_URL está configurado en .env) ───────────────
+    try:
+        from app.api.relay_connector import start_relay_connector
+        start_relay_connector()
+    except Exception as e:
+        print(f"[relay] No se pudo iniciar conector: {e}")
+
+    # ── Autoaprendizaje autónomo ──────────────────────────────────────────────
+    try:
+        from app.autonomous_learner import start_learner
+        start_learner(interval_check=1800)   # verifica cada 30 min
+    except Exception as e:
+        print(f"[learner] No se pudo iniciar autoaprendizaje: {e}")
+
 
     # ── Cloudflare Tunnel ─────────────────────────────────────────────────────
     def _start_tunnel():

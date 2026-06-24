@@ -4,7 +4,10 @@ from PySide6.QtCore import QThread, Signal
 import httpx
 
 _OLLAMA_URL = "http://localhost:11434/api/chat"
-_MODEL      = "cyber-coder:latest"
+try:
+    from app.ollama_client import OLLAMA_MODEL as _MODEL
+except Exception:
+    _MODEL = "cyberagent-original"
 _SYSTEM     = (
     "Eres un analizador de ciberseguridad. Analiza el resultado de una herramienta "
     "ejecutada por un agente IA y determina si contiene actividad maliciosa, sospechosa "
@@ -31,7 +34,7 @@ class ThreatDetector(QThread):
 
         prompt = f"Herramienta: {self.tool_name}\nResultado:\n{result_str}"
         try:
-            with httpx.Client(timeout=25) as client:
+            with httpx.Client(timeout=60) as client:
                 resp = client.post(_OLLAMA_URL, json={
                     "model":    _MODEL,
                     "messages": [
@@ -44,10 +47,11 @@ class ThreatDetector(QThread):
                 if resp.status_code != 200:
                     return
                 content = resp.json().get("message", {}).get("content", "")
-                m = re.search(r'\{.*?\}', content, re.DOTALL)
-                if not m:
+                start = content.rfind("{")
+                end   = content.rfind("}") + 1
+                if start < 0 or end <= start:
                     return
-                data = json.loads(m.group(0))
+                data = json.loads(content[start:end])
                 if data.get("threat"):
                     sev    = data.get("severity", "medium")
                     reason = data.get("reason", "Actividad sospechosa detectada")

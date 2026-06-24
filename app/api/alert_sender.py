@@ -7,30 +7,34 @@ Configura en .env o variables de entorno del sistema:
 import os
 import httpx
 
-CLOUD_URL = os.environ.get("CYBERAGENT_CLOUD_URL", "").rstrip("/")
-SECRET    = os.environ.get("CYBERAGENT_CLOUD_SECRET", "")
-TIMEOUT   = 6
+TIMEOUT = 6
 
 
 def _enabled() -> bool:
-    return bool(CLOUD_URL and SECRET)
+    return bool(os.environ.get("CYBERAGENT_CLOUD_URL", "").rstrip("/")
+                and os.environ.get("CYBERAGENT_CLOUD_SECRET", ""))
+
+
+def _url() -> str:
+    return os.environ.get("CYBERAGENT_CLOUD_URL", "").rstrip("/")
 
 
 def _headers() -> dict:
-    return {"X-Secret": SECRET, "Content-Type": "application/json"}
+    return {"X-Secret": os.environ.get("CYBERAGENT_CLOUD_SECRET", ""),
+            "Content-Type": "application/json"}
 
 
 def send_threat_alert(title: str, body: str) -> bool:
     if not _enabled():
         return False
     try:
-        httpx.post(
-            f"{CLOUD_URL}/notify",
+        r = httpx.post(
+            f"{_url()}/notify",
             json={"type": "threat", "title": title, "body": body},
             headers=_headers(),
             timeout=TIMEOUT,
         )
-        return True
+        return r.status_code < 300
     except Exception as e:
         print(f"[alert] Error enviando amenaza: {e}")
         return False
@@ -42,7 +46,7 @@ def request_approval(tool_id: str, tool_name: str, args: dict) -> str:
         return ""
     try:
         r = httpx.post(
-            f"{CLOUD_URL}/approval/request",
+            f"{_url()}/approval/request",
             json={"tool_id": tool_id, "tool_name": tool_name, "args": args},
             headers=_headers(),
             timeout=TIMEOUT,
@@ -59,7 +63,7 @@ def poll_approval(token: str) -> str | None:
         return None
     try:
         r = httpx.get(
-            f"{CLOUD_URL}/approval/{token}/poll",
+            f"{_url()}/approval/{token}/poll",
             headers=_headers(),
             timeout=TIMEOUT,
         )
