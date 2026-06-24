@@ -2,9 +2,9 @@
 import asyncio, json, os, threading
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response, Cookie
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 import httpx
 
 from app.auth import (
@@ -15,18 +15,37 @@ from app.auth import (
 WEB_DIR = Path(__file__).parent.parent / "web"
 
 app = FastAPI(docs_url=None, redoc_url=None)
-_ALLOWED_ORIGINS = [o for o in [
-    "http://localhost:8765",
-    "http://127.0.0.1:8765",
-    os.environ.get("CYBERAGENT_CLOUD_URL", ""),
-] if o]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+_CORS_LOCAL = frozenset(["http://localhost:8765", "http://127.0.0.1:8765"])
+
+class _DynamicCORS(BaseHTTPMiddleware):
+    """CORS middleware that reads CYBERAGENT_CLOUD_URL on every request."""
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
+        cloud  = os.environ.get("CYBERAGENT_CLOUD_URL", "")
+        allowed = _CORS_LOCAL | ({cloud} if cloud else set())
+
+        if request.method == "OPTIONS":
+            if origin in allowed:
+                return Response(
+                    status_code=204,
+                    headers={
+                        "Access-Control-Allow-Origin":      origin,
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods":     "*",
+                        "Access-Control-Allow-Headers":     "*",
+                        "Access-Control-Max-Age":           "600",
+                    },
+                )
+            return Response(status_code=403)
+
+        resp = await call_next(request)
+        if origin in allowed:
+            resp.headers["Access-Control-Allow-Origin"]      = origin
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+        return resp
+
+app.add_middleware(_DynamicCORS)
 
 if (WEB_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")

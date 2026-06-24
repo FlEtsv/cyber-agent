@@ -9,10 +9,12 @@ Heurística de complejidad (sin llamadas extra al LLM):
   - Arquitectura de sistema / exploit complejo / análisis profundo → modelo potente
 """
 
-import re
+import os, re
 
-FAST_MODEL   = "cyberagent-original"
-POWER_MODEL  = "cyberagent-original"   # mismo modelo; routing preparado para un futuro segundo modelo
+# Set CYBERAGENT_FAST_MODEL / CYBERAGENT_POWER_MODEL in .env to enable real two-model routing.
+# If POWER_MODEL is unset (or same as FAST_MODEL) routing is a no-op — safe default.
+FAST_MODEL  = os.environ.get("CYBERAGENT_FAST_MODEL",  "cyberagent-original")
+POWER_MODEL = os.environ.get("CYBERAGENT_POWER_MODEL", FAST_MODEL)
 
 # Patrones que indican tarea de alta complejidad
 _COMPLEX_PATTERNS = [

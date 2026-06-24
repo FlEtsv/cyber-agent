@@ -11,6 +11,9 @@ from app.ollama_client import OLLAMA_MODEL
 
 log = logging.getLogger("relay_connector")
 
+_BACKOFF_INIT = 5    # seconds before first retry
+_BACKOFF_MAX  = 60   # cap for exponential backoff
+
 
 class RelayConnector:
     def __init__(self, relay_url: str, host_secret: str):
@@ -37,19 +40,36 @@ class RelayConnector:
     def _thread(self):
         asyncio.run(self._async_run())
 
+    def _stop_all_runners(self) -> None:
+        """Stop and discard all active runners (called on WS disconnect)."""
+        for runner in list(self._runners.values()):
+            try:
+                runner.stop()
+            except Exception:
+                pass
+        self._runners.clear()
+
     async def _async_run(self):
         url = f"{self.ws_url}/host?secret={self.host_secret}"
+        backoff = _BACKOFF_INIT
         while self._running:
+            connected = False
             try:
                 log.info(f"[relay] Conectando a {self.ws_url}/host")
                 async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
                     self._ws = ws
+                    connected = True
                     log.info("[relay] Conectado al relay")
                     await self._handle(ws)
             except Exception as e:
-                log.warning(f"[relay] Desconectado: {e}. Reintentando en 5s…")
+                log.warning(f"[relay] Desconectado: {e}. Reintentando en {backoff}s…")
+            finally:
                 self._ws = None
-                await asyncio.sleep(5)
+                self._stop_all_runners()
+            if not self._running:
+                break
+            await asyncio.sleep(backoff)
+            backoff = _BACKOFF_INIT if connected else min(backoff * 2, _BACKOFF_MAX)
 
     async def _handle(self, ws):
         async for raw in ws:

@@ -304,14 +304,14 @@ class AgentWorker(QThread):
         self.trusted_tools    = trusted_tools or set()
         self.session_trust    = session_trust
         self.tool_permissions = tool_permissions or {}
-        self.system_prompt    = system_prompt or SYSTEM_PROMPT
+        self.system_prompt    = system_prompt  # None → rebuilt per call with current date
         self.conversation_id  = conversation_id
         self._approval_event  = None
         self._approved        = None
         self._stop            = False
 
     def _build_system_with_rag(self) -> str:
-        system = self.system_prompt or _build_base_prompt()
+        system = self.system_prompt if self.system_prompt is not None else _build_base_prompt()
         last_user = ""
         for m in reversed(self.messages):
             if m["role"] == "user":
