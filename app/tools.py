@@ -894,8 +894,33 @@ def _list_dir(path: str, recursive: bool = False) -> dict:
     return {"path": path, "entries": sorted(entries, key=lambda x: (x.get("type", ""), x.get("name", "")))}
 
 
+def _is_safe_external_url(url: str) -> tuple[bool, str]:
+    """Block requests to loopback, link-local and private RFC-1918 ranges."""
+    import ipaddress
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False, f"scheme '{parsed.scheme}' not allowed"
+        host = parsed.hostname or ""
+        # Block by hostname
+        if host in ("localhost", ""):
+            return False, "loopback hostname blocked"
+        try:
+            addr = ipaddress.ip_address(host)
+            if addr.is_loopback or addr.is_private or addr.is_link_local or addr.is_reserved:
+                return False, f"private/reserved IP {host} blocked"
+        except ValueError:
+            pass  # hostname, not IP — allow it
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
 def _web_fetch(url: str, headers: dict | None = None) -> dict:
     import urllib.request, re
+    safe, reason = _is_safe_external_url(url)
+    if not safe:
+        return {"error": f"URL bloqueada por política de seguridad: {reason}"}
     default_headers = {"User-Agent": "Mozilla/5.0 (CyberAgent/1.0)"}
     if headers:
         default_headers.update(headers)
@@ -1556,6 +1581,9 @@ def _clipboard_write(text: str) -> dict:
 def _http_request(url: str, method: str = "GET", headers: dict = None,
                   body: str = "", timeout: int = 30) -> dict:
     import urllib.request, urllib.error
+    safe, reason = _is_safe_external_url(url)
+    if not safe:
+        return {"error": f"URL bloqueada por política de seguridad: {reason}"}
     headers = headers or {}
     req = urllib.request.Request(url, method=method.upper())
     for k, v in headers.items():
