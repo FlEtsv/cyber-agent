@@ -41,11 +41,16 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > **Steve escribe aquí.** Los agentes leen esto primero en cada sesión.
 > Si hay texto aquí, tiene prioridad sobre todo el BACKLOG.
 
-```
-(sin objetivo activo)
-```
+    Actualizar el Gui de todo la app, darle una estetica sofisticada y elegante.
+    Diseñar seguridad de fugas de datos. 
+    Proteccion contra errores de corrupcion de datos.
+    Implementar sistema de reportes. 
+    Integrar las herramientas de Hacking. 
+    Realizar pruebas automatizadas.
+    
 
----
+
+
 
 ## 🔄 EN PROGRESO
 
@@ -53,7 +58,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-*(vacío)*
+[claude] B001 — Backoff exponencial en reconexión del relay (ahora sleep fijo 5s) — Archivos: `app/api/relay_connector.py` — Fecha: 2026-06-24 22:09
 
 ---
 
@@ -85,21 +90,21 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 
 | ID | ✅ | Descripción | Archivos | Agente | Prioridad |
 |----|----|-------------|----------|--------|-----------|
-| B001 | ⬜ | Backoff exponencial en reconexión del relay (ahora sleep fijo 5s) | `app/api/relay_connector.py` | claude | alta |
-| B002 | ⬜ | CORS dinámico — ALLOWED_ORIGINS evaluado en import-time, no recarga si cambia la URL | `app/api/server.py` | claude | media |
-| B003 | ⬜ | SYSTEM_PROMPT con fecha fija al arranque — no se actualiza en sesiones largas | `app/ollama_client.py`, `app/api/agent_runner.py` | claude | media |
-| B004 | ⬜ | Frontend: limpiar pendingApproval y currentBubble al reconectar WS | `app/web/static/app.js`, `relay/web/app.js` | codex | alta |
-| B005 | ⬜ | Frontend: banner visible "reconectando" cuando WS cae >3s, deshabilitar input | `app/web/static/app.js`, `relay/web/app.js` | codex | alta |
-| B006 | ⬜ | relay/web: banner "PC offline" diferenciado cuando el PC se desconecta del relay | `relay/web/app.js` | codex | media |
-| B007 | ⬜ | Cleanup de runners activos al perder conexión con el relay | `app/api/relay_connector.py` | claude | alta |
+| B001 | ✅ | Backoff exponencial en reconexión del relay (ahora sleep fijo 5s) | `app/api/relay_connector.py` | claude | alta |
+| B002 | ✅ | CORS dinámico — ALLOWED_ORIGINS evaluado en import-time, no recarga si cambia la URL | `app/api/server.py` | claude | media |
+| B003 | ✅ | SYSTEM_PROMPT con fecha fija al arranque — no se actualiza en sesiones largas | `app/ollama_client.py`, `app/api/agent_runner.py` | claude | media |
+| B004 | ✅ | Frontend: limpiar pendingApproval y currentBubble al reconectar WS | `app/web/static/app.js`, `relay/web/app.js` | codex | alta |
+| B005 | ✅ | Frontend: banner visible "reconectando" cuando WS cae >3s, deshabilitar input | `app/web/static/app.js`, `relay/web/app.js` | codex | alta |
+| B006 | ✅ | relay/web: banner "PC offline" diferenciado cuando el PC se desconecta del relay | `relay/web/app.js` | codex | media |
+| B007 | ✅ | Cleanup de runners activos al perder conexión con el relay | `app/api/relay_connector.py` | claude | alta |
 
 ### Features
 
 | ID | ✅ | Descripción | Archivos | Agente | Prioridad |
 |----|----|-------------|----------|--------|-----------|
-| F001 | ⬜ | Reconexión robusta completa (B001+B004+B005+B006+B007 agrupados) | varios | ambos | alta |
-| F002 | ⬜ | System prompt dinámico por turno de conversación | `app/ollama_client.py`, `app/api/agent_runner.py` | claude | media |
-| F003 | ⬜ | Segunda modelo en model_router (routing real entre fast/power) | `app/model_router.py` | claude | baja |
+| F001 | ✅ | Reconexión robusta completa (B001+B004+B005+B006+B007 agrupados) | varios | ambos | alta |
+| F002 | ✅ | System prompt dinámico por turno de conversación | `app/ollama_client.py`, `app/api/agent_runner.py` | claude | media |
+| F003 | ✅ | Segunda modelo en model_router (routing real entre fast/power) | `app/model_router.py` | claude | baja |
 
 ---
 
