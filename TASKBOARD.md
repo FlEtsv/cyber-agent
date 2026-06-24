@@ -56,6 +56,14 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Si hay texto aquí, tiene prioridad sobre todo el BACKLOG.
 
 *(todos los objetivos han sido implementados y movidos a OBJETIVOS IMPLEMENTADOS)*  
+### OBJ-IO-001: App iOS nativa híbrida con agente local
+- **Prioridad:** alta
+- **Asignado a:** ambos
+- **Estado:** [ ] pendiente
+- **Descripción:** construir una app iOS nativa que se autentique con Google Cloud, conecte con el relay, permita aprobaciones por herramienta y siga funcionando en modo local cuando no haya Internet.
+- **Archivos afectados:** `ios/`, `relay/main.py`, `relay/web/*`, `docs/IOS_EXTENSION_PRD.md`
+- **Criterio de éxito:** el iPhone actúa como cliente nativo, mantiene la conversación, recibe instrucciones del relay y delega decisiones grandes al PC principal sin romper el flujo actual.
+- **Notes:** usar Xcode 17; mantener visión, Bluetooth, GPS y control de dispositivos; limitar el mini LLM a tareas rápidas y seguras.
     Desarrollar la app para ios nativa 
         -inicio de sesion conectado a google cloud 
         -conectarse al relay
@@ -128,6 +136,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 [claude] IOS-001..005 — App nativa iOS: estructura Xcode 17, Auth+Relay, Chat+Approval, BLE/GPS/Devices, Mini LLM offline — Archivos: ios/ — Fecha: 2026-06-24
+[codex] OBJ-IO-001 — Formalizar el objetivo global enorme de la app iOS nativa híbrida — Archivos: TASKBOARD.md — Fecha: 2026-06-24 23:27
 
 ---
 
