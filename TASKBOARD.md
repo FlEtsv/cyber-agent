@@ -149,7 +149,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] IOS-UI-002 — ChatView + MessageBubble iOS con burbujas, entrada, typing y aprobaciones provisionales hasta IOS-UI-003. Validación Swift pendiente: `swift` no disponible en Windows — Commit: e100619 — Fecha: 2026-06-24 23:51
 [codex] IOS-UI-003 — ToolApprovalCard iOS con nombre/args/riesgo/categoría, aprobar/rechazar y countdown 60s. Validación Swift pendiente: `swift` no disponible en Windows — Commit: 25f0d90 — Fecha: 2026-06-24 23:58
 [codex] IOS-UI-004 — DevicesView iOS con secciones BLE/GPS/accesorios, escaneo y conexión BLE. Validación Swift pendiente: `swift` no disponible en Windows — Commit: 438df96 — Fecha: 2026-06-25 00:03
-[codex] IOS-UI-005 — SettingsView iOS para relay, PC local, red local, modo experto, permisos y logout. Validación Swift pendiente: `swift` no disponible en Windows — Commit: PENDIENTE — Fecha: 2026-06-25 00:10
+[codex] IOS-UI-005 — SettingsView iOS para relay, PC local, red local, modo experto, permisos y logout. Validación Swift pendiente: `swift` no disponible en Windows — Commit: 7d9b719 — Fecha: 2026-06-25 00:10
 [claude] B001+B007 — Backoff exponencial (5→10→20→40→60s) + cleanup runners al desconectar — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B002 — CORS dinámico _DynamicCORS lee env por req (no import-time) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
