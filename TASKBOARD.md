@@ -101,7 +101,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-`[claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Jefe de equipo: mejora router LLM (prompt detallado + desktop category + fix encoding) + TOOLS_MANUAL.md completo + USER_GUIDE.md + CONNECTION_GUIDE.md — Archivos: app/tool_router.py, docs/TOOLS_MANUAL.md, docs/USER_GUIDE.md, docs/CONNECTION_GUIDE.md — Fecha: 2026-06-24`
+*(vacío)*
 
 ---
 
@@ -120,8 +120,9 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] UI-003 — Rediseño login/PWA móvil local y relay con estado Cloud Run/PC/iPhone — Commit: 230564a — Fecha: 2026-06-24 22:58
 [claude] TEST-001+DATA-001+SEC-001 — tests auth 12/12 + integrity_check/backup_db + redacción tokens en logs — Commit: 9c92360 — Fecha: 2026-06-24 22:58
 [claude] SEC-003+SEC-004 — Sanitizar errores HTTP + rate limiting relay — Commit: bbaff5b — Fecha: 2026-06-24 23:10
-[codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: 777592d — Fecha: 2026-06-24 23:20
-`[codex] TOOL-001 — Catálogo hacking/tools con permisos por riesgo, routing, UI y manual — Commit: 777592d — Fecha: 2026-06-24 22:52 — ⚠️ zona ajena: app/ollama_client.py y app/api/agent_runner.py para propagar metadatos de eventos`
+[codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: 3cc9d5b (integrado en mejoras web) — Fecha: 2026-06-24 23:20
+[codex] TOOL-001 — Catálogo hacking/tools: TOOL_CATEGORIES, DANGEROUS_TOOLS, ACTIVE_SECURITY_TOOLS, SENSITIVE_ACCESS_TOOLS, TOOL_USE_GUIDES en tools.py + docs/TOOLS.md — Commit: bbaff5b (integrado) — Fecha: 2026-06-24
+[claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Router LLM mejorado (prompt 350t + desktop group + fix encoding) + TOOLS_MANUAL.md + USER_GUIDE.md + CONNECTION_GUIDE.md + TASKBOARD objetivos cerrados — Commit: 3f9a41b — Fecha: 2026-06-24
 
 ---
 
