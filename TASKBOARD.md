@@ -54,6 +54,15 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 
 
 
+## 🔑 PERMISOS SOLICITADOS
+
+> **Steve:** pon `✅` para autorizar el commit/ejecución, o ignora si estás ocupado — el agente pasa a la siguiente tarea y hace commit acumulado cuando vuelvas.
+> Formato agente: `[AGENTE] ID — Acción pendiente: "descripción exacta del commit/ejecución" — Fecha: YYYY-MM-DD HH:MM`
+
+*(vacío)*
+
+---
+
 ## 🔄 EN PROGRESO
 
 > Escribe aquí ANTES de tocar cualquier archivo.
@@ -133,6 +142,10 @@ Cambia `⬜` a `✅` para aprobarla. Los agentes la ejecutan en su próxima sesi
 4. ¿Hay OBJETIVO activo? → ejecutarlo
 5. ¿No hay objetivo? → tomar tarea ✅ de mayor prioridad en tu zona
 6. Escribir en EN PROGRESO antes de tocar nada
-7. Hacer la tarea completa
-8. Mover a COMPLETADO + commit del TASKBOARD
+7. Hacer la tarea completa (código listo, sintaxis verificada)
+8. Pedir permiso en PERMISOS SOLICITADOS para el commit
+   - Si Steve da tick rápido → commit inmediato
+   - Si Steve no responde (está trabajando) → pasar a la siguiente tarea
+     acumular los commits pendientes y ejecutarlos todos juntos cuando Steve tickee
+9. Mover a COMPLETADO con el commit hash
 ```
