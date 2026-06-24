@@ -58,7 +58,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] B003 — SYSTEM_PROMPT con fecha fija al arranque — no se actualiza en sesiones largas — Archivos: `app/ollama_client.py`, `app/api/agent_runner.py` — Fecha: 2026-06-24 22:09
+[claude] B007 — Cleanup de runners activos al perder conexión con el relay — Archivos: `app/api/relay_connector.py` — Fecha: 2026-06-24 22:09
 
 ---
 
