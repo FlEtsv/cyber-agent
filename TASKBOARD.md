@@ -136,7 +136,6 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 [claude] IOS-001..005 — App nativa iOS: estructura Xcode 17, Auth+Relay, Chat+Approval, BLE/GPS/Devices, Mini LLM offline — Archivos: ios/ — Fecha: 2026-06-24
-[codex] AUDIT-001 — Dashboard de actividad del agente en tab Agente: métricas de herramientas, errores y tiempos medios — Archivos: app/widgets/agent_panel.py, app/agent_log.py, TASKBOARD.md — Fecha: 2026-06-24 23:31
 
 ---
 
@@ -147,6 +146,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 
 `[CODEX] INFRA-001 — Listener read-only de TASKBOARD.md — Commit: 831bae3 — Fecha: 2026-06-24 22:14`
 [codex] OBJ-IO-001 — Formalizar el objetivo global enorme de la app iOS nativa híbrida — Commit: 1e4a9cb — Fecha: 2026-06-24 23:27
+[codex] AUDIT-001 — Dashboard de actividad del agente en tab Agente: métricas de herramientas, errores y tiempos medios — Commit: 9b6fa02 — Fecha: 2026-06-24 23:34
 [claude] B001+B007 — Backoff exponencial (5→10→20→40→60s) + cleanup runners al desconectar — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B002 — CORS dinámico _DynamicCORS lee env por req (no import-time) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
