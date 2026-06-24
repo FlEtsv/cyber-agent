@@ -138,8 +138,18 @@ HOST_SECRET=<mismo valor que RELAY_HOST_SECRET>
 RELAY_EMAIL=<email de login>
 RELAY_PW_HASH=<hash bcrypt de la contraseña>
 JWT_SECRET=<secreto para firmar cookies JWT>
-RELAY_TOTP_SECRET=<opcional, para 2FA>
+RELAY_TOTP_SECRET=<obligatorio — secreto TOTP base32 del autenticador>
+
+# Desactivar TOTP solo en entornos de desarrollo sin autenticador
+# TOTP_OPTIONAL=1
 ```
+
+> **Seguridad:** A partir de RELAY-SEC-001 el TOTP es **obligatorio por defecto** en el relay.
+> Si `RELAY_TOTP_SECRET` no está configurado, todos los logins serán rechazados aunque la
+> contraseña sea correcta. Para generar el secreto TOTP:
+> ```powershell
+> .venv\Scripts\python.exe relay/generate_secrets.py
+> ```
 
 ---
 
@@ -253,8 +263,8 @@ Invoke-RestMethod "http://localhost:11434/api/tags"
 // /api/status del relay
 {"relay": true, "pc_online": true}
 
-// /api/auth/status del relay
-{"setup_done": true, "totp_required": false}
+// /api/auth/status del relay (TOTP obligatorio por defecto desde RELAY-SEC-001)
+{"setup_done": true, "totp_required": true}
 
 // API local
 {"status": "ok"}

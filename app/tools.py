@@ -1,8 +1,32 @@
-import subprocess, os, json, shutil, sys, hashlib, difflib, fnmatch
+import subprocess, os, json, shutil, sys, hashlib, difflib, fnmatch, time, threading
 import urllib.parse, base64, codecs, glob
 from datetime import datetime
 from app.mobile_tools import (MOBILE_TOOLS_SCHEMA, MOBILE_DANGEROUS,
                                execute_mobile_tool)
+
+# ── TTL cache para herramientas read-only frecuentes (PERF-001) ───────────────
+_cache_store: dict[str, tuple[float, dict]] = {}
+_cache_lock = threading.Lock()
+_CACHE_TTL = 30  # segundos
+
+_CACHEABLE_TOOLS = frozenset({"system_info", "gpu_info", "memory_info"})
+
+
+def _cache_key(name: str, args: dict) -> str:
+    return name + "|" + json.dumps(args, sort_keys=True)
+
+
+def _cache_get(key: str) -> dict | None:
+    with _cache_lock:
+        entry = _cache_store.get(key)
+        if entry and time.time() - entry[0] < _CACHE_TTL:
+            return entry[1]
+        return None
+
+
+def _cache_set(key: str, result: dict):
+    with _cache_lock:
+        _cache_store[key] = (time.time(), result)
 
 def _sa_module():
     """Lazy import de self_awareness para evitar circular imports."""
@@ -902,6 +926,15 @@ def execute_tool(name: str, args: dict) -> dict:
         }
         all_tools = {**dispatch, **superagent}
         if name in all_tools:
+            if name in _CACHEABLE_TOOLS:
+                key = _cache_key(name, args)
+                cached = _cache_get(key)
+                if cached is not None:
+                    return {**cached, "_cached": True}
+                result = all_tools[name]()
+                if "error" not in result:
+                    _cache_set(key, result)
+                return result
             return all_tools[name]()
         return execute_mobile_tool(name, args)
     except KeyError as e:

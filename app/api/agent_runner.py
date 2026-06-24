@@ -38,6 +38,7 @@ class AgentRunner:
         tool_permissions: dict  = None,
         device_context: str     = "PC (escritorio)",
         conversation_id         = None,
+        expert_mode: bool       = False,
     ):
         self.messages         = messages
         self.model            = model
@@ -45,6 +46,7 @@ class AgentRunner:
         self.tool_permissions = tool_permissions or {}
         self.device_context   = device_context
         self.conversation_id  = conversation_id
+        self.expert_mode      = expert_mode
         self._q               = queue.Queue()
         self._approvals: dict[str, threading.Event] = {}
         self._approval_res: dict[str, bool]         = {}
@@ -252,6 +254,14 @@ class AgentRunner:
                         else:
                             result = {"cancelled": True, "reason": "user_timeout", "tool": name}
                     else:
+                        if dangerous and self.expert_mode:
+                            try:
+                                from app.agent_log import log as _alog
+                                _alog("WARN", "expert_mode",
+                                      f"Auto-aprobada herramienta peligrosa: {name}",
+                                      {"tool": name, "args_brief": str(args)[:200]})
+                            except Exception:
+                                pass
                         result = execute_tool(name, args)
 
                     if not result.get("blocked") and not result.get("cancelled"):

@@ -283,11 +283,26 @@ async def websocket_chat(ws: WebSocket):
                 agent_q = asyncio.Queue()
 
                 from app.api.agent_runner import AgentRunner
+
+                # Expert mode: bypass approval for dangerous tools — local only (DEBATE-002).
+                # Relay/remote sessions can never elevate to expert mode.
+                client_host = ws.client.host if ws.client else ""
+                is_local = client_host in ("127.0.0.1", "::1", "localhost")
+                expert_mode = is_local and bool(data.get("expert_mode", False))
+                if expert_mode:
+                    try:
+                        from app.agent_log import log as _alog
+                        _alog("WARN", "server", "Sesión experta activada (auto-approve peligrosas)",
+                              {"host": client_host, "device": device_ctx})
+                    except Exception:
+                        pass
+
                 runner = AgentRunner(
                     messages         = list(conv_trimmed),
-                    session_trust    = data.get("session_trust", False),
+                    session_trust    = expert_mode or data.get("session_trust", False),
                     tool_permissions = data.get("permissions", {}),
                     device_context   = device_ctx,
+                    expert_mode      = expert_mode,
                 )
 
                 full: list[str] = []

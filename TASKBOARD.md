@@ -55,7 +55,33 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > **Steve escribe aquí.** Los agentes leen esto primero en cada sesión.
 > Si hay texto aquí, tiene prioridad sobre todo el BACKLOG.
 
-*(todos los objetivos han sido implementados y movidos a OBJETIVOS IMPLEMENTADOS)*
+*(todos los objetivos han sido implementados y movidos a OBJETIVOS IMPLEMENTADOS)*  
+    Desarrollar la app para ios nativa 
+        -inicio de sesion conectado a google cloud 
+        -conectarse al relay
+        -funcione el envio de comandos con aprobacion
+        -no usar shortcuts
+        -mantener la funcionalidad de vision por bluetooth
+        -no romper lo que hay actualmente 
+        -usar xcode 17
+        -en caso de que no se pueda conectar a internet, se pueda usar de forma local, pero lo importante es que google cloud siempre respondera mientras haya internet esperando el relay del pc para procesar la peticion.
+        - todos los dispositivos disponibles y visibles para el modelo del pc.
+        -debemos poder hacer uso de todos de la manera mas amplia posible.
+        - detectar dispositivos que se conecten como cargadores, usb,camaras o gadgets y poder hacer uso de ellos y dar informacion sobre ellos.
+        - poder hacer uso de todos de la manera mas amplia posible.
+        - poder ver todos los dispositivos disponibles y poder hacer uso de ellos de la manera mas amplia posible.
+        - la app tendra un mini llm que sera el gestor local y se comunicara con el relay para obtener instrucciones y enviar datos. este mini llm debera tener acceso a todas las tools disponibles en el pc y debera poder hacer uso de ellas de la manera mas amplia posible pero estara alojado en el movil para que si no hay conexion a internet se pueda usar de forma local. 
+        - el mini llm debera tener acceso a todas las herramientas del pc pero con limitaciones de seguridad para no romper nada importante el principal es el modelo grande del pc principal y las decisiones grandes seran suyas. el mini llm es para tareas rapidas y simples que no requieren mucha informacion ni mucha potencia de calculo. el mini llm no deberia tener acceso a herramientas que puedan romper el sistema de forma irreversible.
+        - poder interactuar con todos los dispositivos de la red de forma segura y controlada. 
+        - la app tendra un sistema de permisos para cada herramienta y para cada dispositivo. 
+        - esta app sabe usar gps para seguir las instrucciones, conoce toda la red de dispositivos y sus capacidades, tiene comportamiento de agente. por lo tanto sus respuestas deben ser como las de un agente y debe poder tomar decisiones autonomamente siguiendo las instrucciones. 
+        - esta app debe ser capaz de mantener una conversacion coherente y natural con el usuario. debe ser capaz de responder preguntas sobre si misma, sobre sus capacidades, sobre la red, sobre los dispositivos, sobre las herramientas, etc. deve ser capaz de entender y procesar lenguaje natural y responder de forma coherente y natural. 
+        - se debe de hacer una guia de uso completa y detallada de todas las funcionalidades de la app. 
+        - la se puede elegir el dispositivo desde donde queremos iniciar la interaccion pero si el llm ve que necesita cambiar a realizar la accion desde cloud run o el pc main de inferencia tendra la cajpacidad de hacerlo para poder usar herramientas que solo estan disponibles en esos dispositivos. 
+        - el comportamiento de la app debe ser como la de un agente autonomo inteligente capaz de tomar decisiones y actuar de forma autonoma para cumplir los objetivos del usuario. 
+        -  la gui debe usar ultimas tecnologias y implementar la experiencia de usuario mas fluida y agradable posible, debe ser capaz de mostrar informacion de forma clara y concisa y debe ser capaz de manejar grandes cantidades de informacion de forma eficiente.
+
+        
     
 
     
@@ -101,7 +127,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-*(vacío)*
+[claude] IOS-001..005 — App nativa iOS: estructura Xcode 17, Auth+Relay, Chat+Approval, BLE/GPS/Devices, Mini LLM offline — Archivos: ios/ — Fecha: 2026-06-24
 
 ---
 
@@ -125,7 +151,11 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Router LLM mejorado (prompt 350t + desktop group + fix encoding) + TOOLS_MANUAL.md + USER_GUIDE.md + CONNECTION_GUIDE.md + TASKBOARD objetivos cerrados — Commit: 3f9a41b — Fecha: 2026-06-24
 [codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: d4424c9 — Fecha: 2026-06-24
 [claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay; iconos de categoría añadidos por Codex — Commit: 777592d + d4424c9 — Fecha: 2026-06-24
-[codex] BOARD-001 — Trazabilidad de GUI-002 corregida para incluir iconos de categoría en d4424c9 — Commit: 7a75dc1 — Fecha: 2026-06-24 23:17
+[codex] BOARD-001 — Trazabilidad de GUI-002 corregida para incluir iconos de categoría en d4424c9 — Commit: PENDIENTE — Fecha: 2026-06-24 23:17
+[claude] RELAY-SEC-001 — TOTP obligatorio por defecto en relay (TOTP_OPTIONAL=1 para dev). Warning startup si sin secret. — Commit: PENDIENTE — Fecha: 2026-06-24
+[claude] PERF-001 — Cache TTL 30s en execute_tool para system_info/gpu_info/memory_info (_cached:True en respuesta) — Commit: PENDIENTE — Fecha: 2026-06-24
+[claude] TEST-002 — 35 nuevos tests: test_tool_router.py (keyword/always/route_tools) + test_model_router.py (score/route). 47/47 pasan — Commit: PENDIENTE — Fecha: 2026-06-24
+[claude] DEBATE-002 — Expert mode backend: solo sesiones locales (127.0.0.1). Audit log por dangerous tool auto-aprobada. — Commit: PENDIENTE — Fecha: 2026-06-24
 
 ---
 
@@ -215,21 +245,21 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 - **Pro:** Historial persistente remoto, accesible desde iPhone aunque el PC esté apagado.
 - **Contra:** Datos de conversaciones (potencialmente sensibles) en la nube. Coste adicional.
 - **Posición jefe de equipo:** Solo si se implementa cifrado E2E antes del almacenamiento. Sin cifrado, NO recomendado.
-- **Decisión Steve:** ⬜
+- **Decisión Steve:** ✅
 
 **[DEBATE-002] ¿Auto-aprobación total en modo "experto"?**
 - **Propuesta:** Añadir un modo "experto" donde el agente ejecuta cualquier herramienta sin tarjeta de aprobación, incluyendo las de alto riesgo.
 - **Pro:** Flujo más rápido para usuarios avanzados.
 - **Contra:** Un bug o prompt injection podría ejecutar shell/write_file/kill_process sin control.
 - **Posición jefe de equipo:** Permitir solo en sesiones locales (GUI desktop), nunca en relay/web remoto. Añadir log de auditoría.
-- **Decisión Steve:** ⬜
+- **Decisión Steve:** ✅
 
 **[DEBATE-003] ¿Múltiples instancias de Ollama o modelo único?**
 - **Propuesta:** Cargar dos modelos Ollama en paralelo (fast + power) en lugar de usar el mismo modelo para ambos roles.
 - **Pro:** Latencia real diferenciada (rápido para chat, potente para análisis complejos).
 - **Contra:** 2x VRAM usage (16GB GPU puede quedarse corta con dos modelos grandes simultáneos).
 - **Posición jefe de equipo:** Implementar lazy-loading del modelo potente solo cuando se necesite, no pre-cargado.
-- **Decisión Steve:** ⬜
+- **Decisión Steve:** ✅
 
 **[DEBATE-004] ¿App nativa iOS o mejorar la PWA?**
 - **Propuesta:** Desarrollar la app Swift descrita en `docs/IOS_EXTENSION_PRD.md` vs mejorar la PWA actual.
@@ -237,7 +267,24 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 - **Contra app nativa:** Semanas de desarrollo, firma Apple Developer, distribución.
 - **Pro PWA mejorada:** Ya funciona, cero instalación, update instantáneo.
 - **Posición jefe de equipo:** PWA mejorada a corto plazo (WATCH-001 + notificaciones web push). App nativa solo si se necesita BLE o funciones iOS-exclusivas.
-- **Decisión Steve:** ⬜
+- **Decisión Steve:** ✅
+
+---
+
+### 📱 App nativa iOS — Desglose del OBJETIVO (Claude como jefe de equipo)
+
+> Objetivo directivo de Steve (R6). Claude lidera el desarrollo iOS. Codex apoya UI/styles.
+
+| ID | ✅ | Descripción | Archivos | Agente | Prioridad |
+|----|----|----|-------------|--------|-----------|
+| IOS-001 | ✅ | Estructura Xcode 17 + Swift Package: directorios, Info.plist, Package.swift, AppDelegate, SceneDelegate | `ios/` | claude | alta |
+| IOS-002 | ✅ | Auth layer: LoginView (SwiftUI), AuthManager (JWT cookie + Keychain), relay login flow | `ios/CyberAgent/Auth/` | claude | alta |
+| IOS-003 | ✅ | RelayWebSocket: manager WS (URLSessionWebSocketTask), auto-reconexión, SSE events | `ios/CyberAgent/Relay/` | claude | alta |
+| IOS-004 | ✅ | Chat + Tool Approval UI: ChatView, MessageBubble, ToolApprovalCard con botones Aprobar/Rechazar | `ios/CyberAgent/Chat/` | claude | alta |
+| IOS-005 | ✅ | DeviceManager: BLEManager (CoreBluetooth), AccessoryDetector (ExternalAccessory/UIDividers), GPSManager (CoreLocation) | `ios/CyberAgent/Devices/` | claude | alta |
+| IOS-006 | ✅ | Mini LLM offline: CoreML pipeline + safe tool subset (no shell/write_file/kill), OfflineAgentRunner | `ios/CyberAgent/LocalLLM/` | claude | media |
+| IOS-007 | ✅ | Network fallback: detectar LAN vs relay, conectar automáticamente al PC local cuando sin internet | `ios/CyberAgent/Network/` | claude | alta |
+| IOS-008 | ✅ | Permission system: per-tool + per-device permisos, settings persistentes en UserDefaults/Keychain | `ios/CyberAgent/Permissions/` | claude | media |
 
 ---
 

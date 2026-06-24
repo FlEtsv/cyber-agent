@@ -23,6 +23,19 @@ RELAY_TOTP    = os.environ.get("RELAY_TOTP_SECRET", "")
 JWT_SECRET    = os.environ.get("JWT_SECRET", "")
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET env var is required — set it in Cloud Run secrets")
+
+# TOTP is mandatory by default on the relay.
+# Set TOTP_OPTIONAL=1 only in dev/test environments without an authenticator app.
+TOTP_REQUIRED = os.environ.get("TOTP_OPTIONAL", "0").lower() not in ("1", "true", "yes")
+
+if TOTP_REQUIRED and not RELAY_TOTP:
+    import sys
+    print(
+        "WARNING: TOTP_REQUIRED is active but RELAY_TOTP_SECRET is not set. "
+        "All logins will be rejected until RELAY_TOTP_SECRET is configured. "
+        "Set TOTP_OPTIONAL=1 to disable 2FA (not recommended for production).",
+        file=sys.stderr,
+    )
 JWT_ALGO      = "HS256"
 JWT_HOURS     = 72
 
@@ -76,6 +89,10 @@ def _verify_login(email: str, pw: str, totp: str) -> bool:
         return False
     if not bcrypt.checkpw(pw.encode(), RELAY_PW_HASH.encode()):
         return False
+    if TOTP_REQUIRED:
+        if not RELAY_TOTP:
+            return False  # secret not configured → block until admin sets it up
+        return pyotp.TOTP(RELAY_TOTP).verify(totp, valid_window=1)
     if RELAY_TOTP:
         return pyotp.TOTP(RELAY_TOTP).verify(totp, valid_window=1)
     return True
@@ -112,7 +129,7 @@ def _check_ws_token(ws: WebSocket) -> bool:
 async def auth_status():
     return {
         "setup_done": bool(RELAY_EMAIL and RELAY_PW_HASH),
-        "totp_required": bool(RELAY_TOTP),
+        "totp_required": TOTP_REQUIRED or bool(RELAY_TOTP),
     }
 
 @app.post("/api/auth/login")
