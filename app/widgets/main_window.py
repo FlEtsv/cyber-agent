@@ -15,7 +15,7 @@ from .finetune_dialog import FineTuneDialog
 from .update_dialog import UpdateDialog
 from .mobile_dialog import MobileSubscribeDialog
 from app.ollama_client import AgentWorker, OLLAMA_MODEL, SYSTEM_PROMPT
-from app.consciousness.system_context import build_system_prompt
+from app.consciousness.system_context import build_system_prompt, get_personality_labels
 from app.consciousness import decision_log
 from app.finetune import collector
 from app.api import alert_sender
@@ -137,6 +137,7 @@ class MainWindow(QMainWindow):
         self._approval_pollers: dict[str, ApprovalPoller] = {}
         self._threat_detectors: list = []
         self.selected_model: str = OLLAMA_MODEL
+        self.agent_persona: str = "general"
 
         self._build_ui()
         self._load_conversations()
@@ -163,6 +164,11 @@ class MainWindow(QMainWindow):
 
     # ── Sidebar ───────────────────────────────────────────────────────
 
+    def _on_persona_changed(self, index: int):
+        self.agent_persona = self._persona_ids[index]
+        if hasattr(self, "workspace_state"):
+            self.workspace_state.setText(f"Perfil: {self.persona_combo.currentText()}")
+
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
@@ -180,6 +186,19 @@ class MainWindow(QMainWindow):
         self.model_badge = QLabel(f"  Modelo activo\n  {OLLAMA_MODEL}")
         self.model_badge.setObjectName("model_badge")
         lay.addWidget(self.model_badge)
+
+        persona_lbl = QLabel("  PERFIL")
+        persona_lbl.setObjectName("sidebar_section_hdr")
+        lay.addWidget(persona_lbl)
+
+        self._persona_ids = []
+        self.persona_combo = QComboBox()
+        self.persona_combo.setObjectName("persona_combo")
+        for profile_id, label in get_personality_labels():
+            self._persona_ids.append(profile_id)
+            self.persona_combo.addItem(label)
+        self.persona_combo.currentIndexChanged.connect(self._on_persona_changed)
+        lay.addWidget(self.persona_combo)
 
         # Trust toggle
         self.trust_btn = QPushButton("🛡  Supervisado")
@@ -584,7 +603,7 @@ class MainWindow(QMainWindow):
         separator(f"SEND → {text[:60]}")
         log("INFO", "main_window._send", "Usuario envía mensaje",
             {"msg": text[:200], "model": self.selected_model,
-             "session_trust": self.session_trust})
+             "session_trust": self.session_trust, "persona": self.agent_persona})
 
         self.input_box.clear()
         self._streaming      = True
@@ -614,7 +633,7 @@ class MainWindow(QMainWindow):
             trusted_tools    = self.trusted_tools,
             session_trust    = self.session_trust,
             tool_permissions = self.tool_permissions,
-            system_prompt    = build_system_prompt(SYSTEM_PROMPT),
+            system_prompt    = build_system_prompt(SYSTEM_PROMPT, personality=self.agent_persona),
             conversation_id  = self.active_conv,
         )
         _conv_id = self.active_conv  # snapshot — user may switch conversations mid-stream
