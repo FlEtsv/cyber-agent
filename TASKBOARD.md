@@ -66,7 +66,7 @@ SE DEJAN LAS ACCIONES QUE SE NECESITA QUE EL USUARIO APRUEBE COMO PETICIONES EN 
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 `[CODEX] B004+B005+B006 — Reconexión frontend, limpieza de estado WS y banners PC/reconectando — Archivos: app/web/static/app.js, app/web/static/style.css, relay/web/app.js, relay/web/style.css — Fecha: 2026-06-24 22:15`
-[claude] SEC-001 — Diseño técnico contra fugas de datos: clasificación, redacción, allowlist y auditoría de salidas — Archivos: `docs/`, `app/agent_log.py`, `app/tools.py` — Fecha: 2026-06-24 22:19
+[claude] DATA-001 — Protección contra corrupción de datos: backups SQLite, checks WAL, recuperación y tests — Archivos: `app/database.py`, `app/memory.py`, `scripts/` — Fecha: 2026-06-24 22:19
 
 ---
 
