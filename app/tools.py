@@ -1545,9 +1545,12 @@ def _clipboard_read() -> dict:
     return {"clipboard": r.get("stdout", ""), "length": len(r.get("stdout",""))}
 
 def _clipboard_write(text: str) -> dict:
-    # Use here-string @'...'@ — only breaks on literal "'@" at column 0, which is pathological
-    safe = text.replace("'@", "' @")
-    r = _shell(f"Set-Clipboard -Value @'\n{safe}\n'@", "powershell")
+    import base64 as _b64
+    encoded = _b64.b64encode(text.encode("utf-16-le")).decode("ascii")
+    r = _shell(
+        f'[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String("{encoded}")) | Set-Clipboard',
+        "powershell"
+    )
     return {"ok": r.get("returncode") == 0, "length": len(text)}
 
 def _http_request(url: str, method: str = "GET", headers: dict = None,

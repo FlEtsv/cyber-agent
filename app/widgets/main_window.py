@@ -579,8 +579,9 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _stop(self):
-        if self.worker:
-            self.worker.stop()
+        worker = self.worker  # atomic snapshot — _end_streaming may set self.worker = None concurrently
+        if worker:
+            worker.stop()
 
     # ════════════════════════════════════════════════════════════════════
     # AGENT SIGNALS

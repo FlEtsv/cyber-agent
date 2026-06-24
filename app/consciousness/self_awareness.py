@@ -78,28 +78,24 @@ def _syntax_check(path: str) -> dict:
 
 def _restart_self() -> dict:
     """
-    Reinicia CyberAgent:
-    1. Lanza nueva instancia de pythonw.exe con 2s de delay (para que el token actual termine)
+    Reinicia CyberAgent sin interpolación de shell:
+    1. Lanza nueva instancia directamente con Popen (sin PowerShell)
     2. Señaliza a Qt para que cierre limpiamente
     """
-    python   = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "pythonw.exe")
-    main_py  = os.path.join(PROJECT_ROOT, "main.py")
+    python  = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "pythonw.exe")
+    main_py = os.path.join(PROJECT_ROOT, "main.py")
 
     if not os.path.isfile(python):
-        # Fallback: usar el ejecutable actual
         python = sys.executable
 
-    # PowerShell: espera 2s y arranca nueva instancia sin ventana
-    ps_cmd = (
-        f'Start-Sleep -Seconds 2; '
-        f'Start-Process -FilePath "{python}" '
-        f'-ArgumentList "main.py" '
-        f'-WorkingDirectory "{PROJECT_ROOT}"'
-    )
     try:
         subprocess.Popen(
-            ["powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps_cmd],
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            [python, main_py],
+            cwd=PROJECT_ROOT,
+            creationflags=(
+                getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) |
+                getattr(subprocess, "DETACHED_PROCESS", 0)
+            ),
             close_fds=True,
         )
     except Exception as e:
@@ -117,6 +113,6 @@ def _restart_self() -> dict:
 
     return {
         "success":  True,
-        "message":  "CyberAgent se reiniciará en ~2 segundos con los cambios aplicados.",
+        "message":  "CyberAgent se reiniciará con los cambios aplicados.",
         "new_proc": f"{python} main.py",
     }

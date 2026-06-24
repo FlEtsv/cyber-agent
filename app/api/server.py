@@ -186,13 +186,12 @@ def _detect_device(request: Request) -> dict:
 
 @app.websocket("/ws")
 async def websocket_chat(ws: WebSocket):
-    # Auth check via cookie in WS handshake
+    # Auth check via cookie in WS handshake (must accept before close per Starlette)
     token = ws.cookies.get("ca_token")
+    await ws.accept()
     if not token or not verify_token(token):
         await ws.close(code=4401)
         return
-
-    await ws.accept()
 
     loop      = asyncio.get_running_loop()
     agent_q: asyncio.Queue = asyncio.Queue()
@@ -330,14 +329,23 @@ async def websocket_chat(ws: WebSocket):
 
 # ── Terminal WebSocket ────────────────────────────────────────────────────────
 
+_MAX_TERMINAL_SESSIONS = 3
+_terminal_count = 0
+_MAX_CMD_BYTES = 4096
+
 @app.websocket("/terminal")
 async def terminal_ws(ws: WebSocket):
+    global _terminal_count
     token = ws.cookies.get("ca_token")
+    await ws.accept()
     if not token or not verify_token(token):
         await ws.close(code=4401)
         return
+    if _terminal_count >= _MAX_TERMINAL_SESSIONS:
+        await ws.close(code=4429, reason="Too many terminal sessions")
+        return
 
-    await ws.accept()
+    _terminal_count += 1
     proc = await asyncio.create_subprocess_exec(
         "powershell", "-NoLogo", "-NoProfile", "-Command", "-",
         stdin =asyncio.subprocess.PIPE,
@@ -358,15 +366,16 @@ async def terminal_ws(ws: WebSocket):
     reader = asyncio.create_task(_read())
     try:
         while True:
-            cmd = await ws.receive_text()
+            cmd = await asyncio.wait_for(ws.receive_text(), timeout=300.0)
             if proc.returncode is not None:
-                break  # process already exited
+                break
             if proc.stdin:
-                proc.stdin.write((cmd + "\n").encode())
+                proc.stdin.write((cmd[:_MAX_CMD_BYTES] + "\n").encode())
                 await proc.stdin.drain()
     except Exception:
         pass
     finally:
+        _terminal_count -= 1
         reader.cancel()
         try:
             proc.terminate()
@@ -382,7 +391,7 @@ async def terminal_ws(ws: WebSocket):
 
 def start_server(port: int = 8765):
     import uvicorn
-    cfg = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="error")
+    cfg = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
     srv = uvicorn.Server(cfg)
     t   = threading.Thread(target=srv.run, daemon=True, name="cyberagent-api")
     t.start()

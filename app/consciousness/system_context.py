@@ -22,7 +22,7 @@ def get_system_context() -> str:
         import psutil
         vm  = psutil.virtual_memory()
         cpu = psutil.cpu_count()
-        lines.append(f"CPU:       {cpu} núcleos · {psutil.cpu_percent(interval=0.1):.0f}% uso")
+        lines.append(f"CPU:       {cpu} núcleos · {psutil.cpu_percent(interval=0):.0f}% uso")
         lines.append(f"RAM:       {vm.total/1024**3:.1f} GB total · {vm.percent}% usada")
     except ImportError:
         pass

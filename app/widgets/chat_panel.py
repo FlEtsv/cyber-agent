@@ -445,6 +445,7 @@ class ChatPanel(QWidget):
         root.addWidget(self.scroll)
 
     def clear(self):
+        self._scroll_timer.stop()
         self._tool_to_bubble.clear()
         self._current_bubble = None
         while self.inner.count() > 1:
@@ -453,6 +454,11 @@ class ChatPanel(QWidget):
             if w:
                 if hasattr(w, "_render_timer"):
                     w._render_timer.stop()
+                try:
+                    w.tool_approved.disconnect()
+                    w.tool_rejected.disconnect()
+                except (RuntimeError, AttributeError):
+                    pass
                 w.deleteLater()
 
     def load_messages(self, messages, conv_id: int = None):
@@ -501,6 +507,10 @@ class ChatPanel(QWidget):
             self._current_bubble.finish_streaming_content()
             if msg_id:
                 self._current_bubble.set_message_id(msg_id)
+                try:
+                    self._current_bubble.rated.disconnect()
+                except RuntimeError:
+                    pass
                 self._current_bubble.rated.connect(
                     lambda r, mid=msg_id, cid=conv_id: self.message_rated.emit(mid, cid, r)
                 )

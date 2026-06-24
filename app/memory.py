@@ -100,12 +100,10 @@ def build_layered_history(
     if not memory and older:
         memory = summarize_messages(older)
 
-    history = [{"role": "system", "content": system_prompt}]
+    sys_content = system_prompt
     if memory:
-        history.append({
-            "role": "system",
-            "content": "MEMORIA DE LA CONVERSACION:\n" + _shorten(memory, SUMMARY_MAX_CHARS),
-        })
+        sys_content += "\n\n## MEMORIA DE LA CONVERSACION\n" + _shorten(memory, SUMMARY_MAX_CHARS)
+    history = [{"role": "system", "content": sys_content}]
 
     for message in recent:
         if message.get("role") == "tool":

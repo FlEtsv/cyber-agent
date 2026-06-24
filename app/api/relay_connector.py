@@ -41,7 +41,7 @@ class RelayConnector:
         url = f"{self.ws_url}/host?secret={self.host_secret}"
         while self._running:
             try:
-                log.info(f"[relay] Conectando a {url}")
+                log.info(f"[relay] Conectando a {self.ws_url}/host")
                 async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
                     self._ws = ws
                     log.info("[relay] Conectado al relay")

@@ -85,6 +85,9 @@ async function init() {
   }
 }
 
+let _setupEmail = '';
+let _setupPass  = '';
+
 document.getElementById('setup-form').addEventListener('submit', async e => {
   e.preventDefault();
   const email = document.getElementById('s-email').value.trim();
@@ -98,8 +101,19 @@ document.getElementById('setup-form').addEventListener('submit', async e => {
   document.getElementById('setup-btn').disabled = true;
   const res = await post('/api/auth/setup', {email, password: pass});
   if (res.ok) {
+    _setupEmail = email;
+    _setupPass  = pass;
+    // Clear inputs before showing QR to avoid credential exposure
+    document.getElementById('s-pass').value  = '';
+    document.getElementById('s-pass2').value = '';
     document.getElementById('setup-form').classList.add('hidden');
-    document.getElementById('qr-img').innerHTML = res.qr_svg;
+    // Parse SVG safely instead of innerHTML to prevent XSS
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(res.qr_svg, 'image/svg+xml');
+    const svgEl  = svgDoc.documentElement;
+    const qrImg  = document.getElementById('qr-img');
+    qrImg.innerHTML = '';
+    qrImg.appendChild(svgEl);
     document.getElementById('qr-step').classList.remove('hidden');
   } else {
     showErr(err, res.error || 'Error al crear cuenta');
@@ -112,10 +126,9 @@ document.getElementById('qr-verify-btn').addEventListener('click', async () => {
   const err  = document.getElementById('qr-err');
   if (code.length !== 6) return showErr(err, 'Introduce el codigo de 6 digitos');
 
-  const email = document.getElementById('s-email').value.trim();
-  const pass  = document.getElementById('s-pass').value;
   document.getElementById('qr-verify-btn').disabled = true;
-  const res = await post('/api/auth/login', {email, password: pass, totp: code});
+  const res = await post('/api/auth/login', {email: _setupEmail, password: _setupPass, totp: code});
+  _setupPass = '';  // clear from memory after use
   if (res.ok) {
     window.location.href = '/';
   } else {

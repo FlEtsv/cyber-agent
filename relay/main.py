@@ -20,7 +20,9 @@ HOST_SECRET   = os.environ.get("HOST_SECRET", "change-me")
 RELAY_EMAIL   = os.environ.get("RELAY_EMAIL", "")
 RELAY_PW_HASH = os.environ.get("RELAY_PW_HASH", "")    # bcrypt hash
 RELAY_TOTP    = os.environ.get("RELAY_TOTP_SECRET", "")
-JWT_SECRET    = os.environ.get("JWT_SECRET", secrets.token_hex(32))
+JWT_SECRET    = os.environ.get("JWT_SECRET", "")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET env var is required — set it in Cloud Run secrets")
 JWT_ALGO      = "HS256"
 JWT_HOURS     = 72
 
@@ -40,11 +42,12 @@ app.mount(
 class RelayState:
     def __init__(self):
         self.host_ws: WebSocket | None = None
-        self.host_q:  asyncio.Queue    = asyncio.Queue()
+        self.host_q:  asyncio.Queue    = asyncio.Queue(maxsize=100)
         self.sessions: dict[str, WebSocket] = {}   # session_id → mobile ws
+        self._send_fn = None  # set/cleared only inside host_ws coroutine
 
     def pc_online(self) -> bool:
-        return self.host_ws is not None
+        return self._send_fn is not None
 
 state = RelayState()
 
@@ -107,7 +110,7 @@ async def auth_login(req: Request):
     token = _make_token(email)
     resp  = JSONResponse({"ok": True})
     resp.set_cookie("ca_token", token, httponly=True, samesite="lax",
-                    max_age=JWT_HOURS * 3600)
+                    secure=True, max_age=JWT_HOURS * 3600)
     return resp
 
 @app.post("/api/auth/logout")
@@ -153,7 +156,24 @@ async def host_ws(ws: WebSocket, secret: str = ""):
         return
 
     await ws.accept()
+
+    # Reject a second PC while one is already connected
+    if state.host_ws is not None:
+        await ws.close(code=4409, reason="Host already connected")
+        return
+
     state.host_ws = ws
+
+    async def _send_to_pc(msg: dict):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            try:
+                state.host_q.put_nowait(msg)
+            except asyncio.QueueFull:
+                pass  # queue full — discard silently
+
+    state._send_fn = _send_to_pc
 
     # Drain any queued messages (sessions that opened before PC reconnected)
     while not state.host_q.empty():
@@ -161,15 +181,6 @@ async def host_ws(ws: WebSocket, secret: str = ""):
             await ws.send_json(state.host_q.get_nowait())
         except Exception:
             break
-
-    async def _send_to_pc(msg: dict):
-        try:
-            await ws.send_json(msg)
-        except Exception:
-            state.host_q.put_nowait(msg)
-
-    # Expose to sessions
-    state._send_to_pc = _send_to_pc
 
     try:
         async for raw in ws.iter_text():
@@ -191,7 +202,7 @@ async def host_ws(ws: WebSocket, secret: str = ""):
         pass
     finally:
         state.host_ws = None
-        state._send_to_pc = None
+        state._send_fn = None
         # Notify all mobile sessions
         for sid, mob in list(state.sessions.items()):
             try:
@@ -231,7 +242,7 @@ async def mobile_ws(ws: WebSocket):
             except Exception:
                 continue
 
-            send_fn = getattr(state, "_send_to_pc", None)
+            send_fn = state._send_fn
             if send_fn:
                 await send_fn({**msg, "session_id": session_id})
             else:
@@ -241,7 +252,7 @@ async def mobile_ws(ws: WebSocket):
         pass
     finally:
         state.sessions.pop(session_id, None)
-        send_fn = getattr(state, "_send_to_pc", None)
+        send_fn = state._send_fn
         if send_fn:
             try:
                 await send_fn({"type": "session_closed",

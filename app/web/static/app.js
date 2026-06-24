@@ -299,6 +299,7 @@ class CyberAgent {
   }
 
   _addErrorMsg(msg) {
+    this.toolRows.clear();
     this._ensureAIBubble();
     this.currentBubble.contentEl.textContent = msg;
     this.currentBubble.el.classList.add('error');

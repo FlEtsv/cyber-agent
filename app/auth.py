@@ -72,6 +72,15 @@ def _load() -> dict:
 
 def _save(data: dict):
     _CREDS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        import subprocess as _sp
+        _sp.run(
+            ["icacls", str(_CREDS_FILE), "/inheritance:r",
+             "/grant:r", f"{os.environ.get('USERNAME', 'User')}:(R,W)"],
+            capture_output=True, check=False,
+        )
+    except Exception:
+        pass
 
 
 # ── User management ───────────────────────────────────────────────────────────

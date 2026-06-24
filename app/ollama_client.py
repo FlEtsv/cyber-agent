@@ -397,6 +397,7 @@ class AgentWorker(QThread):
                     break
                 if tool_execution_count >= MAX_TOOL_EXECUTIONS:
                     _emit_status("He alcanzado el presupuesto de herramientas de esta ejecución; cierro con un estado verificable.")
+                    history = normalize_chat_history(history)  # fix dangling tool_calls before summary
                     history.append({
                         "role": "user",
                         "content": (
@@ -525,10 +526,12 @@ class AgentWorker(QThread):
                         import threading
                         self._approved       = None
                         self._approval_event = threading.Event()
-                        if not self._stop:  # guard: stop() may have fired before we created event
+                        if self._stop:
+                            self._approval_event.set()  # already stopped — unblock immediately
+                        else:
                             _emit_status(f"`{name}` necesita aprobación porque puede cambiar el sistema.")
                             self.need_approval.emit({"id": tid, "name": name, "args": args, "dangerous": dangerous})
-                            self._approval_event.wait(timeout=60)  # 60s, no 300s
+                        self._approval_event.wait(timeout=60)  # 60s, no 300s
                         if not self._approved:
                             result = {"cancelled": True, "reason": "Usuario no aprobó a tiempo"}
                             history.append({"role": "tool", "tool_call_id": tid,
@@ -545,8 +548,9 @@ class AgentWorker(QThread):
                     called_tool_names.add(name)
                     tools_executed = True
 
-            # Safety net: loop agotó 15 iteraciones sin generar texto
+            # Safety net: loop agotó iteraciones sin generar texto
             if not full.strip() and tools_executed and not self._stop:
+                history = normalize_chat_history(history)  # fix dangling tool_calls before summary
                 history.append({
                     "role":    "user",
                     "content": "Resume brevemente el resultado de las operaciones anteriores.",

@@ -14,7 +14,10 @@ from datetime import datetime
 from pathlib import Path
 
 _LOG_PATH = Path(__file__).parent.parent / "data" / "learner_log.jsonl"
-_STOP_EVENT = threading.Event()
+_STOP_EVENT   = threading.Event()
+_LEARNER_LOCK = threading.Lock()
+_STATE_LOCK   = threading.Lock()
+_LOG_LOCK     = threading.Lock()
 
 # Matriz de interés: (query, tags, plataforma, intervalo_horas)
 # El agente rota por estas áreas de conocimiento priorizando las más desactualizadas
@@ -55,7 +58,10 @@ def _load_state() -> dict:
 
 def _save_state(state: dict):
     _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    tmp = _STATE_FILE.with_suffix(".tmp")
+    with _STATE_LOCK:
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        tmp.replace(_STATE_FILE)
 
 
 def _next_topic(state: dict):
@@ -72,8 +78,28 @@ def _next_topic(state: dict):
     return best, best_overdue >= 1.0  # (index, should_run_now)
 
 
+def _is_safe_url(url: str) -> bool:
+    try:
+        from urllib.parse import urlparse
+        import ipaddress
+        p = urlparse(url)
+        if p.scheme not in ("http", "https"):
+            return False
+        host = p.hostname or ""
+        try:
+            ip = ipaddress.ip_address(host)
+            return ip.is_global
+        except ValueError:
+            pass  # es un hostname, no una IP
+        return host not in ("localhost", "127.0.0.1", "::1") and not host.endswith(".local")
+    except Exception:
+        return False
+
+
 def _fetch_url(url: str, timeout: int = 12) -> str:
     """Descarga y limpia el texto de una URL."""
+    if not _is_safe_url(url):
+        return ""
     try:
         import httpx
         headers = {
@@ -188,14 +214,18 @@ def _learn_topic(idx: int):
 
 
 def _log_entry(query: str, titles: list):
-    _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    entry = {
-        "ts":     datetime.now().isoformat(),
-        "query":  query,
-        "saved":  titles,
-    }
-    with open(_LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    try:
+        _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts":    datetime.now().isoformat(),
+            "query": query,
+            "saved": titles,
+        }
+        with _LOG_LOCK:
+            with open(_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(f"[Learner] Error escribiendo log: {e}")
 
 
 def _learner_loop(interval_check: int = 1800):
@@ -230,15 +260,16 @@ def _learner_loop(interval_check: int = 1800):
 _learner_thread: threading.Thread | None = None
 
 def start_learner(interval_check: int = 1800):
-    """Inicia el learner en un hilo daemon. Protegido contra doble-arranque."""
+    """Inicia el learner en un hilo daemon. Protegido contra doble-arranque con lock."""
     global _learner_thread
-    if _learner_thread and _learner_thread.is_alive():
-        return _learner_thread
-    _STOP_EVENT.clear()
-    _learner_thread = threading.Thread(
-        target=_learner_loop, args=(interval_check,), daemon=True, name="AutonomousLearner"
-    )
-    _learner_thread.start()
+    with _LEARNER_LOCK:
+        if _learner_thread and _learner_thread.is_alive():
+            return _learner_thread
+        _STOP_EVENT.clear()
+        _learner_thread = threading.Thread(
+            target=_learner_loop, args=(interval_check,), daemon=True, name="AutonomousLearner"
+        )
+        _learner_thread.start()
     print(f"[Learner] Iniciado — verificando cada {interval_check//60} min")
     return _learner_thread
 

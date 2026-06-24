@@ -252,7 +252,7 @@ class AgentRunner:
                         if self._approval_res.get(tid, False):
                             result = execute_tool(name, args)
                         else:
-                            result = {"cancelled": True, "reason": "timeout"}
+                            result = {"cancelled": True, "reason": "user_timeout", "tool": name}
                     else:
                         result = execute_tool(name, args)
 
@@ -263,6 +263,18 @@ class AgentRunner:
                                     "content": json.dumps(result, ensure_ascii=False)})
                     self._q.put({"type": "tool_result",
                                  "data": {"id": tid, "result": result}})
+
+                    if result.get("cancelled"):
+                        history.append({
+                            "role": "user",
+                            "content": (
+                                f"La herramienta `{name}` fue cancelada (timeout de aprobación). "
+                                "No reintentes herramientas peligrosas. "
+                                "Resume lo que se completó hasta ahora."
+                            ),
+                        })
+                        break
+
                     _emit_status(f"`{name}` terminó; incorporo el resultado y decido el siguiente paso.")
                     called_tool_names.add(name)
                     tools_executed = True
