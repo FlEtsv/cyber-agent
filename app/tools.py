@@ -604,6 +604,123 @@ TOOLS_SCHEMA = [
 DANGEROUS_TOOLS = {"shell", "write_file", "run_python", "install_package",
                    "uninstall_package", "kill_process", "env_vars"} | MOBILE_DANGEROUS
 
+ACTIVE_SECURITY_TOOLS = {
+    "port_scan", "dir_bruteforce", "ping_sweep", "banner_grab",
+    "web_crawl", "http_headers_check", "ssl_info", "dns_lookup",
+    "whois_lookup", "traceroute", "arp_cache", "network_connections",
+}
+
+SENSITIVE_ACCESS_TOOLS = {
+    "credential_lookup", "clipboard_read", "clipboard_write", "click_screen",
+    "type_text", "hotkey", "fill_form", "focus_window", "restart_self",
+}
+
+DANGEROUS_TOOLS |= ACTIVE_SECURITY_TOOLS | SENSITIVE_ACCESS_TOOLS
+
+TOOL_CATEGORIES = {
+    "core": {
+        "shell", "read_file", "write_file", "list_directory", "run_python",
+    },
+    "web": {
+        "web_search", "web_fetch", "http_request", "ssl_info",
+        "http_headers_check", "dir_bruteforce", "web_crawl",
+    },
+    "files": {
+        "search_files", "grep_files", "diff_files", "hash_file",
+        "file_metadata",
+    },
+    "system": {
+        "list_processes", "system_info", "memory_info", "gpu_info",
+        "network_info", "env_vars", "process_tree", "process_info",
+        "kill_process", "install_package", "uninstall_package",
+    },
+    "desktop": {
+        "screenshot_pc", "list_monitors", "active_window", "list_windows",
+        "focus_window", "click_screen", "type_text", "hotkey",
+        "ocr_screen", "ui_tree", "fill_form", "credential_lookup",
+        "clipboard_read", "clipboard_write", "open_browser",
+        "windows_notify",
+    },
+    "network": {
+        "port_scan", "dns_lookup", "whois_lookup", "traceroute",
+        "banner_grab", "ping_sweep", "arp_cache", "network_connections",
+    },
+    "forensics": {
+        "strings_extract", "hex_dump", "file_entropy", "pe_info",
+        "file_metadata", "registry_query", "list_services",
+        "check_persistence",
+    },
+    "encode": {"encode_decode"},
+    "rag": {"rag_search", "rag_add"},
+    "self": {"list_self_files", "syntax_check", "restart_self"},
+}
+
+TOOL_USE_GUIDES = {
+    "web": "Audita URLs y APIs. Usa solo sobre activos propios o autorizados.",
+    "network": "Descubre red, puertos y servicios. Requiere autorizacion sobre el objetivo.",
+    "forensics": "Inspecciona archivos, binarios, servicios y persistencia local.",
+    "desktop": "Opera el PC local con inspeccion visual y acciones de usuario.",
+    "system": "Lee o modifica estado del sistema local segun permisos.",
+    "files": "Busca, compara y verifica archivos locales.",
+    "core": "Ejecucion basica y lectura/escritura local.",
+    "encode": "Transforma datos para analisis tecnico.",
+    "rag": "Consulta o amplia la base de conocimiento local.",
+    "self": "Inspecciona o reinicia el propio agente.",
+}
+
+_TOOL_SCHEMA_INDEX = {t["function"]["name"]: t for t in TOOLS_SCHEMA}
+_TOOL_TO_CATEGORY = {
+    name: category
+    for category, names in TOOL_CATEGORIES.items()
+    for name in names
+}
+
+
+def _tool_description(name: str) -> str:
+    schema = _TOOL_SCHEMA_INDEX.get(name, {})
+    return schema.get("function", {}).get("description", "")
+
+
+def get_tool_meta(name: str) -> dict:
+    category = _TOOL_TO_CATEGORY.get(name)
+    if category is None and name.startswith(("mobile_", "ios_")):
+        category = "mobile"
+    category = category or "other"
+    dangerous = name in DANGEROUS_TOOLS
+    return {
+        "name": name,
+        "category": category,
+        "risk": "high" if dangerous else "low",
+        "default_permission": "ask" if dangerous else "auto",
+        "dangerous": dangerous,
+        "guide": TOOL_USE_GUIDES.get(category, "Herramienta disponible en el agente."),
+        "description": _tool_description(name),
+    }
+
+
+def get_tool_catalog() -> list[dict]:
+    return [get_tool_meta(t["function"]["name"]) for t in TOOLS_SCHEMA]
+
+
+def tool_names_by_category(category: str) -> set[str]:
+    if category == "mobile":
+        return {t["function"]["name"] for t in MOBILE_TOOLS_SCHEMA}
+    return set(TOOL_CATEGORIES.get(category, set()))
+
+
+def tool_event_payload(tool_id: str, name: str, args: dict) -> dict:
+    meta = get_tool_meta(name)
+    return {
+        "id": tool_id,
+        "name": name,
+        "args": args,
+        "dangerous": meta["dangerous"],
+        "category": meta["category"],
+        "risk": meta["risk"],
+        "permission": meta["default_permission"],
+        "guide": meta["guide"],
+    }
+
 
 def is_dangerous(name: str) -> bool:
     return name in DANGEROUS_TOOLS

@@ -13,6 +13,11 @@ _SENSITIVE_KEYS = frozenset({
 })
 
 _JWT_RE = re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")
+_SENSITIVE_INLINE_RE = re.compile(
+    r"(?i)\b(password|passwd|pwd|token|api[_-]?key|secret|authorization|cookie|totp[_-]?secret|host[_-]?secret)\b"
+    r"(\s*[:=]\s*)"
+    r"([^\s,;]+)"
+)
 
 
 def _redact(obj):
@@ -25,7 +30,8 @@ def _redact(obj):
     if isinstance(obj, list):
         return [_redact(item) for item in obj]
     if isinstance(obj, str):
-        return _JWT_RE.sub("[JWT_REDACTED]", obj)
+        redacted = _JWT_RE.sub("[JWT_REDACTED]", obj)
+        return _SENSITIVE_INLINE_RE.sub(r"\1\2[REDACTED]", redacted)
     return obj
 
 _LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "agent.log")
@@ -76,3 +82,41 @@ def separator(label: str = ""):
                 f.write(line)
         except Exception:
             pass
+
+
+def build_report(max_lines: int = 500) -> dict:
+    """Build a redacted diagnostic report from agent.log."""
+    max_lines = max(1, min(int(max_lines or 500), 5000))
+    with _lock:
+        try:
+            with open(_LOG_PATH, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()[-max_lines:]
+        except FileNotFoundError:
+            lines = []
+        except Exception as exc:
+            lines = [f"[report] Could not read log: {exc}\n"]
+
+    text = "".join(lines)
+    levels = {"ERROR": 0, "WARN": 0, "INFO": 0, "DEBUG": 0}
+    for line in lines:
+        for level in levels:
+            if f"[{level}]" in line:
+                levels[level] += 1
+
+    return {
+        "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "log_path": os.path.abspath(_LOG_PATH),
+        "line_count": len(lines),
+        "levels": levels,
+        "text": _redact(text),
+    }
+
+
+def write_report(path: str, max_lines: int = 500) -> str:
+    """Write a redacted JSON report and return the absolute output path."""
+    report = build_report(max_lines=max_lines)
+    out = os.path.abspath(path)
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    return out

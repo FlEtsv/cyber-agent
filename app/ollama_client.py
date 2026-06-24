@@ -1,6 +1,6 @@
 import json, socket, subprocess, time, httpx
 from PySide6.QtCore import QThread, Signal
-from app.tools import TOOLS_SCHEMA, execute_tool, is_dangerous
+from app.tools import TOOLS_SCHEMA, execute_tool, is_dangerous, tool_event_payload
 
 OLLAMA_URL   = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "cyberagent-original"
@@ -503,7 +503,8 @@ class AgentWorker(QThread):
                     dangerous = is_dangerous(name)
                     perm      = self.tool_permissions.get(name, "ask")
 
-                    self.tool_call.emit({"id": tid, "name": name, "args": args, "dangerous": dangerous})
+                    event_payload = tool_event_payload(tid, name, args)
+                    self.tool_call.emit(event_payload)
                     _emit_status(f"Voy a usar `{name}` con argumentos: {_brief_args(args)}")
 
                     if perm == "block":
@@ -530,7 +531,7 @@ class AgentWorker(QThread):
                             self._approval_event.set()  # already stopped — unblock immediately
                         else:
                             _emit_status(f"`{name}` necesita aprobación porque puede cambiar el sistema.")
-                            self.need_approval.emit({"id": tid, "name": name, "args": args, "dangerous": dangerous})
+                            self.need_approval.emit(event_payload)
                         self._approval_event.wait(timeout=60)  # 60s, no 300s
                         if not self._approved:
                             result = {"cancelled": True, "reason": "Usuario no aprobó a tiempo"}

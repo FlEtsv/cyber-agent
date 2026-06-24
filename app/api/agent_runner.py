@@ -12,7 +12,7 @@ _ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from app.tools import TOOLS_SCHEMA, execute_tool, is_dangerous
+from app.tools import TOOLS_SCHEMA, execute_tool, is_dangerous, tool_event_payload
 from app.ollama_client import (
     OLLAMA_MODEL,
     OLLAMA_URL,
@@ -235,9 +235,8 @@ class AgentRunner:
                     dangerous = is_dangerous(name)
                     perm      = self.tool_permissions.get(name, "ask")
 
-                    self._q.put({"type": "tool_call",
-                                 "data": {"id": tid, "name": name,
-                                          "args": args, "dangerous": dangerous}})
+                    event_payload = tool_event_payload(tid, name, args)
+                    self._q.put({"type": "tool_call", "data": event_payload})
                     _emit_status(f"Voy a usar `{name}` con argumentos: {_brief_args(args)}")
 
                     if perm == "block":
@@ -246,8 +245,7 @@ class AgentRunner:
                         ev = threading.Event()
                         self._approvals[tid] = ev
                         _emit_status(f"`{name}` necesita aprobación porque puede cambiar el sistema.")
-                        self._q.put({"type": "need_approval",
-                                     "data": {"id": tid, "name": name, "args": args}})
+                        self._q.put({"type": "need_approval", "data": event_payload})
                         ev.wait(timeout=60)
                         if self._approval_res.get(tid, False):
                             result = execute_tool(name, args)

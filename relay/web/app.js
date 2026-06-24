@@ -21,6 +21,28 @@ function escHtml(s) {
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function redactReportValue(value) {
+  const sensitiveKey = /(password|passwd|pwd|token|api[_-]?key|secret|authorization|cookie|session|jwt|bearer|credential|private[_-]?key)/i;
+  const jwtRe = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+  const bearerRe = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi;
+  const inlineRe = /\b(access[_-]?token|refresh[_-]?token|client[_-]?secret|session[_-]?cookie|password|passwd|pwd|token|api[_-]?key|secret|authorization|cookie|totp[_-]?secret|host[_-]?secret)\b(\s*[:=]\s*)([^\s,;&]+)/gi;
+  const queryRe = /([?&](?:access[_-]?token|refresh[_-]?token|client[_-]?secret|session[_-]?cookie|password|passwd|pwd|token|api[_-]?key|secret|authorization|cookie|jwt)=)([^&#]+)/gi;
+  if (Array.isArray(value)) return value.map(redactReportValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, val]) => [
+      key,
+      sensitiveKey.test(key) ? '[REDACTED]' : redactReportValue(val),
+    ]));
+  }
+  if (typeof value === 'string') {
+    return value
+      .replace(jwtRe, '[JWT_REDACTED]')
+      .replace(bearerRe, 'Bearer [REDACTED]')
+      .replace(queryRe, '$1[REDACTED]')
+      .replace(inlineRe, '$1$2[REDACTED]');
+  }
+  return value;
+}
 
 // â”€â”€ CyberAgent Web App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class CyberAgent {
@@ -39,6 +61,13 @@ class CyberAgent {
     this.reconnectNoticeTimer = null;
     this.connectionBanner = null;
     this.pcOnline = true;
+    this.report = {
+      startedAt: new Date().toISOString(),
+      messages: [],
+      tools: [],
+      errors: [],
+      status: [],
+    };
 
     // Detect device type for server context
     const ua = navigator.userAgent.toLowerCase();
@@ -60,6 +89,7 @@ class CyberAgent {
     this.statusText = document.getElementById('status-text');
 
     this._ensureConnectionBanner();
+    this._installReportButton();
     this._bindUI();
     this._connect();
   }
@@ -119,6 +149,7 @@ class CyberAgent {
 
   _onMessage(evt) {
     const { type, data } = evt;
+    this._recordReportEvent(type, data);
 
     switch (type) {
       case 'connected':
@@ -151,15 +182,15 @@ class CyberAgent {
 
       case 'tool_call':
         this._ensureAIBubble();
-        this._addToolActivity(data.id, data.name, data.args);
+        this._addToolActivity(data.id, data.name, data.args, data);
         break;
 
       case 'need_approval':
-        this._showApproval(data.id, data.name, data.args, data.dangerous);
+        this._showApproval(data.id, data.name, data.args, data);
         break;
 
       case 'tool_result':
-        this._setToolDone(data.id);
+        this._setToolDone(data.id, data.result ?? data.output ?? data.content ?? data);
         break;
 
       case 'vision_processing':
@@ -217,6 +248,12 @@ class CyberAgent {
   // â”€â”€ UI: message bubbles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   _addUserBubble(text, imageSrcs = []) {
+    this.report.messages.push({
+      ts: new Date().toISOString(),
+      role: 'user',
+      text: redactReportValue(text),
+      images: imageSrcs.length,
+    });
     const wrap = document.createElement('div');
     wrap.className = 'msg user';
 
@@ -318,10 +355,16 @@ class CyberAgent {
   _finalizeAIBubble() {
     if (!this.currentBubble) return;
     this._renderCurrentBubble();
+    this.report.messages.push({
+      ts: new Date().toISOString(),
+      role: 'assistant',
+      text: redactReportValue(this.currentBubble._raw),
+    });
     this.currentBubble = null;
   }
 
   _addErrorMsg(msg) {
+    this.report.errors.push({ ts: new Date().toISOString(), message: redactReportValue(String(msg)) });
     this.toolRows.clear();
     this._ensureAIBubble();
     this.currentBubble.contentEl.textContent = msg;
@@ -331,7 +374,7 @@ class CyberAgent {
 
   // â”€â”€ Tool activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  _addToolActivity(id, name, args) {
+  _addToolActivity(id, name, args, meta = {}) {
     if (!this.currentBubble) return;
     const { actionsSection, actionsList, toggle } = this.currentBubble;
 
@@ -344,6 +387,7 @@ class CyberAgent {
     row.className = 'tool-row';
     row.innerHTML = `
       <span class="tool-row-name">${icon}  ${escHtml(name)}</span>
+      <span class="tool-row-meta ${meta.risk === 'high' ? 'high' : 'low'}">${escHtml(meta.category || 'tool')} · ${escHtml(meta.risk || 'low')}</span>
       <span class="tool-row-args">${escHtml(argsPreview)}</span>
       <span class="tool-row-status pending">...</span>
     `;
@@ -357,6 +401,15 @@ class CyberAgent {
     actionsList.classList.remove('hidden');
 
     this.toolRows.set(id, { row, status: row.querySelector('.tool-row-status') });
+    this.report.tools.push({
+      ts: new Date().toISOString(),
+      id,
+      name,
+      category: meta.category || 'tool',
+      risk: meta.risk || 'low',
+      args: redactReportValue(args),
+      status: 'pending',
+    });
     this._scrollBottom();
   }
 
@@ -365,6 +418,7 @@ class CyberAgent {
     if (!t) return;
     t.status.textContent = 'done';
     t.status.className   = 'tool-row-status done';
+    this._updateReportTool(id, 'done', result);
     if (result !== null && !t.row.querySelector('.tool-row-result')) {
       const pre = document.createElement('pre');
       pre.className = 'tool-row-result';
@@ -378,12 +432,14 @@ class CyberAgent {
     if (!t) return;
     t.status.textContent = 'cancelled';
     t.status.className   = 'tool-row-status cancelled';
+    this._updateReportTool(id, 'cancelled');
   }
 
   // â”€â”€ Approval card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  _showApproval(id, name, args, dangerous) {
+  _showApproval(id, name, args, meta = {}) {
     this.pendingApproval = id;
+    const dangerous = !!meta.dangerous;
     const icon  = TOOL_ICONS[name] || 'tool';
     const color = dangerous ? 'approval-label-dangerous' : 'approval-label-safe';
 
@@ -391,8 +447,9 @@ class CyberAgent {
       <div class="approval-card ${dangerous ? 'dangerous' : ''}">
         <div class="approval-header">
           <span class="${color}">${icon}  ${escHtml(name)}</span>
-          ${dangerous ? '<span class="approval-warning">requiere confirmacion</span>' : ''}
+          <span class="approval-warning">${escHtml(meta.category || 'tool')} · ${escHtml(meta.risk || 'low')}</span>
         </div>
+        <div class="approval-guide">${escHtml(meta.guide || 'Revisa argumentos antes de ejecutar.')}</div>
         <pre class="approval-args">${escHtml(JSON.stringify(args, null, 2))}</pre>
         <div class="approval-btns">
           <button class="btn btn-execute" id="ap-exec">Ejecutar</button>
@@ -555,6 +612,7 @@ class CyberAgent {
   _setStatus(cls, text) {
     this.statusDot.className = `status-dot ${cls}`;
     document.getElementById('status-text').textContent = text;
+    this.report.status.push({ ts: new Date().toISOString(), cls, text });
   }
 
   _setConnectionState(cls, text, bannerText = '', lockInput = false) {
@@ -613,6 +671,70 @@ class CyberAgent {
     this._ensureConnectionBanner();
     this.connectionBanner.className = '';
     this.connectionBanner.textContent = '';
+  }
+
+  _installReportButton() {
+    if (document.getElementById('report-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'report-btn';
+    btn.textContent = 'Reporte';
+    btn.title = 'Descargar reporte de sesion';
+    btn.addEventListener('click', () => this.downloadReport('json'));
+    const headerStatus = document.querySelector('.header-status');
+    if (!headerStatus) return;
+    const logout = document.getElementById('logout-btn');
+    headerStatus.insertBefore(btn, logout || null);
+  }
+
+  _recordReportEvent(type, data) {
+    if (type === 'status') return;
+    if (type === 'error') {
+      this.report.errors.push({ ts: new Date().toISOString(), message: redactReportValue(String(data)) });
+    }
+  }
+
+  _updateReportTool(id, status, result = null) {
+    const row = this.report.tools.find(t => t.id === id);
+    if (!row) return;
+    row.status = status;
+    row.finishedAt = new Date().toISOString();
+    if (result !== null) row.resultPreview = this._preview(redactReportValue(result), 1200);
+  }
+
+  _preview(value, max) {
+    const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    return text.length > max ? text.slice(0, max) + '\n... [recortado]' : text;
+  }
+
+  downloadReport(format = 'json') {
+    const report = {
+      ...this.report,
+      generatedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      device: `${this.isMobile ? 'movil' : 'PC'} ${this.platform}`,
+      url: location.href,
+      userAgent: navigator.userAgent,
+    };
+    const isHtml = format === 'html';
+    const safeReport = redactReportValue(report);
+    const body = isHtml ? this._reportHtml(safeReport) : JSON.stringify(safeReport, null, 2);
+    const blob = new Blob([body], { type: isHtml ? 'text/html' : 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `cyberagent-session-${new Date().toISOString().replace(/[:.]/g, '-')}.${isHtml ? 'html' : 'json'}`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 1000);
+  }
+
+  _reportHtml(report) {
+    return `<!doctype html><meta charset="utf-8"><title>CyberAgent report</title>
+<style>body{font-family:system-ui;background:#0b0d10;color:#edf2f7;padding:24px;line-height:1.5}pre{white-space:pre-wrap;background:#15191f;border:1px solid #303946;border-radius:8px;padding:16px}</style>
+<h1>CyberAgent session report</h1><pre>${escHtml(JSON.stringify(report, null, 2))}</pre>`;
   }
 
   _scrollBottom() {

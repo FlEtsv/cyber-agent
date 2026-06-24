@@ -116,6 +116,21 @@ header {
 }
 #logout-btn:hover { color: var(--red); }
 
+#report-btn {
+  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--accent));
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: 700 11px/1 var(--font);
+  letter-spacing: 0;
+  cursor: pointer;
+}
+#report-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
 
 /* ── Messages ──────────────────────────────────────────────────────────── */
@@ -267,6 +282,25 @@ header {
   flex-shrink: 0;
   font-family: var(--mono);
 }
+.tool-row-meta {
+  flex-shrink: 0;
+  min-width: 86px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-align: center;
+}
+.tool-row-meta.high {
+  border-color: rgba(239,68,68,0.35);
+  color: var(--red);
+}
+.tool-row-meta.low {
+  border-color: rgba(34,197,94,0.25);
+  color: var(--green);
+}
 .tool-row-args {
   color: var(--dim);
   font-family: var(--mono);
@@ -293,6 +327,12 @@ header {
   font-family: var(--mono);
   font-size: 11px;
   white-space: pre-wrap;
+}
+.approval-guide {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 6px 0 8px;
 }
 
 /* ── Approval Card Overlay ─────────────────────────────────────────────── */

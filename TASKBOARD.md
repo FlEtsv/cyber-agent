@@ -42,6 +42,10 @@ SE DEJAN LAS ACCIONES QUE SE NECESITA QUE EL USUARIO APRUEBE COMO PETICIONES EN 
 Cuando un objetivo global ya esté implementado según sus tareas de desglose y el estado real del sistema, se quita de `OBJETIVOS` y se mueve a `OBJETIVOS IMPLEMENTADOS` con referencia a las tareas/commits que lo cierran.
 ✅
 
+**R10 — EL CHAT NO ES CANAL DE PERMISOS.**
+Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, confirmaciones de commit, push, despliegue ni aprobación operativa por el chat. Todo se solicita exclusivamente en `PERMISOS SOLICITADOS` o `PERMISOS Y PETICIONES` dentro de este documento. Si una acción ya tiene `✅` en el documento, el agente la ejecuta sin volver a mencionarla como permiso en el chat. El chat solo puede usarse para estado breve del trabajo.
+✅
+
 
 ---
 
@@ -54,18 +58,13 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
     Actualizar el Gui de todo la app, darle una estetica sofisticada y elegante.✅
     Diseñar seguridad de fugas de datos. ✅
     Proteccion contra errores de corrupcion de datos.✅
-    Implementar sistema de reportes. ✅
-    Integrar las herramientas de Hacking. ✅
     Realizar pruebas automatizadas.✅
-    conseguir suit de herramientas global de precision.✅
-    actualizar como funciona cada herramienta y hacer un manual de uso.✅
     dejar interfaces listas para conectar con el PC en local o PC en la nube, con la guia de uso correcta y clara.✅
     dejar claro el modo de uso para el usuario final.✅
     Asegurar que cada agente sepa actuar en su campo.✅
     conseguir que cada agente tenga su manual de instrucciones claro.✅
     Asegurar que cada agente tenga su espacio de archivos limpio y ordenado.✅
     lolos agentes son los modelos de IA con los que se conecta el usuario final, no solo los que componen el sistema.✅
-    tenemos un llm de decision de herramientas que debemos de darle un improved de como funcionan cada herramienta y su precision.✅
     
 
     
@@ -75,7 +74,11 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 
 > Los agentes mueven aquí objetivos globales cuando el desglose asociado está completado y verificado.
 
-*(vacío — ningún objetivo global está completamente cerrado todavía)*
+Implementar sistema de reportes. Cerrado por `REP-001` con export JSON/HTML desde web/local/relay, reporte local desde `agent.log`, redacción de secretos y documentación en `docs/SESSION_REPORTS.md`.
+Integrar las herramientas de Hacking. Cerrado por `TOOL-001` con catálogo de herramientas, permisos por riesgo, grupo router `hacking`, metadatos en UI/logs y `docs/TOOLS.md`.
+Conseguir suit de herramientas global de precision. Cerrado por `TOOL-001` con catálogo estructurado de 75 herramientas y routing explícito por categorías.
+Actualizar como funciona cada herramienta y hacer un manual de uso. Cerrado por `TOOL-001` con `docs/TOOLS.md` y guías por categoría.
+Improved del LLM de decisión de herramientas. Cerrado por `TOOL-001` con keywords de hacking/pentest/recon y selección combinada web+network+forensics.
 
 
 
@@ -84,6 +87,7 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 
 > **Steve:** pon `✅` para autorizar el commit, o ignora si estás en dev — el agente pasa a la siguiente tarea y hace commit acumulado cuando llegue el tick.
 > Formato: `[AGENTE] ID — "descripción exacta del commit" — Fecha HH:MM`
+> Regla obligatoria: los agentes no piden estos permisos por chat. Solo añaden/modifican filas aquí y actúan cuando ven `✅`.
 
 [claude] TEST-001+DATA-001+SEC-001 — "push git origin master (commit 9c92360)" — Fecha: 2026-06-24 22:58
 
@@ -95,7 +99,7 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] SEC-002 — Allowlist dominios en web_fetch/http_request — Archivos: `app/tools.py` — Fecha: 2026-06-24 22:58
+*(vacío)*
 
 ---
 
@@ -113,6 +117,9 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 [codex] UI-002 — Rediseño GUI desktop PySide: cabecera workspace, navegación, estados y tema visual — Commit: 0d54b7c — Fecha: 2026-06-24 22:50
 [codex] UI-003 — Rediseño login/PWA móvil local y relay con estado Cloud Run/PC/iPhone — Commit: 230564a — Fecha: 2026-06-24 22:58
 [claude] TEST-001+DATA-001+SEC-001 — tests auth 12/12 + integrity_check/backup_db + redacción tokens en logs — Commit: 9c92360 — Fecha: 2026-06-24 22:58
+[claude] SEC-003+SEC-004 — Sanitizar errores HTTP + rate limiting relay — Commit: bbaff5b — Fecha: 2026-06-24 23:10
+[codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: PENDIENTE — Fecha: 2026-06-24 23:20
+`[codex] TOOL-001 — Catálogo hacking/tools con permisos por riesgo, routing, UI y manual — Commit: PENDIENTE — Fecha: 2026-06-24 22:52 — ⚠️ zona ajena: app/ollama_client.py y app/api/agent_runner.py para propagar metadatos de eventos`
 
 ---
 
@@ -186,13 +193,17 @@ Cambia `⬜` a `✅` para aprobarla. Los agentes la ejecutan en su próxima sesi
 5. ¿No hay objetivo? → tomar tarea ✅ de mayor prioridad en tu zona
 6. Escribir en EN PROGRESO antes de tocar nada
 7. Hacer la tarea completa
-8. Mover a COMPLETADO + commit del TASKBOARD
+8. Si necesita validación, ejecución, commit, push o despliegue: registrarlo en PERMISOS SOLICITADOS / PERMISOS Y PETICIONES y seguir con otra tarea si no hay ✅
+9. Si ya hay ✅ en el documento: ejecutar sin pedir permiso por chat
+10. Mover a COMPLETADO + commit del TASKBOARD
 ```
 
 
 ## 📌 PERMISOS Y PETICIONES
 
 Se dejan las acciones que se necesita que el usuario apruebe como peticiones en el área de permisos y peticiones abajo, tomad los objetivos genericos como que teneis que desglosarlo como tareas de implementacion, haceis desgloses añadís en tareas de backlog y yo las apruebo asi todo el rato.
+
+**Prohibido pedir estos permisos por chat.** El chat no es un canal de aprobación. Si falta un `✅`, el agente registra la petición aquí y continúa con otra tarea aprobada. Si el `✅` ya está puesto, ejecuta directamente y actualiza el estado.
 
 | ID | ✅ | Agente | Acción solicitada | Estado |
 |----|----|--------|-------------------|--------|
