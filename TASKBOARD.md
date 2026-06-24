@@ -123,7 +123,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: 3cc9d5b (integrado en mejoras web) — Fecha: 2026-06-24 23:20
 [codex] TOOL-001 — Catálogo hacking/tools: TOOL_CATEGORIES, DANGEROUS_TOOLS, ACTIVE_SECURITY_TOOLS, SENSITIVE_ACCESS_TOOLS, TOOL_USE_GUIDES en tools.py + docs/TOOLS.md — Commit: bbaff5b (integrado) — Fecha: 2026-06-24
 [claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Router LLM mejorado (prompt 350t + desktop group + fix encoding) + TOOLS_MANUAL.md + USER_GUIDE.md + CONNECTION_GUIDE.md + TASKBOARD objetivos cerrados — Commit: 3f9a41b — Fecha: 2026-06-24
-[codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: PENDIENTE (verificado OK) — Fecha: 2026-06-24
+[codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: d4424c9 — Fecha: 2026-06-24
 [claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay — verificado implementado en 777592d — Commit: 777592d — Fecha: 2026-06-24
 
 ---
@@ -186,6 +186,57 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 |----|----|-------------|----------|--------|-----------|
 | GUI-001 | ✅ | Panel visual de catálogo de herramientas en la GUI desktop: lista por categoría con badge de riesgo, filtro, y link a manual | `app/widgets/tools_panel.py`, `app/widgets/main_window.py`, `app/styles.py` | codex | media |
 | GUI-002 | ✅ | Badges de categoría y riesgo en action rows del chat web/relay: icono de categoría + color por riesgo (alto=rojo, bajo=verde) | `app/web/static/app.js`, `relay/web/app.js`, `app/web/static/style.css`, `relay/web/style.css` | codex | media |
+
+---
+
+### 💡 Propuestas, Mejoras y Debates — Jefe de equipo a Director
+
+> **Steve:** marca ✅ las que apruebes para que los agentes las ejecuten. Las de tipo DEBATE no tienen implementación asignada — son decisiones de arquitectura que el director debe tomar.
+
+#### Mejoras técnicas (pendientes de aprobación)
+
+| ID | ✅ | Tipo | Descripción | Zona | Agente | Prioridad |
+|----|----|----|-------------|------|--------|-----------|
+| WATCH-001 | ⬜ | feat | Modo "watch" de screenshots periódicos: captura pantalla cada N segundos, envía al chat como stream de imágenes. Útil para supervisión remota desde iPhone. | `app/tools.py`, `app/api/agent_runner.py`, `app/web/static/app.js` | ambos | media |
+| RELAY-SEC-001 | ⬜ | security | Forzar TOTP en el relay: actualmente `totp_required: false`. Activar 2FA obligatorio para todas las sesiones remotas mejora la seguridad ante robo de contraseña. | `relay/main.py`, `docs/CONNECTION_GUIDE.md` | claude | alta |
+| TEST-002 | ⬜ | test | Tests de integración end-to-end con relay mock: simular PC↔relay↔cliente, verificar reconexión, aprobación de herramientas y reportes. | `tests/test_relay_integration.py` | ambos | media |
+| PERF-001 | ⬜ | refactor | Cache TTL corto para herramientas read-only frecuentes (`system_info`, `gpu_info`, `memory_info`): evitar llamadas duplicadas en la misma sesión cada <30s. | `app/tools.py` | claude | baja |
+| RAG-002 | ⬜ | feat | Ampliar temas del autonomous_learner: añadir CVE feeds (NVD API), exploit-db, threat intelligence. Mejorar relevancia de los documentos auto-aprendidos. | `app/autonomous_learner.py` | codex | media |
+| MULTI-001 | ⬜ | feat | Selector de personalidad del agente en la UI: "Asistente general", "Hacker ofensivo", "Analista defensivo" — cambia el system prompt base sin alterar filtros. | `app/consciousness/system_context.py`, `app/widgets/main_window.py` | ambos | baja |
+| AUDIT-001 | ⬜ | feat | Dashboard de actividad del agente: herramientas más usadas, errores frecuentes, tiempo medio de respuesta por sesión. Visible en tab "Agente". | `app/widgets/agent_panel.py`, `app/agent_log.py` | codex | baja |
+
+#### Debates de arquitectura — Decisión del Director
+
+> Estas entradas no tienen implementación directa. Son preguntas de diseño que afectan a cómo evoluciona el sistema. Los agentes esperan directriz antes de actuar.
+
+**[DEBATE-001] ¿Historial de conversaciones en el relay?**
+- **Propuesta:** Guardar el historial de conversaciones en Cloud Run (Firestore/CloudSQL) para acceder desde cualquier dispositivo sin depender del PC.
+- **Pro:** Historial persistente remoto, accesible desde iPhone aunque el PC esté apagado.
+- **Contra:** Datos de conversaciones (potencialmente sensibles) en la nube. Coste adicional.
+- **Posición jefe de equipo:** Solo si se implementa cifrado E2E antes del almacenamiento. Sin cifrado, NO recomendado.
+- **Decisión Steve:** ⬜
+
+**[DEBATE-002] ¿Auto-aprobación total en modo "experto"?**
+- **Propuesta:** Añadir un modo "experto" donde el agente ejecuta cualquier herramienta sin tarjeta de aprobación, incluyendo las de alto riesgo.
+- **Pro:** Flujo más rápido para usuarios avanzados.
+- **Contra:** Un bug o prompt injection podría ejecutar shell/write_file/kill_process sin control.
+- **Posición jefe de equipo:** Permitir solo en sesiones locales (GUI desktop), nunca en relay/web remoto. Añadir log de auditoría.
+- **Decisión Steve:** ⬜
+
+**[DEBATE-003] ¿Múltiples instancias de Ollama o modelo único?**
+- **Propuesta:** Cargar dos modelos Ollama en paralelo (fast + power) en lugar de usar el mismo modelo para ambos roles.
+- **Pro:** Latencia real diferenciada (rápido para chat, potente para análisis complejos).
+- **Contra:** 2x VRAM usage (16GB GPU puede quedarse corta con dos modelos grandes simultáneos).
+- **Posición jefe de equipo:** Implementar lazy-loading del modelo potente solo cuando se necesite, no pre-cargado.
+- **Decisión Steve:** ⬜
+
+**[DEBATE-004] ¿App nativa iOS o mejorar la PWA?**
+- **Propuesta:** Desarrollar la app Swift descrita en `docs/IOS_EXTENSION_PRD.md` vs mejorar la PWA actual.
+- **Pro app nativa:** Acceso a CoreBluetooth, notificaciones push reales, mejor UX.
+- **Contra app nativa:** Semanas de desarrollo, firma Apple Developer, distribución.
+- **Pro PWA mejorada:** Ya funciona, cero instalación, update instantáneo.
+- **Posición jefe de equipo:** PWA mejorada a corto plazo (WATCH-001 + notificaciones web push). App nativa solo si se necesita BLE o funciones iOS-exclusivas.
+- **Decisión Steve:** ⬜
 
 ---
 
