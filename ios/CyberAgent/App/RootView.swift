@@ -13,12 +13,7 @@ struct RootView: View {
             }
 
             NavigationStack {
-                PlaceholderPanel(
-                    title: "Dispositivos",
-                    subtitle: "BLE, GPS y accesorios",
-                    systemImage: "bolt.horizontal",
-                    accent: AppChrome.success
-                )
+                DevicesView()
             }
             .tabItem {
                 Label("Dispositivos", systemImage: "bolt.horizontal")
