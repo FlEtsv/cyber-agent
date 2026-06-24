@@ -14,27 +14,44 @@ _ALWAYS = frozenset({"shell", "read_file", "write_file", "run_python"})
 
 # ── Categorías disponibles ────────────────────────────────────────────────────
 CATEGORIES: dict[str, set[str]] = {
+    # Búsqueda, fetch y auditoría web pasiva/activa
     "web":       {"web_search", "web_fetch", "http_request", "ssl_info",
                   "http_headers_check", "dir_bruteforce", "web_crawl"},
+    # Exploración y verificación de archivos locales
     "files":     {"list_directory", "search_files", "grep_files", "diff_files",
                   "hash_file", "file_metadata"},
+    # Estado y control del sistema operativo local
     "system":    {"list_processes", "system_info", "memory_info", "gpu_info",
                   "network_info", "env_vars", "process_tree", "process_info",
                   "kill_process", "install_package", "uninstall_package"},
+    # Descubrimiento y análisis de red: puertos, DNS, ARP, trazas
     "network":   {"port_scan", "dns_lookup", "whois_lookup", "traceroute",
                   "banner_grab", "ping_sweep", "arp_cache", "network_connections"},
+    # Pentesting/hacking: agrupa network + web-audit + forensics para tareas ofensivas/defensivas
     "hacking":   {"port_scan", "dns_lookup", "whois_lookup", "traceroute",
                   "banner_grab", "ping_sweep", "arp_cache", "network_connections",
                   "ssl_info", "http_headers_check", "dir_bruteforce", "web_crawl",
                   "strings_extract", "hex_dump", "file_entropy", "pe_info",
-                  "registry_query", "list_services", "check_persistence"},
+                  "registry_query", "list_services", "check_persistence",
+                  "web_search", "network_connections", "process_tree"},
+    # Análisis forense local: binarios, registros, servicios, persistencia
     "forensics": {"strings_extract", "hex_dump", "file_entropy", "pe_info",
                   "file_metadata", "registry_query", "list_services",
                   "check_persistence"},
+    # Codificación/decodificación de datos (base64, hex, URL, rot13)
     "encode":    {"encode_decode"},
+    # Control completo del escritorio Windows: pantalla, teclado, ratón, ventanas, OCR, UI
+    "desktop":   {"screenshot_pc", "list_monitors", "active_window", "list_windows",
+                  "focus_window", "click_screen", "type_text", "hotkey",
+                  "ocr_screen", "ui_tree", "fill_form", "credential_lookup",
+                  "clipboard_read", "clipboard_write", "open_browser",
+                  "windows_notify"},
+    # Notificaciones y portapapeles (subconjunto rápido de desktop)
     "media":     {"screenshot_pc", "clipboard_read", "clipboard_write",
                   "windows_notify", "open_browser"},
+    # Base de conocimiento vectorial interna del agente
     "rag":       {"rag_search", "rag_add"},
+    # Auto-inspección y reinicio del propio agente
     "self":      {"list_self_files", "syntax_check", "restart_self"},
 }
 
@@ -42,34 +59,44 @@ CATEGORIES: dict[str, set[str]] = {
 _KW: dict[str, set[str]] = {
     "web":       {"buscar","search","web","http","url","internet","fetch","api",
                   "rest","curl","download","descargar","ssl","https","página",
-                  "pagina","sitio","scrape","crawl","endpoint","request","petici"},
+                  "pagina","sitio","scrape","crawl","endpoint","request","petici",
+                  "header","cabecera","certificado","certificate"},
     "files":     {"archivo","file","directorio","directory","carpeta","folder",
                   "grep","diferencia","diff","hash","md5","sha","metadatos",
-                  "listar","ls","ruta","path","extensi"},
+                  "listar","ls","ruta","path","extensi","busca","encuentra"},
     "system":    {"proceso","process","memoria","memory","ram","gpu","vram","cpu",
                   "sistema","system","instalar","install","paquete","package",
                   "matar","kill","rendimiento","performance","variable","env",
-                  "pip","npm","conda","hardware","temperatura","disco","disk"},
+                  "pip","npm","conda","hardware","temperatura","disco","disk",
+                  "servicio","service","tarea","task"},
     "network":   {"puerto","port","scan","nmap","red","network","ip","dns",
                   "whois","traceroute","ping","arp","escanear","conexiones",
-                  "firewall","subred","subnet","host","gateway","socket"},
+                  "firewall","subred","subnet","host","gateway","socket",
+                  "banner","latencia","latency"},
     "hacking":   {"hacking","pentest","penetration","recon","reconocimiento",
                   "enumerar","enumeration","vulnerable","vuln","cve","ctf",
-                  "auditoria","auditorÃ­a","seguridad ofensiva","blue team",
-                  "red team","osint","exposure","expuesto"},
+                  "auditoria","auditoria","auditoría","seguridad ofensiva","blue team",
+                  "red team","osint","exposure","expuesto","ataque","attack",
+                  "exploit","payload","inyeccion","injection","bypass","escalad",
+                  "privilege","privesc","footprint","fingerprint"},
     "forensics": {"malware","virus","exploit","vulnerabilidad","vulnerability",
                   "registro","registry","servicio","service","persistencia",
                   "persistence","strings","hex","entropia","entropy","pe",
                   "ejecutable","exe","dll","anali","forense","forensic",
-                  "reversing","reverse","binary","ransomware","trojan","backdoor"},
+                  "reversing","reverse","binary","ransomware","trojan","backdoor",
+                  "shellcode","ioc","indicator","sample","muestra","binario"},
     "encode":    {"base64","encode","decode","codif","decodif","cifr","descifr",
-                  "rot13","jwt","xor","aes","rsa"},
-    "media":     {"pantalla","screenshot","captura","portapapeles","clipboard",
-                  "notificaci","notification","navegador","browser","abrir"},
+                  "rot13","jwt","xor","aes","rsa","hex","url encode","url decode"},
+    "desktop":   {"pantalla","screenshot","captura","click","ratón","mouse",
+                  "teclado","keyboard","ventana","window","tipo","type","escrib",
+                  "ocr","texto pantalla","ui","interfaz","control","automatiza",
+                  "portapapeles","clipboard","credencial","credential","abrir",
+                  "open","browser","naveg","formulario","form","hotkey","atajo"},
+    "media":     {"notificaci","notification","notifica","avisa"},
     "rag":       {"recuerda","remember","aprende","learn","conocimiento",
-                  "knowledge","rag","guardar conocimiento"},
+                  "knowledge","rag","guardar conocimiento","base de datos","vectorial"},
     "self":      {"código propio","tu código","modif","repair","mejora",
-                  "automod","reparar","reinici","restart","source"},
+                  "automod","reparar","reinici","restart","source","codigo fuente"},
 }
 
 # ── Índice nombre→schema ──────────────────────────────────────────────────────
@@ -97,12 +124,46 @@ def _build_schema(names: set[str]) -> list[dict]:
 
 
 # ── Capa 1: LLM router ────────────────────────────────────────────────────────
-_ROUTER_SYSTEM = (
-    "Eres un selector de herramientas. Dado un mensaje, responde SOLO con los "
-    "nombres de categorías necesarias separadas por coma, sin explicación.\n"
-    f"Categorías disponibles: {', '.join(CATEGORIES.keys())}, todas\n"
-    "Si el mensaje es ambiguo o necesitas todo, responde: todas"
-)
+_ROUTER_SYSTEM = """\
+Eres un selector de herramientas de precisión para un agente de ciberseguridad.
+Dado el mensaje del usuario, responde SOLO con los nombres de categorías necesarias \
+separadas por coma. Sin explicación. Sin puntos. Solo nombres.
+
+CATEGORÍAS Y SU USO EXACTO:
+- web: buscar en internet, fetch de URL, llamadas HTTP/REST, auditar cabeceras o SSL, \
+crawl de páginas, fuerza bruta de directorios web
+- files: leer/buscar/comparar archivos locales, grep, hashes, metadatos de archivos
+- system: estado del SO, procesos, RAM/CPU/GPU, instalar/desinstalar paquetes, \
+variables de entorno, matar procesos
+- network: escanear puertos, DNS, WHOIS, traceroute, ARP, banner grab, descubrir hosts
+- hacking: tareas ofensivas/defensivas completas — pentest, CTF, recon, OSINT, \
+auditoría de seguridad (incluye network + web-audit + forensics)
+- forensics: análisis de binarios locales, strings/hex/entropy, PE headers, \
+registro de Windows, servicios, persistencia, malware
+- encode: codificar/decodificar base64, hex, URL, rot13, JWT
+- desktop: controlar el escritorio Windows — screenshots, clicks, teclado, OCR, \
+ventanas, formularios, credenciales del sistema, portapapeles
+- rag: consultar o guardar en la base de conocimiento interna del agente
+- self: listar, verificar sintaxis o reiniciar el propio agente
+
+REGLAS DE DESAMBIGUACIÓN:
+- "hacking" incluye todo lo de "network" + partes de "web" y "forensics" — úsalo solo para \
+tareas de seguridad activa o pasiva completas
+- "desktop" para cualquier acción visual/de usuario en el PC: screenshots, clics, tipo, OCR
+- "web" solo para HTTP/internet — no para archivos locales
+- "network" solo para reconocimiento de red pura; si es auditoría completa usa "hacking"
+- Si el mensaje es genérico o ambiguo: responde "todas"
+
+Ejemplos:
+  "escanea puertos de 192.168.1.1" → network
+  "haz un pentest a mi web" → hacking
+  "descarga y analiza este binario" → web,forensics
+  "captura pantalla y haz click en el botón" → desktop
+  "busca archivos .py modificados hoy" → files
+  "instala nmap" → system
+  "¿cuánta RAM tiene?" → system
+  "auditoría completa del servidor" → hacking,web
+"""
 
 
 def _llm_route(message: str, model: str, ollama_url: str) -> set[str] | None:
