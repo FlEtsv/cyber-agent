@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(230)
+        sidebar.setFixedWidth(258)
         lay = QVBoxLayout(sidebar)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
@@ -306,12 +306,41 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
+        header = QWidget()
+        header.setObjectName("workspace_header")
+        hlay = QHBoxLayout(header)
+        hlay.setContentsMargins(18, 14, 18, 12)
+        hlay.setSpacing(12)
+
+        title_box = QVBoxLayout()
+        title_box.setContentsMargins(0, 0, 0, 0)
+        title_box.setSpacing(2)
+
+        self.workspace_title = QLabel("CyberAgent Console")
+        self.workspace_title.setObjectName("workspace_title")
+        self.workspace_subtitle = QLabel("Chat, terminal y memoria operativa en una sola vista")
+        self.workspace_subtitle.setObjectName("workspace_subtitle")
+        title_box.addWidget(self.workspace_title)
+        title_box.addWidget(self.workspace_subtitle)
+
+        hlay.addLayout(title_box, 1)
+
+        self.workspace_route = QLabel("Vista: Chat")
+        self.workspace_route.setObjectName("workspace_pill")
+        hlay.addWidget(self.workspace_route)
+
+        self.workspace_state = QLabel("Sistema listo")
+        self.workspace_state.setObjectName("workspace_pill_accent")
+        hlay.addWidget(self.workspace_state)
+
+        lay.addWidget(header)
+
         # Tab bar
         tab_bar = QWidget()
         tab_bar.setObjectName("tab_bar")
         tlay = QHBoxLayout(tab_bar)
-        tlay.setContentsMargins(12, 6, 12, 0)
-        tlay.setSpacing(6)
+        tlay.setContentsMargins(18, 0, 18, 0)
+        tlay.setSpacing(8)
 
         self.tab_chat = QPushButton("💬  Chat")
         self.tab_chat.setObjectName("tab_btn_active")
@@ -446,6 +475,8 @@ class MainWindow(QMainWindow):
             btn.setStyle(btn.style())
         if idx == 2:
             self.agent_panel.refresh_log()
+        if hasattr(self, "workspace_route"):
+            self.workspace_route.setText(["Vista: Chat", "Vista: Terminal", "Vista: Agente"][idx])
 
     # ════════════════════════════════════════════════════════════════════
     # PERMISSIONS
@@ -548,6 +579,8 @@ class MainWindow(QMainWindow):
         self.stop_btn.show()
         self.input_box.setReadOnly(True)
         self.model_status.setText("● generando...")
+        if hasattr(self, "workspace_state"):
+            self.workspace_state.setText("Generando respuesta")
 
         db.save_message(self.active_conv, "user", text)
         db.update_title(self.active_conv, text)
@@ -708,6 +741,8 @@ class MainWindow(QMainWindow):
         self._end_streaming()
         self._load_conversations()
         self.model_status.setText("● modelo listo")
+        if hasattr(self, "workspace_state"):
+            self.workspace_state.setText("Sistema listo")
 
     def _on_error(self, msg: str):
         if not self.isVisible():
@@ -731,6 +766,8 @@ class MainWindow(QMainWindow):
         )
         self._end_streaming()
         self.model_status.setText("error de conexion" if is_connection else "error del agente")
+        if hasattr(self, "workspace_state"):
+            self.workspace_state.setText("Revisar error")
 
     def _end_streaming(self):
         self._streaming = False
@@ -741,6 +778,8 @@ class MainWindow(QMainWindow):
         self.send_btn.show()
         self.input_box.setReadOnly(False)
         self.input_box.setFocus()
+        if hasattr(self, "workspace_state") and self.model_status.text() != "error de conexion":
+            self.workspace_state.setText("Sistema listo")
 
     # ════════════════════════════════════════════════════════════════════
     # TRUST

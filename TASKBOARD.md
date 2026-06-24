@@ -97,7 +97,6 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 
 [claude] TEST-001 — Suite mínima automatizada backend/frontend: syntax check + tests unitarios auth — Archivos: `tests/`, `scripts/`, `app/database.py` — Fecha: 2026-06-24 22:19
 [claude] DATA-001 — Integridad DB + backup diario automático — Archivos: `app/database.py` — Fecha: 2026-06-24 22:45
-`[CODEX] UI-002 — Rediseño GUI desktop PySide: layout, navegación, paneles y estados — Archivos: app/widgets/main_window.py, app/styles.py — Fecha: 2026-06-24 22:39`
 `[CODEX] UI-003 — Rediseño login/PWA móvil: acceso claro, estado Cloud Run/PC y experiencia iPhone — Archivos: app/web/login.html, app/web/static/login.css, relay/web/login.html, relay/web/login.css — Fecha: 2026-06-24 22:44`
 
 ---
@@ -113,6 +112,7 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 [claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] F003 — FAST_MODEL/POWER_MODEL configurables via CYBERAGENT_*_MODEL env — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [codex] B004+B005+B006+UI-001 — Reconexión frontend, banners PC/reconectando y pulido visual web/relay — Commit: 3cc9d5b — Fecha: 2026-06-24 22:35
+[codex] UI-002 — Rediseño GUI desktop PySide: cabecera workspace, navegación, estados y tema visual — Commit: pendiente — Fecha: 2026-06-24 22:50
 
 ---
 
@@ -197,4 +197,5 @@ Se dejan las acciones que se necesita que el usuario apruebe como peticiones en 
 | ID | ✅ | Agente | Acción solicitada | Estado |
 |----|----|--------|-------------------|--------|
 | P-CODEX-001 | ✅ | codex | Ejecutar `node --check app/web/static/app.js` y `node --check relay/web/app.js`; si pasan, hacer commit acumulado `[codex] feat: improve web reconnect and visual states` con B004+B005+B006+UI-001 y actualización del TASKBOARD. | completado: 3cc9d5b |
-| P-CODEX-002 | ✅ | codex | Ejecutar validación de sintaxis Python para `app/widgets/main_window.py` y `app/styles.py`; si pasa, commit `[codex] feat: refine desktop gui shell` con UI-002 y actualización del TASKBOARD. | pendiente |
+| P-CODEX-002 | ✅ | codex | Ejecutar validación de sintaxis Python para `app/widgets/main_window.py` y `app/styles.py`; si pasa, commit `[codex] feat: refine desktop gui shell` con UI-002 y actualización del TASKBOARD. | completado: pendiente |
+| P-CODEX-003 | ⬜ | codex | Ejecutar validación HTML/CSS básica de login local/relay; si pasa, commit `[codex] feat: redesign mobile login surfaces` con UI-003 y actualización del TASKBOARD. | pendiente |
