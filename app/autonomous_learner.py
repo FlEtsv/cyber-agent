@@ -9,9 +9,10 @@ Ciclo:
   4. Extrae el texto útil y lo guarda en ChromaDB
   5. Registra lo que aprendió en un log
 """
-import threading, time, re, hashlib, os, json
-from datetime import datetime
+import threading, time, re, hashlib, os, json, csv, io
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 _LOG_PATH = Path(__file__).parent.parent / "data" / "learner_log.jsonl"
 _STOP_EVENT   = threading.Event()
@@ -24,9 +25,13 @@ _LOG_LOCK     = threading.Lock()
 INTEREST_MATRIX = [
     # Ciberseguridad — alta prioridad
     ("new CVE vulnerabilities 2025 critical Windows Linux",          ["security", "cve"],      "all",     12),
+    ("NVD critical CVE Windows Linux network remote code execution",  ["security", "cve", "nvd"], "all",   12),
+    ("CISA KEV known exploited vulnerabilities ransomware edge devices", ["security", "kev", "threat-intel"], "all", 12),
+    ("Exploit-DB recent remote code execution privilege escalation",  ["security", "exploit-db", "exploit"], "all", 24),
     ("advanced PowerShell offensive security techniques 2025",       ["security", "powershell"],"windows", 24),
     ("privilege escalation Linux techniques 2025",                   ["security", "linux"],     "linux",   24),
     ("malware analysis techniques evasion 2025",                     ["security", "malware"],   "all",     48),
+    ("MITRE ATT&CK threat intelligence techniques detection 2025",    ["security", "threat-intel", "mitre"], "all", 48),
     ("web application hacking OWASP top 10 2025",                   ["security", "web"],       "all",     48),
     # IA y agentes — media prioridad
     ("Ollama local LLM new models performance 2025",                 ["ai", "ollama"],          "all",     24),
@@ -44,6 +49,20 @@ INTEREST_MATRIX = [
 ]
 
 _STATE_FILE = Path(__file__).parent.parent / "data" / "learner_state.json"
+_NVD_CVES_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+_CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+_EXPLOITDB_CSV_URL = "https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv"
+_SOURCE_WEIGHTS = {
+    "nvd.nist.gov": 7,
+    "services.nvd.nist.gov": 7,
+    "cisa.gov": 7,
+    "mitre.org": 6,
+    "attack.mitre.org": 6,
+    "exploit-db.com": 5,
+    "gitlab.com": 4,
+    "owasp.org": 4,
+    "github.com": 2,
+}
 
 
 def _load_state() -> dict:
@@ -163,12 +182,193 @@ def _web_search_raw(query: str, max_results: int = 4) -> list[dict]:
         return []
 
 
+def _host(url: str) -> str:
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
+
+
+def _source_score(url: str, tags: list[str]) -> int:
+    host = _host(url)
+    score = 0
+    for domain, weight in _SOURCE_WEIGHTS.items():
+        if host == domain or host.endswith("." + domain):
+            score += weight
+            break
+    if "cve" in tags and ("nvd.nist.gov" in host or "cve.org" in host):
+        score += 4
+    if "threat-intel" in tags and any(x in host for x in ("cisa.gov", "mitre.org")):
+        score += 4
+    if "exploit-db" in tags and any(x in host for x in ("exploit-db.com", "gitlab.com")):
+        score += 4
+    return score
+
+
+def _rank_results(results: list[dict], tags: list[str], limit: int = 6) -> list[dict]:
+    seen = set()
+    ranked = []
+    for item in results:
+        title = (item.get("title") or "").strip()
+        url = (item.get("url") or "").strip()
+        key = (url or title).lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        content_len = len(item.get("content") or item.get("snippet") or "")
+        ranked.append((_source_score(url, tags), content_len, item))
+    ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [item for _, _, item in ranked[:limit]]
+
+
+def _nvd_recent_cves(query: str, max_results: int = 5) -> list[dict]:
+    """Fetch recent high-signal CVEs from the NVD 2.0 CVE API."""
+    try:
+        import httpx
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=21)
+        params = {
+            "keywordSearch": " ".join(query.split()[:8]),
+            "cvssV3Severity": "CRITICAL",
+            "pubStartDate": start.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "pubEndDate": end.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "resultsPerPage": max_results,
+        }
+        r = httpx.get(_NVD_CVES_URL, params=params, timeout=20)
+        if r.status_code >= 400:
+            params.pop("keywordSearch", None)
+            r = httpx.get(_NVD_CVES_URL, params=params, timeout=20)
+        data = r.json()
+        out = []
+        for item in data.get("vulnerabilities", [])[:max_results]:
+            cve = item.get("cve", {})
+            cve_id = cve.get("id", "CVE")
+            descriptions = cve.get("descriptions") or []
+            desc = next((d.get("value", "") for d in descriptions if d.get("lang") == "en"), "")
+            metrics = cve.get("metrics", {})
+            cvss = None
+            for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
+                if metrics.get(key):
+                    cvss = metrics[key][0]
+                    break
+            severity = ""
+            score = ""
+            if cvss:
+                severity = cvss.get("cvssData", {}).get("baseSeverity") or cvss.get("baseSeverity", "")
+                score = cvss.get("cvssData", {}).get("baseScore", "")
+            refs = [ref.get("url", "") for ref in cve.get("references", {}).get("referenceData", [])[:5]]
+            content = (
+                f"CVE: {cve_id}\nSeverity: {severity} {score}\n"
+                f"Published: {cve.get('published', '')}\nLast modified: {cve.get('lastModified', '')}\n"
+                f"Description: {desc}\nReferences:\n" + "\n".join(refs)
+            )
+            out.append({
+                "title": f"{cve_id} {severity}".strip(),
+                "snippet": desc[:500],
+                "content": content,
+                "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
+                "source": "nvd",
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _cisa_kev_items(max_results: int = 5) -> list[dict]:
+    """Fetch CISA Known Exploited Vulnerabilities as threat-intel documents."""
+    try:
+        import httpx
+        r = httpx.get(_CISA_KEV_URL, timeout=20)
+        data = r.json()
+        vulns = data.get("vulnerabilities", [])
+        vulns.sort(key=lambda v: v.get("dateAdded", ""), reverse=True)
+        out = []
+        for item in vulns[:max_results]:
+            cve_id = item.get("cveID", "CVE")
+            content = (
+                f"CVE: {cve_id}\nVendor: {item.get('vendorProject', '')}\n"
+                f"Product: {item.get('product', '')}\nDate added: {item.get('dateAdded', '')}\n"
+                f"Due date: {item.get('dueDate', '')}\nKnown ransomware use: {item.get('knownRansomwareCampaignUse', '')}\n"
+                f"Vulnerability: {item.get('vulnerabilityName', '')}\n"
+                f"Action: {item.get('requiredAction', '')}\n"
+                f"Notes: {item.get('notes', '')}"
+            )
+            out.append({
+                "title": f"{cve_id} KEV {item.get('vendorProject', '')} {item.get('product', '')}".strip(),
+                "snippet": item.get("vulnerabilityName", ""),
+                "content": content,
+                "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+                "source": "cisa-kev",
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _exploitdb_recent(query: str, max_results: int = 5) -> list[dict]:
+    """Read the official Exploit-DB CSV and select rows matching the topic."""
+    try:
+        import httpx
+        r = httpx.get(_EXPLOITDB_CSV_URL, timeout=20)
+        keywords = {w.lower() for w in re.findall(r"[a-zA-Z0-9_-]{4,}", query)}
+        rows = []
+        reader = csv.DictReader(io.StringIO(r.text))
+        for row in reader:
+            title = row.get("description", "")
+            haystack = " ".join([
+                title,
+                row.get("type", ""),
+                row.get("platform", ""),
+                row.get("codes", ""),
+            ]).lower()
+            score = sum(1 for kw in keywords if kw in haystack)
+            if score <= 0:
+                continue
+            rows.append((score, row))
+        rows.sort(key=lambda item: (item[0], item[1].get("date", "")), reverse=True)
+        out = []
+        for _, row in rows[:max_results]:
+            exploit_id = row.get("id", "")
+            title = row.get("description", "Exploit-DB entry")
+            url = f"https://www.exploit-db.com/exploits/{exploit_id}" if exploit_id else "https://www.exploit-db.com/"
+            content = (
+                f"Exploit-DB ID: {exploit_id}\nTitle: {title}\nDate: {row.get('date', '')}\n"
+                f"Author: {row.get('author', '')}\nType: {row.get('type', '')}\n"
+                f"Platform: {row.get('platform', '')}\nPort: {row.get('port', '')}\n"
+                f"Verified: {row.get('verified', '')}\nPath: {row.get('file', '')}\nCodes: {row.get('codes', '')}"
+            )
+            out.append({
+                "title": f"Exploit-DB {exploit_id}: {title}",
+                "snippet": content,
+                "content": content,
+                "url": url,
+                "source": "exploit-db",
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _specialized_results(query: str, tags: list[str]) -> list[dict]:
+    results = []
+    tagset = set(tags)
+    if "nvd" in tagset or "cve" in tagset:
+        results.extend(_nvd_recent_cves(query))
+    if "kev" in tagset or "threat-intel" in tagset:
+        results.extend(_cisa_kev_items())
+    if "exploit-db" in tagset or "exploit" in tagset:
+        results.extend(_exploitdb_recent(query))
+    return results
+
+
 def _learn_topic(idx: int):
     """Ejecuta un ciclo de aprendizaje para el topic dado."""
     query, tags, platform, _ = INTEREST_MATRIX[idx]
     print(f"[Learner] 🔍 Buscando: {query[:60]}...")
 
-    results = _web_search_raw(query, max_results=4)
+    results = _specialized_results(query, tags)
+    results.extend(_web_search_raw(query, max_results=4))
+    results = _rank_results(results, tags, limit=6)
     if not results:
         print(f"[Learner] Sin resultados para: {query[:40]}")
         return
@@ -182,7 +382,9 @@ def _learn_topic(idx: int):
         else:
             snippet_only = False
 
-        if snippet_only or not url.startswith("http"):
+        if res.get("content"):
+            content = res["content"]
+        elif snippet_only or not url.startswith("http"):
             # Solo guardar el snippet si no podemos fetch
             content = res.get("snippet", "")
         else:
@@ -202,7 +404,7 @@ def _learn_topic(idx: int):
                 title=f"[Auto] {title}",
                 content=f"Fuente: {url}\n\n{content}",
                 platform=platform,
-                tags=tags + ["auto_learned"],
+                tags=tags + ["auto_learned", res.get("source", "web")],
             )
             learned.append(title[:80])
         except Exception as e:
