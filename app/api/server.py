@@ -1,7 +1,7 @@
 """CyberAgent Web Server — FastAPI + WebSocket + PWA + Auth."""
 import asyncio, json, os, threading
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response, Cookie
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Response, Cookie
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -46,6 +46,22 @@ class _DynamicCORS(BaseHTTPMiddleware):
         return resp
 
 app.add_middleware(_DynamicCORS)
+
+
+@app.exception_handler(HTTPException)
+async def _http_exc(request: Request, exc: HTTPException):
+    return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+
+
+@app.exception_handler(Exception)
+async def _generic_exc(request: Request, exc: Exception):
+    try:
+        from app.agent_log import log_exception as _lex
+        _lex("server", f"{type(exc).__name__} @ {request.method} {request.url.path}")
+    except Exception:
+        pass
+    return JSONResponse({"error": "Error interno del servidor"}, status_code=500)
+
 
 if (WEB_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")

@@ -5,9 +5,9 @@ Acts as a fixed-URL bridge between the mobile browser and the PC agent.
 PC connects outbound  → wss://<relay>/host?secret=HOST_SECRET
 Mobile browser        → wss://<relay>/ws  (after login)
 """
-import asyncio, json, os, secrets, time, uuid
+import asyncio, collections, json, os, secrets, time, uuid
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import bcrypt
@@ -29,6 +29,22 @@ JWT_HOURS     = 72
 WEB_DIR = Path(__file__).parent / "web"
 
 app = FastAPI(docs_url=None, redoc_url=None)
+
+
+# ── Rate limiting (in-memory, per IP) ─────────────────────────────────────────
+_RATE_WINDOW = 300   # seconds
+_RATE_MAX    = 10    # max login attempts per window per IP
+_rate_hits: dict[str, collections.deque] = {}
+
+def _rate_ok(ip: str) -> bool:
+    now = time.time()
+    dq = _rate_hits.setdefault(ip, collections.deque())
+    while dq and dq[0] < now - _RATE_WINDOW:
+        dq.popleft()
+    if len(dq) >= _RATE_MAX:
+        return False
+    dq.append(now)
+    return True
 
 STATIC_DIR = WEB_DIR / "static"
 app.mount(
@@ -101,6 +117,9 @@ async def auth_status():
 
 @app.post("/api/auth/login")
 async def auth_login(req: Request):
+    ip = req.client.host if req.client else "unknown"
+    if not _rate_ok(ip):
+        return JSONResponse({"ok": False, "error": "Demasiados intentos. Espera unos minutos."}, status_code=429)
     body  = await req.json()
     email = body.get("email", "").strip()
     pw    = body.get("password", "")
@@ -149,13 +168,22 @@ async def api_status():
 
 
 # ── PC host WebSocket (/host) ─────────────────────────────────────────────────
+@app.exception_handler(HTTPException)
+async def _http_exc(request: Request, exc: HTTPException):
+    return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+
+
+@app.exception_handler(Exception)
+async def _generic_exc(request: Request, exc: Exception):
+    return JSONResponse({"error": "Error interno del servidor"}, status_code=500)
+
+
 @app.websocket("/host")
 async def host_ws(ws: WebSocket, secret: str = ""):
+    await ws.accept()
     if secret != HOST_SECRET:
         await ws.close(code=4401)
         return
-
-    await ws.accept()
 
     # Reject a second PC while one is already connected
     if state.host_ws is not None:
@@ -215,11 +243,10 @@ async def host_ws(ws: WebSocket, secret: str = ""):
 # ── Mobile chat WebSocket (/ws) ───────────────────────────────────────────────
 @app.websocket("/ws")
 async def mobile_ws(ws: WebSocket):
+    await ws.accept()
     if not _check_ws_token(ws):
         await ws.close(code=4401)
         return
-
-    await ws.accept()
     session_id = str(uuid.uuid4())
     state.sessions[session_id] = ws
 
