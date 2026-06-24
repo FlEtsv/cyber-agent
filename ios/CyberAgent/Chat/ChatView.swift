@@ -128,7 +128,7 @@ struct ChatView: View {
             Spacer()
             VStack(spacing: 10) {
                 ForEach(viewModel.pendingApprovals) { payload in
-                    PendingApprovalCard(
+                    ToolApprovalCard(
                         payload: payload,
                         approve: { viewModel.approve(toolId: payload.id) },
                         reject: { viewModel.reject(toolId: payload.id) }
@@ -188,92 +188,6 @@ private struct TypingIndicator: View {
             Spacer(minLength: 48)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct PendingApprovalCard: View {
-    let payload: ToolPayload
-    let approve: () -> Void
-    let reject: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(payload.name)
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(ChatColors.textPrimary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Text((payload.risk ?? "riesgo").uppercased())
-                    .font(.system(.caption2, design: .monospaced, weight: .bold))
-                    .foregroundStyle(riskColor)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(riskColor.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-
-            if let category = payload.category {
-                Text(category)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(ChatColors.textSecondary)
-            }
-
-            Text(Self.formatArgs(payload.args))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(ChatColors.textSecondary)
-                .lineLimit(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 10) {
-                Button("Rechazar", action: reject)
-                    .buttonStyle(ApprovalButtonStyle(color: ChatColors.danger))
-
-                Button("Aprobar", action: approve)
-                    .buttonStyle(ApprovalButtonStyle(color: ChatColors.success))
-            }
-        }
-        .padding(14)
-        .background(ChatColors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(riskColor, lineWidth: 1)
-        )
-    }
-
-    private var riskColor: Color {
-        switch payload.risk?.lowercased() {
-        case "high", "alto", "danger", "dangerous":
-            return ChatColors.danger
-        default:
-            return ChatColors.success
-        }
-    }
-
-    private static func formatArgs(_ args: [String: AnyCodable]) -> String {
-        guard !args.isEmpty else { return "{}" }
-        if let data = try? JSONEncoder().encode(args),
-           let text = String(data: data, encoding: .utf8) {
-            return text
-        }
-        return args.keys.sorted().joined(separator: ", ")
-    }
-}
-
-private struct ApprovalButtonStyle: ButtonStyle {
-    let color: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(.subheadline, design: .rounded, weight: .semibold))
-            .foregroundStyle(ChatColors.textPrimary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(color.opacity(configuration.isPressed ? 0.72 : 1.0))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
