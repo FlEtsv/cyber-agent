@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleDisplayName</key>
+	<string>CyberAgent</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIRequiresFullScreen</key>
+	<false/>
+
+	<!-- Permisos de privacidad -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>CyberAgent necesita Bluetooth para detectar y conectar con dispositivos cercanos.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>CyberAgent necesita Bluetooth para detectar dispositivos periféricos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CyberAgent usa tu ubicación para incluirla en el contexto del agente.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>CyberAgent puede usar tu ubicación en segundo plano para tareas de automatización.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CyberAgent necesita la cámara para análisis de visión y captura de imágenes.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CyberAgent necesita el micrófono para comandos de voz.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CyberAgent puede acceder a fotos para análisis de imagen.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>CyberAgent necesita acceso a la red local para conectar con el PC en tu WiFi.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>CyberAgent puede usar Face ID para desbloquear la sesión de forma segura.</string>
+
+	<!-- Accesorios MFi (ExternalAccessory) -->
+	<key>UISupportedExternalAccessoryProtocols</key>
+	<array>
+		<string>com.cyberagent.serial</string>
+	</array>
+
+	<!-- Dominios seguros para el relay y LAN -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>run.app</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<!-- Permite HTTP en LAN (IP local) -->
+			<key>192.168.0.0</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+
+	<!-- Modos de background -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+</dict>
+</plist>

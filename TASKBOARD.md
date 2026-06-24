@@ -136,6 +136,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 [claude] IOS-001..005 — App nativa iOS: estructura Xcode 17, Auth+Relay, Chat+Approval, BLE/GPS/Devices, Mini LLM offline — Archivos: ios/ — Fecha: 2026-06-24
+[codex] AUDIT-001 — Dashboard de actividad del agente en tab Agente: métricas de herramientas, errores y tiempos medios — Archivos: app/widgets/agent_panel.py, app/agent_log.py, TASKBOARD.md — Fecha: 2026-06-24 23:31
 
 ---
 
@@ -280,20 +281,35 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 
 ---
 
-### 📱 App nativa iOS — Desglose del OBJETIVO (Claude como jefe de equipo)
+### 📱 App nativa iOS — Desglose del OBJETIVO
 
-> Objetivo directivo de Steve (R6). Claude lidera el desarrollo iOS. Codex apoya UI/styles.
+> **Jefe de equipo (claude):** Arquitectura, relay, auth, mini LLM, devices, network, ChatViewModel.
+> **Codex:** UI SwiftUI (vistas, estilos, animaciones, Assets, Info.plist permisos).
+
+#### Zona Claude — Backend iOS
 
 | ID | ✅ | Descripción | Archivos | Agente | Prioridad |
 |----|----|----|-------------|--------|-----------|
-| IOS-001 | ✅ | Estructura Xcode 17 + Swift Package: directorios, Info.plist, Package.swift, AppDelegate, SceneDelegate | `ios/` | claude | alta |
-| IOS-002 | ✅ | Auth layer: LoginView (SwiftUI), AuthManager (JWT cookie + Keychain), relay login flow | `ios/CyberAgent/Auth/` | claude | alta |
-| IOS-003 | ✅ | RelayWebSocket: manager WS (URLSessionWebSocketTask), auto-reconexión, SSE events | `ios/CyberAgent/Relay/` | claude | alta |
-| IOS-004 | ✅ | Chat + Tool Approval UI: ChatView, MessageBubble, ToolApprovalCard con botones Aprobar/Rechazar | `ios/CyberAgent/Chat/` | claude | alta |
-| IOS-005 | ✅ | DeviceManager: BLEManager (CoreBluetooth), AccessoryDetector (ExternalAccessory/UIDividers), GPSManager (CoreLocation) | `ios/CyberAgent/Devices/` | claude | alta |
-| IOS-006 | ✅ | Mini LLM offline: CoreML pipeline + safe tool subset (no shell/write_file/kill), OfflineAgentRunner | `ios/CyberAgent/LocalLLM/` | claude | media |
-| IOS-007 | ✅ | Network fallback: detectar LAN vs relay, conectar automáticamente al PC local cuando sin internet | `ios/CyberAgent/Network/` | claude | alta |
-| IOS-008 | ✅ | Permission system: per-tool + per-device permisos, settings persistentes en UserDefaults/Keychain | `ios/CyberAgent/Permissions/` | claude | media |
+| IOS-001 | ✅ | Package.swift, Models (ChatMessage, AgentEvent), Utils (Constants, KeychainHelper) — EN PROGRESO | `ios/` | claude | alta |
+| IOS-002 | ✅ | AuthManager (JWT cookie + Keychain), NetworkMonitor — EN PROGRESO | `ios/CyberAgent/Auth/` | claude | alta |
+| IOS-003 | ✅ | RelayManager: URLSessionWebSocketTask, auto-reconexión exponencial, parseo AgentEvent | `ios/CyberAgent/Relay/` | claude | alta |
+| IOS-005 | ✅ | BLEManager (CoreBluetooth), AccessoryDetector (ExternalAccessory), GPSManager (CoreLocation) | `ios/CyberAgent/Devices/` | claude | alta |
+| IOS-006 | ✅ | LocalLLMManager (CoreML), SafeToolSubset (sin shell/write/kill), OfflineAgentRunner | `ios/CyberAgent/LocalLLM/` | claude | media |
+| IOS-007 | ✅ | ConnectionResolver: LAN vs relay, fallback automático, ConnectionMode | `ios/CyberAgent/Network/` | claude | alta |
+| IOS-008 | ✅ | PermissionManager: per-tool + per-device, UserDefaults/Keychain | `ios/CyberAgent/Permissions/` | claude | media |
+| IOS-009 | ✅ | ChatViewModel: lógica agente (enviar msg, parsear tokens, manejar aprobaciones, historial) | `ios/CyberAgent/Chat/ChatViewModel.swift` | claude | alta |
+
+#### Zona Codex — Frontend iOS SwiftUI
+
+| ID | ✅ | Descripción | Archivos | Agente | Prioridad |
+|----|----|----|-------------|--------|-----------|
+| IOS-UI-001 | ✅ | RootView + MainTabView: tabs Chat/Dispositivos/Configuración con tema dark GitHub | `ios/CyberAgent/App/RootView.swift` | codex | alta |
+| IOS-UI-002 | ✅ | ChatView + MessageBubble: burbujas user/assistant, markdown, typing indicator, scroll al último | `ios/CyberAgent/Chat/ChatView.swift`, `MessageBubble.swift` | codex | alta |
+| IOS-UI-003 | ✅ | ToolApprovalCard: tarjeta aprobación con nombre/args/riesgo/categoría, Aprobar/Rechazar, countdown 60s | `ios/CyberAgent/Chat/ToolApprovalCard.swift` | codex | alta |
+| IOS-UI-004 | ✅ | DevicesView: lista BLE/USB/GPS con estado, acciones por tipo de dispositivo | `ios/CyberAgent/Devices/DevicesView.swift` | codex | alta |
+| IOS-UI-005 | ✅ | SettingsView: URL relay, IP local, expert mode toggle, permisos por herramienta, logout | `ios/CyberAgent/Chat/SettingsView.swift` | codex | media |
+| IOS-UI-006 | ✅ | Assets.xcassets, Info.plist (permisos BT/GPS/Cámara/Red/Micrófono), LaunchScreen, AppIcon placeholder | `ios/CyberAgent/Assets.xcassets/`, `ios/CyberAgent/Info.plist` | codex | alta |
+| IOS-UI-007 | ✅ | Theme.swift: Colors (dark GitHub), Typography, CAButton, CACard, StatusDot | `ios/CyberAgent/Utils/Theme.swift` | codex | media |
 
 ---
 
@@ -320,6 +336,7 @@ Cambia `⬜` a `✅` para aprobarla. Los agentes la ejecutan en su próxima sesi
 8. Si necesita validación, ejecución, commit, push o despliegue: registrarlo en PERMISOS SOLICITADOS / PERMISOS Y PETICIONES y seguir con otra tarea si no hay ✅
 9. Si ya hay ✅ en el documento: ejecutar sin pedir permiso por chat
 10. Mover a COMPLETADO + commit del TASKBOARD
+11. Si Codex se queda sin margen de uso o se interrumpe, dejar en `EN PROGRESO` el estado exacto, el punto donde se quedó, qué falta y cuándo puede reanudar para que Claude lo vea y continúe la coordinación.
 ```
 
 
@@ -334,3 +351,79 @@ Se dejan las acciones que se necesita que el usuario apruebe como peticiones en 
 | P-CODEX-001 | ✅ | codex | Ejecutar `node --check app/web/static/app.js` y `node --check relay/web/app.js`; si pasan, hacer commit acumulado `[codex] feat: improve web reconnect and visual states` con B004+B005+B006+UI-001 y actualización del TASKBOARD. | completado: 3cc9d5b |
 | P-CODEX-002 | ✅ | codex | Ejecutar validación de sintaxis Python para `app/widgets/main_window.py` y `app/styles.py`; si pasa, commit `[codex] feat: refine desktop gui shell` con UI-002 y actualización del TASKBOARD. | completado: 0d54b7c |
 | P-CODEX-003 | ✅ | codex | Ejecutar validación HTML/CSS básica de login local/relay; si pasa, commit `[codex] feat: redesign mobile login surfaces` con UI-003 y actualización del TASKBOARD. | completado: 230564a |
+
+---
+
+## 🔄 PROTOCOLO DE TURNO CUANDO SE AGOTA EL CONTEXTO
+
+> Instrucción del Director al equipo.
+
+Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
+1. **Dejar en este documento** (sección BLOQUEADO o nota en COMPLETADO/EN PROGRESO):
+   - ID de tarea que estaba ejecutando
+   - Estado exacto: qué se hizo, qué falta
+   - Timestamp de disponibilidad estimada
+   - Archivos tocados (para que el otro agente no pise)
+2. **Claude (jefe de equipo) verá el estado** al inicio de su próximo turno.
+3. **No dejar archivos a medias** — dejar siempre código que compile o marcar claramente como WIP.
+
+**Formato de nota de pausa:**
+```
+[AGENTE] PAUSA en IOS-XXX — Hecho: [lista]. Falta: [lista]. Archivos WIP: x.swift — Disponible: HH:MM
+```
+
+---
+
+## 📋 ASIGNACIONES DIRECTAS CODEX — del Jefe de Equipo (claude)
+
+> **Codex:** Estas son tus tareas concretas para el proyecto iOS. Empieza por IOS-UI-001 (alta).
+> Lee los archivos de claude en `ios/CyberAgent/` antes de empezar cada UI — los ViewModels ya están listos.
+
+### IOS-UI-001 — RootView + MainTabView ✅
+**Archivos a crear:** `ios/CyberAgent/App/RootView.swift`
+- `RootView`: selector entre ChatView / DevicesView / SettingsView con TabView
+- Tabs: "Chat" (icono: message), "Dispositivos" (bolt.horizontal), "Ajustes" (gear)
+- Usar `ChatViewModel` ya implementado (importar y usar `@StateObject`)
+- Tema: fondo `#0d1117`, tabs accent `#58a6ff`
+
+### IOS-UI-002 — ChatView + MessageBubble ✅
+**Archivos a crear:** `ios/CyberAgent/Chat/ChatView.swift`, `ios/CyberAgent/Chat/MessageBubble.swift`
+- `ChatView`: ScrollViewReader, TextField con botón enviar, indicador de typing, overlay con ToolApprovalCards
+- `MessageBubble`: user (derecha, `#1f6feb`) / assistant (izquierda, `#161b22`), timestamps, Markdown básico (negrita, código)
+- Lee `ChatViewModel.swift` para ver qué datos están disponibles
+
+### IOS-UI-003 — ToolApprovalCard ✅
+**Archivo a crear:** `ios/CyberAgent/Chat/ToolApprovalCard.swift`
+- Card oscura (`#161b22`, borde `#f85149` si alto riesgo, `#3fb950` si bajo)
+- Muestra: nombre tool, categoría badge, risk badge, args en `Text` monospace
+- Botones: "Aprobar" (verde) / "Rechazar" (rojo)
+- Countdown timer 60s (ProgressView circular)
+- Auto-rechaza cuando el timer llega a 0
+
+### IOS-UI-004 — DevicesView ✅
+**Archivo a crear:** `ios/CyberAgent/Devices/DevicesView.swift`
+- 3 secciones: BLE (lista `ble.discoveredDevices`), GPS (mapa mini o coordenadas), Accesorios USB
+- Botón "Escanear BLE" → `BLEManager.shared.startScan()`
+- Status dot (verde/gris) por dispositivo
+- Tap en BLE device → `BLEManager.shared.connect(to:)`
+
+### IOS-UI-005 — SettingsView ✅
+**Archivo a crear:** `ios/CyberAgent/Chat/SettingsView.swift`
+- URL del relay (TextField con `UserDefaults`)
+- IP del PC local (TextField)
+- Toggle "Preferir red local"
+- Toggle "Modo experto" → `PermissionManager.shared.setExpertMode(_:)`
+- Lista de permisos por herramienta (Picker: Auto/Preguntar/Bloquear)
+- Botón "Cerrar sesión" → `AuthManager.shared.logout()`
+
+### IOS-UI-006 — Assets + Info.plist ✅
+**Archivos a crear:** `ios/CyberAgent/Assets.xcassets/Contents.json` + AppIcon placeholder
+- El `Info.plist` ya está en `ios/CyberAgent/Info.plist` (claude)
+- Crea el `Assets.xcassets` con estructura mínima (Contents.json, AccentColor, AppIcon)
+
+### IOS-UI-007 — Theme.swift ✅
+**Archivo a crear:** `ios/CyberAgent/Utils/Theme.swift`
+- `CAColors`: backgroundPrimary (#0d1117), backgroundSecondary (#161b22), accent (#58a6ff), dangerRed (#f85149), successGreen (#3fb950), textPrimary (.white), textSecondary (#8b949e), borderColor (#30363d)
+- `CAFont`: monospaced, body, caption
+- `StatusDot(color:)`: Circle 8pt
+- `CAButton(label:action:style:)`: style enum (primary/danger/ghost)

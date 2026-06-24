@@ -63,6 +63,15 @@ def _stat(text: str) -> QLabel:
     return lbl
 
 
+def _chip(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setStyleSheet(
+        "QLabel { background: #0d1117; border: 1px solid #1e2d3d; border-radius: 5px;"
+        " color: #c9d1d9; font-size: 11px; padding: 4px 8px; }"
+    )
+    return lbl
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # RAG PANEL
 # ══════════════════════════════════════════════════════════════════════════
@@ -261,6 +270,22 @@ class DecisionLogPanel(QWidget):
         self.stat_lbl = _stat("")
         lay.addWidget(self.stat_lbl)
 
+        metrics_row = QHBoxLayout()
+        metrics_row.setSpacing(6)
+        self.metric_time_lbl = _chip("Tiempo medio: -")
+        self.metric_tool_lbl = _chip("Herramienta top: -")
+        self.metric_error_lbl = _chip("Error top: -")
+        self.metric_log_lbl = _chip("Logs: -")
+        for lbl in (
+            self.metric_time_lbl,
+            self.metric_tool_lbl,
+            self.metric_error_lbl,
+            self.metric_log_lbl,
+        ):
+            metrics_row.addWidget(lbl)
+        metrics_row.addStretch()
+        lay.addLayout(metrics_row)
+
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Herramienta", "Args", "Resultado", "Estado", "Fecha"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -289,6 +314,7 @@ class DecisionLogPanel(QWidget):
 
     def refresh(self):
         try:
+            from app.agent_log import summarize_activity
             from app.consciousness.decision_log import get_recent_decisions, get_stats
             import json as _json
 
@@ -298,6 +324,42 @@ class DecisionLogPanel(QWidget):
             rejected  = int(stats.get("rejected") or 0)
             self.stat_lbl.setText(
                 f"Total: {total}  |  ✓ Aprobadas: {approved}  |  ✗ Rechazadas: {rejected}"
+            )
+
+            activity = summarize_activity(max_lines=1000, decision_limit=500)
+            response = activity.get("response", {})
+            top_tools = activity.get("top_tools", [])
+            top_errors = activity.get("top_errors", [])
+            levels = activity.get("levels", {})
+            avg_seconds = response.get("avg_seconds")
+            p50_seconds = response.get("p50_seconds")
+            response_count = response.get("count", 0) or 0
+            error_count = levels.get("ERROR", 0) or 0
+
+            self.metric_time_lbl.setText(
+                "Tiempo medio: "
+                + (
+                    f"{avg_seconds:.2f}s (p50 {p50_seconds:.2f}s, {response_count} muestras)"
+                    if avg_seconds is not None and p50_seconds is not None
+                    else "sin datos"
+                )
+            )
+            self.metric_tool_lbl.setText(
+                "Herramienta top: "
+                + (
+                    f"{top_tools[0]['tool']} ({top_tools[0]['count']})"
+                    if top_tools else "sin datos"
+                )
+            )
+            self.metric_error_lbl.setText(
+                "Error top: "
+                + (
+                    f"{top_errors[0]['section']} ({top_errors[0]['count']})"
+                    if top_errors else "sin errores"
+                )
+            )
+            self.metric_log_lbl.setText(
+                f"Logs: {activity.get('log_lines', 0)} | Errores: {error_count}"
             )
 
             rows = get_recent_decisions(limit=100)
