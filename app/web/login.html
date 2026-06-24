@@ -8,9 +8,24 @@
   <link rel="stylesheet" href="/static/login.css">
 </head>
 <body>
-<div id="card">
+<main class="shell">
+  <section class="hero" aria-label="Estado de CyberAgent">
+    <div class="brand-mark">CA</div>
+    <div>
+      <p class="eyebrow">instancia local</p>
+      <h1>CyberAgent</h1>
+      <p class="hero-copy">Acceso directo al agente principal de este PC.</p>
+    </div>
+    <div class="status-grid">
+      <div class="status-chip"><span></span> PC local</div>
+      <div class="status-chip"><span></span> Ollama</div>
+      <div class="status-chip muted"><span></span> PWA lista</div>
+    </div>
+  </section>
+
+  <section id="card" aria-label="Acceso">
   <div class="logo">CA</div>
-  <h1>CyberAgent</h1>
+  <h2>Entrar</h2>
   <p class="sub" id="card-sub">Tu agente. Tu infraestructura.</p>
 
   <form id="setup-form" class="hidden">
@@ -44,7 +59,8 @@
     <button type="submit" id="login-btn">Entrar</button>
     <p id="login-err" class="err hidden"></p>
   </form>
-</div>
+  </section>
+</main>
 
 <script>
 let totpRequired = false;

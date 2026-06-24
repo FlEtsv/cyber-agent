@@ -96,7 +96,6 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
 [claude] SEC-002 — Allowlist dominios en web_fetch/http_request — Archivos: `app/tools.py` — Fecha: 2026-06-24 22:58
-`[CODEX] UI-003 — Rediseño login/PWA móvil: acceso claro, estado Cloud Run/PC y experiencia iPhone — Archivos: app/web/login.html, app/web/static/login.css, relay/web/login.html, relay/web/login.css — Fecha: 2026-06-24 22:44`
 
 ---
 
@@ -112,6 +111,7 @@ Cuando un objetivo global ya esté implementado según sus tareas de desglose y 
 [claude] F003 — FAST_MODEL/POWER_MODEL configurables via CYBERAGENT_*_MODEL env — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [codex] B004+B005+B006+UI-001 — Reconexión frontend, banners PC/reconectando y pulido visual web/relay — Commit: 3cc9d5b — Fecha: 2026-06-24 22:35
 [codex] UI-002 — Rediseño GUI desktop PySide: cabecera workspace, navegación, estados y tema visual — Commit: 0d54b7c — Fecha: 2026-06-24 22:50
+[codex] UI-003 — Rediseño login/PWA móvil local y relay con estado Cloud Run/PC/iPhone — Commit: pendiente — Fecha: 2026-06-24 22:58
 [claude] TEST-001+DATA-001+SEC-001 — tests auth 12/12 + integrity_check/backup_db + redacción tokens en logs — Commit: 9c92360 — Fecha: 2026-06-24 22:58
 
 ---
@@ -198,4 +198,4 @@ Se dejan las acciones que se necesita que el usuario apruebe como peticiones en 
 |----|----|--------|-------------------|--------|
 | P-CODEX-001 | ✅ | codex | Ejecutar `node --check app/web/static/app.js` y `node --check relay/web/app.js`; si pasan, hacer commit acumulado `[codex] feat: improve web reconnect and visual states` con B004+B005+B006+UI-001 y actualización del TASKBOARD. | completado: 3cc9d5b |
 | P-CODEX-002 | ✅ | codex | Ejecutar validación de sintaxis Python para `app/widgets/main_window.py` y `app/styles.py`; si pasa, commit `[codex] feat: refine desktop gui shell` con UI-002 y actualización del TASKBOARD. | completado: 0d54b7c |
-| P-CODEX-003 | ✅ | codex | Ejecutar validación HTML/CSS básica de login local/relay; si pasa, commit `[codex] feat: redesign mobile login surfaces` con UI-003 y actualización del TASKBOARD. | pendiente |
+| P-CODEX-003 | ✅ | codex | Ejecutar validación HTML/CSS básica de login local/relay; si pasa, commit `[codex] feat: redesign mobile login surfaces` con UI-003 y actualización del TASKBOARD. | completado: pendiente |
