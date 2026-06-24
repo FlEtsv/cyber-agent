@@ -58,7 +58,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] F002 — System prompt dinámico por turno de conversación — Archivos: `app/ollama_client.py`, `app/api/agent_runner.py` — Fecha: 2026-06-24 22:09
+[claude] F003 — Segunda modelo en model_router (routing real entre fast/power) — Archivos: `app/model_router.py` — Fecha: 2026-06-24 22:09
 
 ---
 
