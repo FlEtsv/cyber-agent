@@ -47,11 +47,20 @@ class ThreatDetector(QThread):
                 if resp.status_code != 200:
                     return
                 content = resp.json().get("message", {}).get("content", "")
-                start = content.rfind("{")
-                end   = content.rfind("}") + 1
-                if start < 0 or end <= start:
+                # Find the JSON object that contains "threat" key
+                match = re.search(r'\{[^{}]*"threat"\s*:[^{}]*\}', content)
+                if not match:
                     return
-                data = json.loads(content[start:end])
+                try:
+                    data = json.loads(match.group())
+                except json.JSONDecodeError:
+                    start = content.rfind('{"threat"')
+                    if start < 0:
+                        return
+                    end = content.find("}", start) + 1
+                    if end <= start:
+                        return
+                    data = json.loads(content[start:end])
                 if data.get("threat"):
                     sev    = data.get("severity", "medium")
                     reason = data.get("reason", "Actividad sospechosa detectada")

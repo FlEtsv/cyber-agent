@@ -24,12 +24,12 @@ def _get_collection():
                 embedding_function=ef,
                 metadata={"hnsw:space": "cosine"},
             )
-            _collection = col  # assign before indexing so a failed index doesn't null it
             if col.count() == 0:
                 try:
                     _index_documents(col)
                 except Exception as ie:
                     print(f"[RAG] Index error (non-fatal): {ie}")
+            _collection = col  # assign AFTER indexing to avoid serving empty collection
         except Exception as e:
             print(f"[RAG] ChromaDB init error: {e}")
             _collection = None
@@ -98,11 +98,13 @@ def add_document(doc_id: str, title: str, content: str,
 
 def reset_index():
     global _collection
-    try:
-        import chromadb
-        client = chromadb.PersistentClient(path=CHROMA_PATH)
-        client.delete_collection("cyberagent_kb")
-        _collection = None
-        _get_collection()
-    except Exception as e:
-        print(f"[RAG] Reset error: {e}")
+    with _lock:
+        try:
+            import chromadb
+            client = chromadb.PersistentClient(path=CHROMA_PATH)
+            client.delete_collection("cyberagent_kb")
+        except Exception as e:
+            print(f"[RAG] Reset error: {e}")
+        finally:
+            _collection = None  # always clear, even if delete fails
+    _get_collection()  # re-init outside lock — double-check inside protects it

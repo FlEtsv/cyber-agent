@@ -1,4 +1,4 @@
-import json, os
+import json, os, tempfile, shutil
 from datetime import datetime
 from app import database as db
 
@@ -41,21 +41,30 @@ def export_jsonl(output_path: str = None) -> tuple[str, int]:
         ).fetchall()
 
     count = 0
-    with open(output_path, "w", encoding="utf-8") as f:
-        for row in rows:
-            conv_msgs = db.get_messages(row["conversation_id"])
-            for i, msg in enumerate(conv_msgs):
-                if msg["id"] == row["message_id"] and i > 0:
-                    prev = conv_msgs[i - 1]
-                    if prev["role"] == "user":
-                        entry = {
-                            "messages": [
-                                {"role": "user",      "content": prev["content"]},
-                                {"role": "assistant", "content": msg["content"]},
-                            ]
-                        }
-                        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-                        count += 1
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".jsonl", dir=DATA_DIR)
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            for row in rows:
+                conv_msgs = db.get_messages(row["conversation_id"])
+                for i, msg in enumerate(conv_msgs):
+                    if msg["id"] == row["message_id"] and i > 0:
+                        prev = conv_msgs[i - 1]
+                        if prev["role"] == "user":
+                            entry = {
+                                "messages": [
+                                    {"role": "user",      "content": prev["content"]},
+                                    {"role": "assistant", "content": msg["content"]},
+                                ]
+                            }
+                            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                            count += 1
+        shutil.move(tmp_path, output_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
     return output_path, count
 
 

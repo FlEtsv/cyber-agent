@@ -83,11 +83,17 @@ def save_message(conv_id, role, content, tool_data=None):
 
 def delete_conversation(conv_id):
     with get_conn() as c:
-        c.execute("DELETE FROM message_ratings WHERE conversation_id=?", (conv_id,))
-        c.execute("DELETE FROM decision_log WHERE conversation_id=?", (conv_id,))
-        c.execute("DELETE FROM conversation_memory WHERE conversation_id=?", (conv_id,))
-        c.execute("DELETE FROM messages WHERE conversation_id=?", (conv_id,))
-        c.execute("DELETE FROM conversations WHERE id=?", (conv_id,))
+        c.execute("BEGIN")
+        try:
+            c.execute("DELETE FROM message_ratings WHERE conversation_id=?", (conv_id,))
+            c.execute("DELETE FROM decision_log WHERE conversation_id=?", (conv_id,))
+            c.execute("DELETE FROM conversation_memory WHERE conversation_id=?", (conv_id,))
+            c.execute("DELETE FROM messages WHERE conversation_id=?", (conv_id,))
+            c.execute("DELETE FROM conversations WHERE id=?", (conv_id,))
+            c.execute("COMMIT")
+        except Exception:
+            c.execute("ROLLBACK")
+            raise
 
 def get_memory_summary(conv_id):
     with get_conn() as c:

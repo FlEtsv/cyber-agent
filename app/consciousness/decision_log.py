@@ -4,9 +4,9 @@ from app import database as db
 
 def log_decision(conversation_id, tool_name: str, args: dict,
                  result: dict, approved: bool):
-    result_str = json.dumps(result, ensure_ascii=False)
+    result_str = json.dumps(result, ensure_ascii=True)  # ASCII-safe, no multibyte slice risk
     if len(result_str) > 4000:
-        result_str = result_str[:4000] + "..."
+        result_str = result_str[:3997] + "..."
     with db.get_conn() as conn:
         conn.execute(
             """INSERT INTO decision_log

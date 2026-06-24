@@ -1,4 +1,4 @@
-const CACHE = 'cyberagent-v2';
+const CACHE = 'cyberagent-v3';
 const PRECACHE = ['/', '/static/style.css', '/static/app.js'];
 
 self.addEventListener('install', e => {
@@ -24,6 +24,18 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // Network-first for HTML — ensures updated app.js/styles reach users
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets
   e.respondWith(
     caches.match(e.request).then(cached => {
       const network = fetch(e.request).then(res => {

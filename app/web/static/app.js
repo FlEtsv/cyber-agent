@@ -390,7 +390,10 @@ class CyberAgent {
     this.approvalOverlay.innerHTML = '';
     this.pendingApproval = null;
     if (always) this.permissions[name] = 'auto';
-    this._send({ type: 'approve', tool_id: id, approved });
+    // Send approval directly — must NOT go into outbox (server timeout may have already expired)
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'approve', tool_id: id, approved }));
+    }
     if (!approved) this._setToolCancelled(id);
   }
 
@@ -418,8 +421,9 @@ class CyberAgent {
   }
 
   async captureScreen() {
+    let stream;
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const track  = stream.getVideoTracks()[0];
       const cap    = new ImageCapture(track);
       const bitmap = await cap.grabFrame();
@@ -428,12 +432,13 @@ class CyberAgent {
       canvas.height = bitmap.height;
       canvas.getContext('2d').drawImage(bitmap, 0, 0);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      stream.getTracks().forEach(t => t.stop());
       this._attachImage(dataUrl);
     } catch (e) {
       if (e.name !== 'NotAllowedError') {
         console.warn('Screen capture:', e);
       }
+    } finally {
+      if (stream) stream.getTracks().forEach(t => t.stop());
     }
   }
 

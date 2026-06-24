@@ -83,6 +83,20 @@ class UpdateDialog(QDialog):
         self.update_btn.setEnabled(False)
         self.log.clear()
 
+        # Clean up previous worker before starting a new one
+        if self._worker is not None:
+            try:
+                self._worker.progress.disconnect()
+                self._worker.done.disconnect() if hasattr(self._worker, 'done') else None
+                self._worker.ready.disconnect() if hasattr(self._worker, 'ready') else None
+                self._worker.failed.disconnect()
+            except RuntimeError:
+                pass
+            self._worker.quit()
+            self._worker.wait(2000)
+            self._worker.deleteLater()
+            self._worker = None
+
         if is_frozen():
             self._worker = ReleaseUpdater()
             self._worker.progress.connect(self._on_progress)
@@ -95,6 +109,13 @@ class UpdateDialog(QDialog):
             self._worker.failed.connect(self._on_failed)
 
         self._worker.start()
+
+    def closeEvent(self, event):
+        if self._worker and self._worker.isRunning():
+            self._worker.quit()
+            self._worker.wait(3000)
+            self._worker.deleteLater()
+        super().closeEvent(event)
 
     def _on_progress(self, msg: str):
         self.log.append(msg)
@@ -118,8 +139,12 @@ class UpdateDialog(QDialog):
     def _apply_and_restart(self):
         from app.updater import is_frozen, apply_frozen_update, restart
         self.apply_btn.setEnabled(False)
+        self.update_btn.setEnabled(False)
         if is_frozen() and self._zip:
             self.log.append("\nAplicando actualización y reiniciando...")
+            # Process events before blocking file operation, but prevent close
+            self.setWindowFlag(Qt.WindowCloseButtonHint, False)
+            self.show()
             QApplication.processEvents()
             apply_frozen_update(self._zip)
             QApplication.quit()

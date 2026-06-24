@@ -29,12 +29,21 @@ def _loop(model: str, interval: int):
         _ping(model)
 
 
+_thread: threading.Thread | None = None
+
+
 def start_keepalive(model: str, interval: int = _PING_INTERVAL):
-    t = threading.Thread(target=_loop, args=(model, interval),
-                         daemon=True, name="OllamaKeepalive")
-    t.start()
+    global _thread
+    if _thread is not None and _thread.is_alive():
+        return  # already running — avoid duplicate threads
+    _stop.clear()
+    _thread = threading.Thread(target=_loop, args=(model, interval),
+                               daemon=True, name="OllamaKeepalive")
+    _thread.start()
     print(f"[keepalive] Modelo '{model}' activo en VRAM — ping cada {interval//60} min")
 
 
 def stop_keepalive():
+    global _thread
     _stop.set()
+    _thread = None

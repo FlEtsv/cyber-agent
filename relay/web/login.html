@@ -56,6 +56,9 @@ async function post(url, body) {
     body: JSON.stringify(body),
     credentials: 'same-origin',
   });
+  if (!r.ok && !r.headers.get('content-type')?.includes('application/json')) {
+    throw new Error(`HTTP ${r.status}`);
+  }
   return r.json();
 }
 
@@ -85,6 +88,9 @@ async function init() {
   }
 }
 
+let _setupEmail = '';
+let _setupPass  = '';
+
 document.getElementById('setup-form').addEventListener('submit', async e => {
   e.preventDefault();
   const email = document.getElementById('s-email').value.trim();
@@ -96,13 +102,28 @@ document.getElementById('setup-form').addEventListener('submit', async e => {
   if (pass.length < 8) return showErr(err, 'Minimo 8 caracteres');
 
   document.getElementById('setup-btn').disabled = true;
-  const res = await post('/api/auth/setup', {email, password: pass});
-  if (res.ok) {
-    document.getElementById('setup-form').classList.add('hidden');
-    document.getElementById('qr-img').innerHTML = res.qr_svg;
-    document.getElementById('qr-step').classList.remove('hidden');
-  } else {
-    showErr(err, res.error || 'Error al crear cuenta');
+  try {
+    const res = await post('/api/auth/setup', {email, password: pass});
+    if (res.ok) {
+      _setupEmail = email;
+      _setupPass  = pass;
+      document.getElementById('s-pass').value  = '';
+      document.getElementById('s-pass2').value = '';
+      document.getElementById('setup-form').classList.add('hidden');
+      // Parse SVG safely to prevent XSS
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(res.qr_svg, 'image/svg+xml');
+      svgDoc.querySelectorAll('script').forEach(s => s.remove());
+      const qrImg = document.getElementById('qr-img');
+      qrImg.innerHTML = '';
+      qrImg.appendChild(svgDoc.documentElement);
+      document.getElementById('qr-step').classList.remove('hidden');
+    } else {
+      showErr(err, res.error || 'Error al crear cuenta');
+      document.getElementById('setup-btn').disabled = false;
+    }
+  } catch(ex) {
+    showErr(err, 'Error de conexion. Intenta de nuevo.');
     document.getElementById('setup-btn').disabled = false;
   }
 });
@@ -112,14 +133,18 @@ document.getElementById('qr-verify-btn').addEventListener('click', async () => {
   const err  = document.getElementById('qr-err');
   if (code.length !== 6) return showErr(err, 'Introduce el codigo de 6 digitos');
 
-  const email = document.getElementById('s-email').value.trim();
-  const pass  = document.getElementById('s-pass').value;
   document.getElementById('qr-verify-btn').disabled = true;
-  const res = await post('/api/auth/login', {email, password: pass, totp: code});
-  if (res.ok) {
-    window.location.href = '/';
-  } else {
-    showErr(err, 'Codigo incorrecto, intentalo de nuevo');
+  try {
+    const res = await post('/api/auth/login', {email: _setupEmail, password: _setupPass, totp: code});
+    _setupPass = '';
+    if (res.ok) {
+      window.location.href = '/';
+    } else {
+      showErr(err, 'Codigo incorrecto, intentalo de nuevo');
+      document.getElementById('qr-verify-btn').disabled = false;
+    }
+  } catch(ex) {
+    showErr(err, 'Error de conexion. Intenta de nuevo.');
     document.getElementById('qr-verify-btn').disabled = false;
   }
 });
@@ -132,11 +157,16 @@ document.getElementById('login-form').addEventListener('submit', async e => {
   const err   = document.getElementById('login-err');
 
   document.getElementById('login-btn').disabled = true;
-  const res = await post('/api/auth/login', {email, password: pass, totp});
-  if (res.ok) {
-    window.location.href = '/';
-  } else {
-    showErr(err, res.error || 'Credenciales incorrectas');
+  try {
+    const res = await post('/api/auth/login', {email, password: pass, totp});
+    if (res.ok) {
+      window.location.href = '/';
+    } else {
+      showErr(err, res.error || 'Credenciales incorrectas');
+      document.getElementById('login-btn').disabled = false;
+    }
+  } catch(ex) {
+    showErr(err, 'Error de conexion. Intenta de nuevo.');
     document.getElementById('login-btn').disabled = false;
   }
 });
