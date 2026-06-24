@@ -118,8 +118,8 @@ Improved del LLM de decisión de herramientas. Cerrado por `TOOL-001` con keywor
 [codex] UI-003 — Rediseño login/PWA móvil local y relay con estado Cloud Run/PC/iPhone — Commit: 230564a — Fecha: 2026-06-24 22:58
 [claude] TEST-001+DATA-001+SEC-001 — tests auth 12/12 + integrity_check/backup_db + redacción tokens en logs — Commit: 9c92360 — Fecha: 2026-06-24 22:58
 [claude] SEC-003+SEC-004 — Sanitizar errores HTTP + rate limiting relay — Commit: bbaff5b — Fecha: 2026-06-24 23:10
-[codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: PENDIENTE — Fecha: 2026-06-24 23:20
-`[codex] TOOL-001 — Catálogo hacking/tools con permisos por riesgo, routing, UI y manual — Commit: PENDIENTE — Fecha: 2026-06-24 22:52 — ⚠️ zona ajena: app/ollama_client.py y app/api/agent_runner.py para propagar metadatos de eventos`
+[codex] REP-001 — Sistema de reportes de sesión con export JSON/HTML, redacción y documentación — Commit: 777592d — Fecha: 2026-06-24 23:20
+`[codex] TOOL-001 — Catálogo hacking/tools con permisos por riesgo, routing, UI y manual — Commit: 777592d — Fecha: 2026-06-24 22:52 — ⚠️ zona ajena: app/ollama_client.py y app/api/agent_runner.py para propagar metadatos de eventos`
 
 ---
 
