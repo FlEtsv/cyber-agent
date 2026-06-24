@@ -1,8 +1,32 @@
 """
 Traceability log for CyberAgent — writes to agent.log in the project root.
 Import and call log() from anywhere; thread-safe.
+Sensitive values (tokens, passwords, secrets) are redacted before writing.
 """
-import os, threading, datetime, json, traceback
+import os, re, threading, datetime, json, traceback
+
+_SENSITIVE_KEYS = frozenset({
+    "password", "password_hash", "pw", "secret", "token", "api_key",
+    "access_token", "bearer", "hash", "totp_secret", "host_secret",
+    "jwt_secret", "relay_host_secret", "auth", "authorization",
+    "cookie", "ca_token", "key", "private_key",
+})
+
+_JWT_RE = re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")
+
+
+def _redact(obj):
+    """Recursively redact sensitive values before serialization."""
+    if isinstance(obj, dict):
+        return {
+            k: "[REDACTED]" if k.lower() in _SENSITIVE_KEYS else _redact(v)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redact(item) for item in obj]
+    if isinstance(obj, str):
+        return _JWT_RE.sub("[JWT_REDACTED]", obj)
+    return obj
 
 _LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "agent.log")
 _lock = threading.Lock()
@@ -16,7 +40,7 @@ def log(level: str, section: str, msg: str, data=None):
     line = f"[{_ts()}] [{level}] [{section}] {msg}"
     if data is not None:
         try:
-            d = json.dumps(data, ensure_ascii=False, default=str)
+            d = json.dumps(_redact(data), ensure_ascii=False, default=str)
             if len(d) > 300:
                 d = d[:297] + "..."
             line += f"  | {d}"

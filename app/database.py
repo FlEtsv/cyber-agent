@@ -1,7 +1,12 @@
-import sqlite3, json, os, threading
+import sqlite3, json, os, shutil, threading, logging
 from datetime import datetime
+from pathlib import Path
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "cyberagent.db")
+log = logging.getLogger("database")
+
+DB_PATH    = os.path.join(os.path.dirname(__file__), "..", "cyberagent.db")
+_DB_PATH   = Path(DB_PATH).resolve()
+_BACKUP_DIR = _DB_PATH.parent / "backups"
 
 _local = threading.local()
 
@@ -12,7 +17,40 @@ def get_conn():
         _local.conn.execute("PRAGMA journal_mode=WAL")
     return _local.conn
 
+def check_integrity() -> tuple[bool, list[str]]:
+    """Run PRAGMA integrity_check on the DB. Returns (ok, messages)."""
+    try:
+        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+        rows = conn.execute("PRAGMA integrity_check").fetchall()
+        conn.close()
+        messages = [r[0] for r in rows]
+        return (messages == ["ok"]), messages
+    except Exception as exc:
+        return False, [str(exc)]
+
+
+def backup_db() -> Path | None:
+    """Copy DB to data/backups/cyberagent_YYYYMMDD.db. Keeps last 7 daily backups."""
+    if not _DB_PATH.exists():
+        return None
+    try:
+        _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        dest = _BACKUP_DIR / f"cyberagent_{datetime.now().strftime('%Y%m%d')}.db"
+        if not dest.exists():
+            shutil.copy2(_DB_PATH, dest)
+        # Prune old backups: keep latest 7
+        for old in sorted(_BACKUP_DIR.glob("cyberagent_*.db"))[:-7]:
+            old.unlink(missing_ok=True)
+        return dest
+    except Exception as exc:
+        log.warning(f"DB backup failed: {exc}")
+        return None
+
+
 def init_db():
+    ok, msgs = check_integrity()
+    if not ok:
+        log.error(f"[DB] integrity_check FAILED: {msgs}")
     with get_conn() as c:
         c.executescript("""
             PRAGMA journal_mode=WAL;
