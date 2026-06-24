@@ -152,7 +152,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] IOS-UI-005 — SettingsView iOS para relay, PC local, red local, modo experto, permisos y logout. Validación Swift pendiente: `swift` no disponible en Windows — Commit: 7d9b719 — Fecha: 2026-06-25 00:10
 [codex] IOS-UI-006 — Assets.xcassets mínimo con Contents, AccentColor y AppIcon placeholder. JSON validado con ConvertFrom-Json — Commit: 3365244 — Fecha: 2026-06-25 00:14
 [codex] IOS-UI-007 — Theme.swift con CAColors, CAFont, StatusDot y CAButton reutilizables. Validación Swift pendiente: `swift` no disponible en Windows — Commit: bce37e9 — Fecha: 2026-06-25 00:17
-[codex] RAG-002 — Autonomous learner ampliado con NVD CVE API 2.0, CISA KEV, Exploit-DB CSV, ranking por fuente y tags de origen. Validación: py_compile + pytest 47/47 — Commit: PENDIENTE — Fecha: 2026-06-25 00:26
+[codex] RAG-002 — Autonomous learner ampliado con NVD CVE API 2.0, CISA KEV, Exploit-DB CSV, ranking por fuente y tags de origen. Validación: py_compile + pytest 47/47 — Commit: 3b715e9 — Fecha: 2026-06-25 00:26
 [claude] B001+B007 — Backoff exponencial (5→10→20→40→60s) + cleanup runners al desconectar — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B002 — CORS dinámico _DynamicCORS lee env por req (no import-time) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
 [claude] B003+F002 — AgentWorker llama _build_base_prompt() por turno (fecha actual en cada mensaje) — Commit: c842ed7 — Fecha: 2026-06-24 22:20
