@@ -116,6 +116,98 @@ TOOLS_SCHEMA = [
         }, "required": []}
     }},
     {"type": "function", "function": {
+        "name": "list_monitors",
+        "description": "Lista pantallas conectadas con posicion, resolucion, area de trabajo, primario y escala si Windows la expone.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "active_window",
+        "description": "Devuelve la ventana activa: handle, titulo, proceso, PID y rectangulo.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "list_windows",
+        "description": "Lista ventanas visibles del escritorio con titulo, PID, proceso, posicion y tamano.",
+        "parameters": {"type": "object", "properties": {
+            "title_filter": {"type": "string", "description": "Filtro opcional por titulo"},
+            "process_filter": {"type": "string", "description": "Filtro opcional por nombre de proceso"},
+            "limit": {"type": "integer", "description": "Maximo de ventanas (default 80)"}
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "focus_window",
+        "description": "Trae una ventana al frente por hwnd, titulo parcial o PID.",
+        "parameters": {"type": "object", "properties": {
+            "hwnd": {"type": "integer", "description": "Handle de ventana"},
+            "title": {"type": "string", "description": "Texto parcial del titulo"},
+            "pid": {"type": "integer", "description": "PID del proceso"}
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "click_screen",
+        "description": "Hace click en coordenadas absolutas de pantalla.",
+        "parameters": {"type": "object", "properties": {
+            "x": {"type": "integer"},
+            "y": {"type": "integer"},
+            "button": {"type": "string", "enum": ["left", "right", "middle"], "description": "Boton (default left)"},
+            "clicks": {"type": "integer", "description": "Numero de clicks (default 1)"}
+        }, "required": ["x", "y"]}
+    }},
+    {"type": "function", "function": {
+        "name": "type_text",
+        "description": "Escribe texto Unicode en el campo activo de Windows.",
+        "parameters": {"type": "object", "properties": {
+            "text": {"type": "string"},
+            "interval_ms": {"type": "integer", "description": "Pausa entre caracteres (default 0)"}
+        }, "required": ["text"]}
+    }},
+    {"type": "function", "function": {
+        "name": "hotkey",
+        "description": "Envia una combinacion de teclas, por ejemplo ['ctrl','l'], ['tab'], ['enter'].",
+        "parameters": {"type": "object", "properties": {
+            "keys": {"type": "array", "items": {"type": "string"}}
+        }, "required": ["keys"]}
+    }},
+    {"type": "function", "function": {
+        "name": "ocr_screen",
+        "description": "Captura pantalla y extrae texto visible con OCR si pytesseract/tesseract estan disponibles.",
+        "parameters": {"type": "object", "properties": {
+            "monitor": {"type": "integer", "description": "Monitor 0=principal"},
+            "x": {"type": "integer", "description": "Recorte X opcional"},
+            "y": {"type": "integer", "description": "Recorte Y opcional"},
+            "width": {"type": "integer", "description": "Ancho de recorte opcional"},
+            "height": {"type": "integer", "description": "Alto de recorte opcional"}
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "ui_tree",
+        "description": "Inspecciona controles de la ventana activa o de una ventana por hwnd usando Windows UI Automation.",
+        "parameters": {"type": "object", "properties": {
+            "hwnd": {"type": "integer", "description": "Handle de ventana; si se omite usa ventana activa"},
+            "depth": {"type": "integer", "description": "Profundidad maxima (default 2)"},
+            "limit": {"type": "integer", "description": "Maximo de nodos (default 120)"}
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "fill_form",
+        "description": "Rellena un formulario combinando focus, clicks, texto y hotkeys. Acepta acciones secuenciales.",
+        "parameters": {"type": "object", "properties": {
+            "hwnd": {"type": "integer", "description": "Ventana a enfocar antes de empezar"},
+            "title": {"type": "string", "description": "Titulo parcial de ventana a enfocar"},
+            "actions": {"type": "array", "items": {"type": "object"}, "description": "Acciones: click{x,y}, type{text}, hotkey{keys}, wait{ms}"}
+        }, "required": ["actions"]}
+    }},
+    {"type": "function", "function": {
+        "name": "credential_lookup",
+        "description": "Consulta credenciales guardadas de la sesion actual en Windows Credential Manager y navegadores Chromium. reveal=true intenta devolver secretos cuando DPAPI lo permite.",
+        "parameters": {"type": "object", "properties": {
+            "source": {"type": "string", "enum": ["all", "windows", "chrome", "edge"], "description": "Fuente (default all)"},
+            "query": {"type": "string", "description": "Filtro por target/url/usuario"},
+            "reveal": {"type": "boolean", "description": "Si true intenta devolver password/secret"},
+            "limit": {"type": "integer", "description": "Maximo de resultados por fuente (default 50)"}
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
         "name": "clipboard_read",
         "description": "Lee el contenido actual del portapapeles de Windows.",
         "parameters": {"type": "object", "properties": {}, "required": []}
@@ -566,7 +658,37 @@ def execute_tool(name: str, args: dict) -> dict:
         }
         superagent = {
             "screenshot_pc":   lambda: _screenshot_pc(int(args.get("monitor", 0))),
-            "clipboard_read":  lambda: _clipboard_read(),
+            "list_monitors":   lambda: _list_monitors(),
+            "active_window":   lambda: _active_window(),
+            "list_windows":    lambda: _list_windows(
+                                   args.get("title_filter", ""),
+                                   args.get("process_filter", ""),
+                                   int(args.get("limit", 80))),
+            "focus_window":    lambda: _focus_window(
+                                   args.get("hwnd"), args.get("title", ""),
+                                   args.get("pid")),
+            "click_screen":    lambda: _click_screen(
+                                   int(args["x"]), int(args["y"]),
+                                   args.get("button", "left"),
+                                   int(args.get("clicks", 1))),
+            "type_text":       lambda: _type_text(
+                                   args["text"], int(args.get("interval_ms", 0))),
+            "hotkey":          lambda: _hotkey(args["keys"]),
+            "ocr_screen":      lambda: _ocr_screen(
+                                   int(args.get("monitor", 0)),
+                                   args.get("x"), args.get("y"),
+                                   args.get("width"), args.get("height")),
+            "ui_tree":         lambda: _ui_tree(
+                                   args.get("hwnd"), int(args.get("depth", 2)),
+                                   int(args.get("limit", 120))),
+            "fill_form":       lambda: _fill_form(
+                                   args.get("actions", []), args.get("hwnd"),
+                                   args.get("title", "")),
+            "credential_lookup": lambda: _credential_lookup(
+                                   args.get("source", "all"),
+                                   args.get("query", ""),
+                                   bool(args.get("reveal", False)),
+                                   int(args.get("limit", 50))),            "clipboard_read":  lambda: _clipboard_read(),
             "clipboard_write": lambda: _clipboard_write(args["text"]),
             "http_request":    lambda: _http_request(
                                    args["url"], args.get("method","GET"),
@@ -999,6 +1121,411 @@ def _screenshot_pc(monitor: int = 0) -> dict:
         return {"error": "Instala mss: pip install mss"}
     except Exception as e:
         return {"error": str(e)}
+
+def _win_ctypes():
+    import ctypes
+    from ctypes import wintypes
+    return ctypes, wintypes, ctypes.windll.user32, ctypes.windll.kernel32
+
+def _rect_to_dict(rect) -> dict:
+    return {
+        "left": int(rect.left), "top": int(rect.top),
+        "right": int(rect.right), "bottom": int(rect.bottom),
+        "width": int(rect.right - rect.left),
+        "height": int(rect.bottom - rect.top),
+    }
+
+def _window_info(hwnd: int) -> dict | None:
+    import psutil
+    ctypes, wintypes, user32, _kernel32 = _win_ctypes()
+    if not hwnd or not user32.IsWindow(hwnd):
+        return None
+    length = user32.GetWindowTextLengthW(hwnd)
+    buf = ctypes.create_unicode_buffer(length + 1)
+    user32.GetWindowTextW(hwnd, buf, length + 1)
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    rect = wintypes.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    process = ""
+    try:
+        process = psutil.Process(pid.value).name()
+    except Exception:
+        pass
+    return {
+        "hwnd": int(hwnd),
+        "title": buf.value,
+        "pid": int(pid.value),
+        "process": process,
+        "rect": _rect_to_dict(rect),
+        "visible": bool(user32.IsWindowVisible(hwnd)),
+        "minimized": bool(user32.IsIconic(hwnd)),
+    }
+
+def _list_monitors() -> dict:
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+
+        class MONITORINFOEXW(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("rcMonitor", wintypes.RECT),
+                ("rcWork", wintypes.RECT),
+                ("dwFlags", wintypes.DWORD),
+                ("szDevice", wintypes.WCHAR * 32),
+            ]
+
+        monitors = []
+        enum_proc_type = ctypes.WINFUNCTYPE(
+            wintypes.BOOL, wintypes.HMONITOR, wintypes.HDC,
+            ctypes.POINTER(wintypes.RECT), wintypes.LPARAM
+        )
+
+        def _callback(hmonitor, _hdc, _lprc, _data):
+            info = MONITORINFOEXW()
+            info.cbSize = ctypes.sizeof(MONITORINFOEXW)
+            user32.GetMonitorInfoW(hmonitor, ctypes.byref(info))
+            scale = None
+            try:
+                shcore = ctypes.windll.shcore
+                dpi_x = ctypes.c_uint()
+                dpi_y = ctypes.c_uint()
+                if shcore.GetDpiForMonitor(hmonitor, 0, ctypes.byref(dpi_x), ctypes.byref(dpi_y)) == 0:
+                    scale = round(dpi_x.value / 96, 2)
+            except Exception:
+                pass
+            monitors.append({
+                "index": len(monitors),
+                "device": info.szDevice,
+                "primary": bool(info.dwFlags & 1),
+                "monitor": _rect_to_dict(info.rcMonitor),
+                "work_area": _rect_to_dict(info.rcWork),
+                "scale": scale,
+            })
+            return True
+
+        user32.EnumDisplayMonitors(0, 0, enum_proc_type(_callback), 0)
+        return {"monitors": monitors, "count": len(monitors)}
+    except Exception as e:
+        return {"error": str(e)}
+
+def _active_window() -> dict:
+    try:
+        _ctypes, _wintypes, user32, _kernel32 = _win_ctypes()
+        return _window_info(user32.GetForegroundWindow()) or {"error": "No active window"}
+    except Exception as e:
+        return {"error": str(e)}
+
+def _list_windows(title_filter: str = "", process_filter: str = "", limit: int = 80) -> dict:
+    try:
+        import ctypes
+        from ctypes import wintypes
+        _ctypes, _wintypes, user32, _kernel32 = _win_ctypes()
+        title_filter = (title_filter or "").lower()
+        process_filter = (process_filter or "").lower()
+        windows = []
+        enum_proc_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def _callback(hwnd, _data):
+            if len(windows) >= max(1, limit):
+                return False
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            info = _window_info(hwnd)
+            if not info or not info.get("title"):
+                return True
+            if title_filter and title_filter not in info["title"].lower():
+                return True
+            if process_filter and process_filter not in info.get("process", "").lower():
+                return True
+            windows.append(info)
+            return True
+
+        user32.EnumWindows(enum_proc_type(_callback), 0)
+        return {"windows": windows, "count": len(windows)}
+    except Exception as e:
+        return {"error": str(e)}
+
+def _resolve_window(hwnd=None, title: str = "", pid=None) -> int | None:
+    if hwnd:
+        return int(hwnd)
+    windows = _list_windows(title_filter=title or "", limit=200).get("windows", [])
+    if pid:
+        windows = [w for w in windows if int(w.get("pid") or 0) == int(pid)]
+    if title:
+        title_l = title.lower()
+        exact = [w for w in windows if w.get("title", "").lower() == title_l]
+        if exact:
+            return int(exact[0]["hwnd"])
+    return int(windows[0]["hwnd"]) if windows else None
+
+def _focus_window(hwnd=None, title: str = "", pid=None) -> dict:
+    try:
+        _ctypes, _wintypes, user32, _kernel32 = _win_ctypes()
+        target = _resolve_window(hwnd, title, pid)
+        if not target:
+            return {"ok": False, "error": "Ventana no encontrada"}
+        user32.ShowWindow(target, 9 if user32.IsIconic(target) else 5)
+        ok = bool(user32.SetForegroundWindow(target))
+        return {"ok": ok, "window": _window_info(target)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def _click_screen(x: int, y: int, button: str = "left", clicks: int = 1) -> dict:
+    try:
+        import ctypes, time
+        user32 = ctypes.windll.user32
+        events = {"left": (0x0002, 0x0004), "right": (0x0008, 0x0010), "middle": (0x0020, 0x0040)}
+        down, up = events.get((button or "left").lower(), events["left"])
+        user32.SetCursorPos(int(x), int(y))
+        for _ in range(max(1, int(clicks))):
+            user32.mouse_event(down, 0, 0, 0, 0)
+            user32.mouse_event(up, 0, 0, 0, 0)
+            time.sleep(0.05)
+        return {"ok": True, "x": x, "y": y, "button": button, "clicks": clicks}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def _type_text(text: str, interval_ms: int = 0) -> dict:
+    try:
+        import ctypes, time
+        user32 = ctypes.windll.user32
+        for ch in text:
+            code = ord(ch)
+            user32.keybd_event(0, code, 0x0004, 0)
+            user32.keybd_event(0, code, 0x0004 | 0x0002, 0)
+            if interval_ms:
+                time.sleep(max(0, interval_ms) / 1000)
+        return {"ok": True, "chars": len(text)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def _hotkey(keys: list) -> dict:
+    try:
+        import ctypes, time
+        user32 = ctypes.windll.user32
+        keymap = {
+            "ctrl": 0x11, "control": 0x11, "shift": 0x10, "alt": 0x12,
+            "win": 0x5B, "cmd": 0x5B, "enter": 0x0D, "return": 0x0D,
+            "tab": 0x09, "esc": 0x1B, "escape": 0x1B, "space": 0x20,
+            "backspace": 0x08, "delete": 0x2E, "home": 0x24, "end": 0x23,
+            "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28,
+            "f11": 0x7A,
+        }
+        vk_codes = []
+        for key in keys:
+            k = str(key).lower()
+            vk = ord(k.upper()) if len(k) == 1 else keymap.get(k)
+            if not vk:
+                return {"ok": False, "error": f"Tecla no soportada: {key}"}
+            vk_codes.append(vk)
+        for vk in vk_codes:
+            user32.keybd_event(vk, 0, 0, 0)
+            time.sleep(0.02)
+        for vk in reversed(vk_codes):
+            user32.keybd_event(vk, 0, 0x0002, 0)
+            time.sleep(0.02)
+        return {"ok": True, "keys": keys}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def _ocr_screen(monitor: int = 0, x=None, y=None, width=None, height=None) -> dict:
+    try:
+        import tempfile
+        from PIL import Image
+        try:
+            import mss
+        except ImportError:
+            return {"error": "Falta mss. Instala con: pip install mss pillow pytesseract"}
+        with mss.mss() as sct:
+            mons = sct.monitors
+            idx = min(max(0, monitor) + 1, len(mons) - 1)
+            region = dict(mons[idx])
+            if all(v is not None for v in (x, y, width, height)):
+                region = {"left": int(x), "top": int(y), "width": int(width), "height": int(height)}
+            shot = sct.grab(region)
+            img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
+        path = os.path.join(tempfile.gettempdir(), "cyberagent_ocr_screen.png")
+        img.save(path)
+        try:
+            import pytesseract
+            text = pytesseract.image_to_string(img)
+            return {"ok": True, "text": text[:12000], "image_path": path, "region": region}
+        except Exception as e:
+            return {"ok": False, "image_path": path, "region": region, "error": f"OCR no disponible: {e}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def _ui_tree(hwnd=None, depth: int = 2, limit: int = 120) -> dict:
+    active = _active_window()
+    target = int(hwnd) if hwnd else active.get("hwnd")
+    if not target:
+        return {"error": "No hay ventana objetivo"}
+    script = rf"""
+$hwnd = [IntPtr]{target}
+$maxDepth = {max(0, depth)}
+$limit = {max(1, limit)}
+Add-Type -AssemblyName UIAutomationClient
+$root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+$out = New-Object System.Collections.ArrayList
+function Walk($el, $depth) {{
+  if ($null -eq $el -or $out.Count -ge $limit) {{ return }}
+  $r = $el.Current.BoundingRectangle
+  [void]$out.Add([pscustomobject]@{{
+    depth=$depth; name=$el.Current.Name; automation_id=$el.Current.AutomationId;
+    class_name=$el.Current.ClassName; control_type=$el.Current.ControlType.ProgrammaticName;
+    enabled=$el.Current.IsEnabled; rect=@{{left=$r.Left; top=$r.Top; width=$r.Width; height=$r.Height}}
+  }})
+  if ($depth -ge $maxDepth) {{ return }}
+  $children = $el.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+  foreach ($c in $children) {{ Walk $c ($depth + 1) }}
+}}
+Walk $root 0
+$out | ConvertTo-Json -Depth 6
+"""
+    r = _shell(script, "powershell", timeout=20)
+    if r.get("returncode") != 0:
+        return {"error": r.get("stderr") or r.get("stdout")}
+    try:
+        nodes = json.loads(r.get("stdout") or "[]")
+        if isinstance(nodes, dict):
+            nodes = [nodes]
+        return {"hwnd": target, "nodes": nodes, "count": len(nodes)}
+    except Exception:
+        return {"hwnd": target, "raw": r.get("stdout", "")[:12000]}
+
+def _fill_form(actions: list, hwnd=None, title: str = "") -> dict:
+    import time
+    events = []
+    if hwnd or title:
+        events.append({"focus": _focus_window(hwnd=hwnd, title=title)})
+        time.sleep(0.25)
+    for action in actions:
+        kind = (action.get("action") or action.get("type") or "").lower()
+        if kind == "click":
+            events.append({"click": _click_screen(int(action["x"]), int(action["y"]), action.get("button", "left"), int(action.get("clicks", 1)))})
+        elif kind == "type":
+            events.append({"type": _type_text(str(action.get("text", "")), int(action.get("interval_ms", 0)))})
+        elif kind == "hotkey":
+            events.append({"hotkey": _hotkey(action.get("keys", []))})
+        elif kind == "wait":
+            ms = int(action.get("ms", 500))
+            time.sleep(max(0, ms) / 1000)
+            events.append({"wait": ms})
+        else:
+            events.append({"error": f"Accion no soportada: {kind}", "action": action})
+        time.sleep(float(action.get("after_ms", 80)) / 1000)
+    return {"ok": True, "events": events}
+
+def _credential_lookup(source: str = "all", query: str = "", reveal: bool = False, limit: int = 50) -> dict:
+    source = (source or "all").lower()
+    query_l = (query or "").lower()
+    results = []
+    errors = []
+    if source in ("all", "windows"):
+        r = _shell("cmdkey /list", "cmd", timeout=10)
+        text = r.get("stdout", "")
+        entries = []
+        current = {}
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                if current:
+                    entries.append(current); current = {}
+                continue
+            if ":" in line:
+                k, v = line.split(":", 1)
+                current[k.strip().lower().replace(" ", "_")] = v.strip()
+        if current:
+            entries.append(current)
+        for e in entries:
+            blob = json.dumps(e, ensure_ascii=False).lower()
+            if query_l and query_l not in blob:
+                continue
+            e["source"] = "windows"
+            e["secret"] = None
+            e["note"] = "Windows cmdkey lista metadatos; no expone passwords en claro."
+            results.append(e)
+            if len(results) >= limit:
+                break
+    if source in ("all", "chrome", "edge") and len(results) < limit:
+        try:
+            results.extend(_chromium_credentials(source, query_l, reveal, max(1, limit - len(results))))
+        except Exception as e:
+            errors.append(str(e))
+    return {"results": results[:limit], "count": min(len(results), limit), "reveal": reveal, "errors": errors}
+
+def _chromium_credentials(source: str, query_l: str, reveal: bool, limit: int) -> list:
+    import sqlite3, tempfile
+    bases = []
+    local = os.environ.get("LOCALAPPDATA", "")
+    if source in ("all", "chrome"):
+        bases.append(("chrome", os.path.join(local, "Google", "Chrome", "User Data")))
+    if source in ("all", "edge"):
+        bases.append(("edge", os.path.join(local, "Microsoft", "Edge", "User Data")))
+    out = []
+    for browser, base in bases:
+        if not os.path.isdir(base):
+            continue
+        profiles = ["Default"] + [d for d in os.listdir(base) if d.startswith("Profile ")]
+        for profile in profiles:
+            db = os.path.join(base, profile, "Login Data")
+            if not os.path.exists(db):
+                continue
+            tmp = os.path.join(tempfile.gettempdir(), f"ca_{browser}_{profile.replace(' ', '_')}_login_data")
+            try:
+                shutil.copy2(db, tmp)
+                con = sqlite3.connect(tmp)
+                cur = con.execute("select origin_url, action_url, username_value, password_value, blacklisted_by_user from logins")
+                for origin_url, action_url, username, password_blob, blacklisted in cur.fetchall():
+                    item = {"source": browser, "profile": profile, "origin_url": origin_url, "action_url": action_url, "username": username, "blacklisted": bool(blacklisted), "secret": None}
+                    blob = json.dumps(item, ensure_ascii=False).lower()
+                    if query_l and query_l not in blob:
+                        continue
+                    if reveal:
+                        item["secret"] = _dpapi_decrypt(password_blob)
+                    out.append(item)
+                    if len(out) >= limit:
+                        return out
+                con.close()
+            except Exception as e:
+                out.append({"source": browser, "profile": profile, "error": str(e)})
+            finally:
+                try:
+                    os.remove(tmp)
+                except Exception:
+                    pass
+    return out
+
+def _dpapi_decrypt(blob) -> str | None:
+    try:
+        import ctypes
+        from ctypes import wintypes
+        if blob is None:
+            return None
+        data = bytes(blob)
+        if data.startswith(b"v10") or data.startswith(b"v11"):
+            return "[chrome password encrypted with app-bound/AES key; Local State key support pendiente]"
+
+        class DATA_BLOB(ctypes.Structure):
+            _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+        crypt32 = ctypes.windll.crypt32
+        kernel32 = ctypes.windll.kernel32
+        in_buf = ctypes.create_string_buffer(data)
+        in_blob = DATA_BLOB(len(data), ctypes.cast(in_buf, ctypes.POINTER(ctypes.c_char)))
+        out_blob = DATA_BLOB()
+        if not crypt32.CryptUnprotectData(ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)):
+            return None
+        try:
+            raw = ctypes.string_at(out_blob.pbData, out_blob.cbData)
+            return raw.decode("utf-8", errors="replace")
+        finally:
+            kernel32.LocalFree(out_blob.pbData)
+    except Exception as e:
+        return f"[decrypt error: {e}]"
 
 def _clipboard_read() -> dict:
     r = _shell("Get-Clipboard", "powershell")

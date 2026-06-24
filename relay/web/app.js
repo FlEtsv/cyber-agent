@@ -1,9 +1,10 @@
 ﻿'use strict';
 
 const TOOL_ICONS = {
-  shell:'âš¡', run_python:'â¬¡', write_file:'âœŽ', read_file:'â–¤',
-  list_directory:'â–¥', web_fetch:'â—Ž', list_processes:'â—ˆ',
-  screenshot:'âŠ¡', install_package:'â¬‡', uninstall_package:'â¬†', system_info:'â—‰',
+  shell:'>', run_python:'py', write_file:'edit', read_file:'file',
+  list_directory:'dir', web_fetch:'web', list_processes:'proc',
+  screenshot:'screen', screenshot_pc:'screen', install_package:'install',
+  uninstall_package:'remove', system_info:'info',
 };
 
 // â”€â”€ Markdown renderer (via marked CDN) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -178,7 +179,7 @@ class CyberAgent {
       images:        this.attachedImgs.map(i => i.b64),
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
-      device:        `${this.isMobile ? 'mÃ³vil' : 'PC'} ${this.platform}`,
+      device:        `${this.isMobile ? 'movil' : 'PC'} ${this.platform}`,
     });
 
     this.inputEl.value = '';
@@ -198,7 +199,7 @@ class CyberAgent {
 
     const avatar = document.createElement('div');
     avatar.className = 'msg-avatar';
-    avatar.textContent = 'TÃš';
+    avatar.textContent = 'TU';
 
     const body = document.createElement('div');
     body.className = 'msg-body';
@@ -310,7 +311,7 @@ class CyberAgent {
     if (!this.currentBubble) return;
     const { actionsSection, actionsList, toggle } = this.currentBubble;
 
-    const icon = TOOL_ICONS[name] || 'â—‹';
+    const icon = TOOL_ICONS[name] || 'tool';
     const argsPreview = Object.entries(args || {})
       .map(([k,v]) => `${k}=${JSON.stringify(v).slice(0,30)}`)
       .join('  ').slice(0, 60);
@@ -320,14 +321,16 @@ class CyberAgent {
     row.innerHTML = `
       <span class="tool-row-name">${icon}  ${escHtml(name)}</span>
       <span class="tool-row-args">${escHtml(argsPreview)}</span>
-      <span class="tool-row-status pending">â—</span>
+      <span class="tool-row-status pending">...</span>
     `;
 
     actionsList.appendChild(row);
     actionsSection.style.display = '';
     this.currentBubble._count++;
     const n = this.currentBubble._count;
-    toggle.textContent = `â–¶  ${n} ${n === 1 ? 'acciÃ³n' : 'acciones'}`;
+    toggle.textContent = `v  ${n} ${n === 1 ? 'accion' : 'acciones'}`;
+    toggle.classList.add('open');
+    actionsList.classList.remove('hidden');
 
     this.toolRows.set(id, { row, status: row.querySelector('.tool-row-status') });
     this._scrollBottom();
@@ -349,7 +352,7 @@ class CyberAgent {
   _setToolCancelled(id) {
     const t = this.toolRows.get(id);
     if (!t) return;
-    t.status.textContent = 'âœ—';
+    t.status.textContent = 'cancelled';
     t.status.className   = 'tool-row-status cancelled';
   }
 
@@ -357,14 +360,14 @@ class CyberAgent {
 
   _showApproval(id, name, args, dangerous) {
     this.pendingApproval = id;
-    const icon  = TOOL_ICONS[name] || 'â—‹';
+    const icon  = TOOL_ICONS[name] || 'tool';
     const color = dangerous ? 'approval-label-dangerous' : 'approval-label-safe';
 
     this.approvalOverlay.innerHTML = `
       <div class="approval-card ${dangerous ? 'dangerous' : ''}">
         <div class="approval-header">
           <span class="${color}">${icon}  ${escHtml(name)}</span>
-          ${dangerous ? '<span class="approval-warning">requiere confirmaciÃ³n</span>' : ''}
+          ${dangerous ? '<span class="approval-warning">requiere confirmacion</span>' : ''}
         </div>
         <pre class="approval-args">${escHtml(JSON.stringify(args, null, 2))}</pre>
         <div class="approval-btns">
@@ -443,7 +446,7 @@ class CyberAgent {
     img.src = dataUrl;
     const rm = document.createElement('button');
     rm.className = 'attachment-remove';
-    rm.textContent = 'Ã—';
+    rm.textContent = 'x';
     rm.onclick = () => {
       const idx = this.attachedImgs.findIndex(i => i.dataUrl === dataUrl);
       if (idx > -1) this.attachedImgs.splice(idx, 1);
@@ -505,7 +508,7 @@ class CyberAgent {
     this.sendBtn.style.display = 'none';
     this.stopBtn.style.display = '';
     this.inputEl.disabled = true;
-    this._setStatus('thinking', 'generandoâ€¦');
+    this._setStatus('thinking', 'generando...');
   }
 
   _endStreaming() {
@@ -538,11 +541,11 @@ class CyberAgent {
     if (this.messages.querySelector('.msg')) return;
     this.messages.innerHTML = `
       <div class="welcome">
-        <div class="welcome-icon">âš¡</div>
+        <div class="welcome-icon">CA</div>
         <h2>CyberAgent</h2>
         <p>Agente de IA con acceso completo al sistema. Tu inferencia, tu hardware.</p>
         <div class="welcome-suggestions">
-          <button class="suggestion" onclick="app.suggest(this)">Â¿QuÃ© procesos estÃ¡n usando mÃ¡s CPU?</button>
+          <button class="suggestion" onclick="app.suggest(this)">Que procesos estan usando mas CPU?</button>
           <button class="suggestion" onclick="app.suggest(this)">Escanea los puertos abiertos en esta red</button>
           <button class="suggestion" onclick="app.suggest(this)">Instala y configura nmap</button>
         </div>

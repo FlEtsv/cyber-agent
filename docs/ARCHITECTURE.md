@@ -56,6 +56,36 @@ Key files:
 - `app/widgets/tool_card.py`: visible tool/action cards.
 - `app/web/`: local PWA files.
 
+Desktop control capabilities now live in `app/tools.py`:
+
+- `list_monitors`: connected displays, coordinates, work areas, primary flag, scale.
+- `active_window`: foreground window title, hwnd, PID, process, rect.
+- `list_windows`: visible windows with title/process/geometry.
+- `focus_window`: bring target window to foreground.
+- `click_screen`: absolute-coordinate mouse click.
+- `type_text`: Unicode text typing into the active field.
+- `hotkey`: keyboard shortcuts such as `ctrl+l`, `tab`, `enter`, `f11`.
+- `ocr_screen`: screenshot plus OCR when Tesseract/pytesseract are installed.
+- `ui_tree`: Windows UI Automation tree for active/target window.
+- `fill_form`: sequential click/type/hotkey/wait automation.
+- `credential_lookup`: Windows Credential Manager and Chromium credential metadata lookup, with best-effort reveal.
+
+These tools are intended to let the agent operate normal desktop workflows with an inspect-act-verify loop:
+
+1. inspect monitors/windows/screenshot/UI tree,
+2. focus the correct window,
+3. perform click/type/hotkey steps,
+4. verify with screenshot/OCR/UI tree,
+5. report progress in the chat action stream.
+
+Example target workflow:
+
+```text
+Open a browser, navigate to Netflix, enter credentials supplied by the user,
+search a series, start episode 1 from the beginning, enter fullscreen on display 1,
+and confirm playback with screenshot/active-window state.
+```
+
 ### Cloud Run Relay
 
 Path:
@@ -224,4 +254,3 @@ Asset verification:
 Invoke-WebRequest -Uri https://cyberagent-relay-819820880956.us-central1.run.app/static/style.css -UseBasicParsing
 Invoke-WebRequest -Uri https://cyberagent-relay-819820880956.us-central1.run.app/static/app.js -UseBasicParsing
 ```
-
