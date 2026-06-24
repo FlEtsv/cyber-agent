@@ -225,6 +225,49 @@ def normalize_chat_history(history: list) -> list:
             normalized.append(msg)
             continue
 
+    # Ollama rejects histories that contain two assistant messages at the end of
+    # the list, and some OpenAI-compatible servers reject consecutive assistant
+    # messages anywhere. Compact those turns after tool validation so mobile and
+    # desktop runners share the same repair path.
+    compacted: list[dict] = []
+    for msg in normalized:
+        if (
+            compacted
+            and compacted[-1].get("role") == "assistant"
+            and msg.get("role") == "assistant"
+        ):
+            prev = dict(compacted[-1])
+            cur = dict(msg)
+            prev_tool_calls = prev.get("tool_calls")
+            cur_tool_calls = cur.get("tool_calls")
+            if prev_tool_calls and not cur_tool_calls:
+                text = str(cur.get("content") or "").strip()
+                if text:
+                    prev["content"] = (
+                        str(prev.get("content") or "").rstrip()
+                        + "\n\n[continuacion compactada]\n"
+                        + text
+                    ).strip()
+                compacted[-1] = prev
+                continue
+            if not prev_tool_calls and cur_tool_calls:
+                text = str(prev.get("content") or "").strip()
+                if text:
+                    cur["content"] = (text + "\n\n" + str(cur.get("content") or "")).strip()
+                compacted[-1] = cur
+                continue
+            prev.pop("tool_calls", None)
+            cur.pop("tool_calls", None)
+            prev["content"] = (
+                str(prev.get("content") or "").rstrip()
+                + "\n\n"
+                + str(cur.get("content") or "").lstrip()
+            ).strip() or "[respuestas anteriores compactadas]"
+            compacted[-1] = prev
+            continue
+        compacted.append(msg)
+    normalized = compacted
+
     # If the final assistant still has unresolved tool calls, strip them so the
     # next request asks the model to continue instead of replaying a half turn.
     if normalized and normalized[-1].get("role") == "assistant" and normalized[-1].get("tool_calls"):
