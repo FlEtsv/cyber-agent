@@ -35,6 +35,10 @@ class CyberAgent {
     this.sessionTrust  = false;
     this.outbox        = [];
     this.reconnectDelay = 1500;
+    this.reconnectTimer = null;
+    this.reconnectNoticeTimer = null;
+    this.connectionBanner = null;
+    this.pcOnline = true;
 
     // Detect device type for server context
     const ua = navigator.userAgent.toLowerCase();
@@ -55,6 +59,7 @@ class CyberAgent {
     this.statusDot  = document.querySelector('.status-dot');
     this.statusText = document.getElementById('status-text');
 
+    this._ensureConnectionBanner();
     this._bindUI();
     this._connect();
   }
@@ -62,13 +67,17 @@ class CyberAgent {
   // â”€â”€ WebSocket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   _connect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this._setConnectionState('offline', 'conectando...', 'Conectando con CyberAgent...', true);
+
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url   = `${proto}//${location.host}/ws`;
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this.reconnectDelay = 1500;
-      this._setStatus('', 'conectado');
+      this._clearTransientConversationState();
+      this._setConnectionState('', 'conectado');
       this._flushOutbox();
     };
     this.ws.onclose = e => {
@@ -76,12 +85,12 @@ class CyberAgent {
         window.location.href = '/login';
         return;
       }
-      this._setStatus('offline', 'desconectado');
+      this._handleDisconnect('desconectado');
       const wait = this.reconnectDelay;
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.7, 15000);
-      setTimeout(() => this._connect(), wait);
+      this.reconnectTimer = setTimeout(() => this._connect(), wait);
     };
-    this.ws.onerror = () => this._setStatus('error', 'error WS');
+    this.ws.onerror = () => this._setConnectionState('error', 'error WS', 'Error de conexion con el agente.', true);
     this.ws.onmessage = e => {
       try {
         this._onMessage(JSON.parse(e.data));
@@ -96,7 +105,7 @@ class CyberAgent {
       this.ws.send(JSON.stringify(obj));
     } else {
       this.outbox.push(obj);
-      this._setStatus('offline', 'reconectando...');
+      this._handleDisconnect('reconectando...');
     }
   }
 
@@ -113,7 +122,12 @@ class CyberAgent {
 
     switch (type) {
       case 'connected':
-        this._setStatus('', 'conectado');
+        this.pcOnline = data?.pc_online !== false;
+        if (!this.pcOnline) {
+          this._setConnectionState('offline', 'PC offline', 'El PC principal no esta conectado al relay.', true);
+        } else {
+          this._setConnectionState('', 'conectado');
+        }
         if (data?.models?.length) {
           document.querySelector('.header-model').textContent =
             data.models.find(m => m === 'cyberagent-original') ||
@@ -158,6 +172,10 @@ class CyberAgent {
         break;
 
       case 'error':
+        if (typeof data === 'string' && /pc no conectado|pc no est/i.test(data)) {
+          this.pcOnline = false;
+          this._setConnectionState('offline', 'PC offline', data, true);
+        }
         this._addErrorMsg(data);
         this._endStreaming();
         break;
@@ -169,6 +187,11 @@ class CyberAgent {
   send() {
     const text = this.inputEl.value.trim();
     if ((!text && this.attachedImgs.length === 0) || this.streaming) return;
+    if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
+      this._setConnectionState('offline', this.pcOnline ? 'reconectando...' : 'PC offline',
+        this.pcOnline ? 'Esperando reconexion con CyberAgent.' : 'El PC principal no esta conectado al relay.', true);
+      return;
+    }
 
     this._beginStreaming();
     this._addUserBubble(text, this.attachedImgs.map(i => i.dataUrl));
@@ -513,7 +536,7 @@ class CyberAgent {
     this.currentBubble = null;
     this.sendBtn.style.display = 'none';
     this.stopBtn.style.display = '';
-    this.inputEl.disabled = true;
+    this._setInputLocked(true);
     this._setStatus('thinking', 'generando...');
   }
 
@@ -521,15 +544,75 @@ class CyberAgent {
     this.streaming = false;
     this.sendBtn.style.display = '';
     this.stopBtn.style.display = 'none';
-    this.inputEl.disabled = false;
-    this.inputEl.focus();
-    this._setStatus('', 'conectado');
+    if (this.ws?.readyState === WebSocket.OPEN && this.pcOnline) {
+      this._setInputLocked(false);
+      this.inputEl.focus();
+      this._setConnectionState('', 'conectado');
+    }
     this._hideApproval();
   }
 
   _setStatus(cls, text) {
     this.statusDot.className = `status-dot ${cls}`;
     document.getElementById('status-text').textContent = text;
+  }
+
+  _setConnectionState(cls, text, bannerText = '', lockInput = false) {
+    if (this.reconnectNoticeTimer) {
+      clearTimeout(this.reconnectNoticeTimer);
+      this.reconnectNoticeTimer = null;
+    }
+    this._setStatus(cls, text);
+    this._setInputLocked(lockInput || this.streaming);
+    if (bannerText) {
+      this._showConnectionBanner(cls, bannerText);
+    } else {
+      this._hideConnectionBanner();
+    }
+  }
+
+  _handleDisconnect(text) {
+    this.pcOnline = true;
+    this._setStatus('offline', text);
+    this._setInputLocked(true);
+    if (this.reconnectNoticeTimer) clearTimeout(this.reconnectNoticeTimer);
+    this.reconnectNoticeTimer = setTimeout(() => {
+      this._showConnectionBanner('offline', 'Reconectando con CyberAgent. El envio se reactivara automaticamente.');
+    }, 3000);
+  }
+
+  _clearTransientConversationState() {
+    this.toolRows.clear();
+    this.currentBubble = null;
+    this._hideApproval();
+  }
+
+  _setInputLocked(locked) {
+    this.inputEl.disabled = locked;
+    this.sendBtn.disabled = locked;
+  }
+
+  _ensureConnectionBanner() {
+    this.connectionBanner = document.getElementById('connection-banner');
+    if (this.connectionBanner) return;
+    this.connectionBanner = document.createElement('div');
+    this.connectionBanner.id = 'connection-banner';
+    this.connectionBanner.setAttribute('role', 'status');
+    this.connectionBanner.setAttribute('aria-live', 'polite');
+    const header = document.querySelector('header');
+    header.insertAdjacentElement('afterend', this.connectionBanner);
+  }
+
+  _showConnectionBanner(cls, text) {
+    this._ensureConnectionBanner();
+    this.connectionBanner.className = `visible ${cls || 'offline'}`;
+    this.connectionBanner.textContent = text;
+  }
+
+  _hideConnectionBanner() {
+    this._ensureConnectionBanner();
+    this.connectionBanner.className = '';
+    this.connectionBanner.textContent = '';
   }
 
   _scrollBottom() {
@@ -600,4 +683,3 @@ class CyberAgent {
 
 // â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const app = new CyberAgent();
-
