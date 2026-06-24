@@ -6,12 +6,7 @@ struct RootView: View {
     var body: some View {
         TabView {
             NavigationStack {
-                PlaceholderPanel(
-                    title: "Chat",
-                    subtitle: chatViewModel.connectionStatus,
-                    systemImage: "message",
-                    accent: AppChrome.accent
-                )
+                ChatView(viewModel: chatViewModel)
             }
             .tabItem {
                 Label("Chat", systemImage: "message")
