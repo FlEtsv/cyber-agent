@@ -58,7 +58,7 @@ Si Steve escribe esas palabras en `OBJETIVOS`, ambos agentes paran, commitean el
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] B001 — Backoff exponencial en reconexión del relay (ahora sleep fijo 5s) — Archivos: `app/api/relay_connector.py` — Fecha: 2026-06-24 22:09
+[claude] B002 — CORS dinámico — ALLOWED_ORIGINS evaluado en import-time, no recarga si cambia la URL — Archivos: `app/api/server.py` — Fecha: 2026-06-24 22:09
 
 ---
 
