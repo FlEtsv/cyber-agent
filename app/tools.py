@@ -1351,8 +1351,21 @@ def _ocr_screen(monitor: int = 0, x=None, y=None, width=None, height=None) -> di
         img.save(path)
         try:
             import pytesseract
+            tesseract_cmd = (
+                shutil.which("tesseract")
+                or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+                or r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"
+            )
+            if tesseract_cmd and os.path.exists(tesseract_cmd):
+                pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
             text = pytesseract.image_to_string(img)
-            return {"ok": True, "text": text[:12000], "image_path": path, "region": region}
+            return {
+                "ok": True,
+                "text": text[:12000],
+                "image_path": path,
+                "region": region,
+                "tesseract_cmd": getattr(pytesseract.pytesseract, "tesseract_cmd", None),
+            }
         except Exception as e:
             return {"ok": False, "image_path": path, "region": region, "error": f"OCR no disponible: {e}"}
     except Exception as e:
