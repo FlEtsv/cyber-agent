@@ -124,7 +124,8 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] TOOL-001 — Catálogo hacking/tools: TOOL_CATEGORIES, DANGEROUS_TOOLS, ACTIVE_SECURITY_TOOLS, SENSITIVE_ACCESS_TOOLS, TOOL_USE_GUIDES en tools.py + docs/TOOLS.md — Commit: bbaff5b (integrado) — Fecha: 2026-06-24
 [claude] TOOL-002+DOC-001+DOC-002+DOC-003 — Router LLM mejorado (prompt 350t + desktop group + fix encoding) + TOOLS_MANUAL.md + USER_GUIDE.md + CONNECTION_GUIDE.md + TASKBOARD objetivos cerrados — Commit: 3f9a41b — Fecha: 2026-06-24
 [codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: d4424c9 — Fecha: 2026-06-24
-[claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay — verificado implementado en 777592d — Commit: 777592d — Fecha: 2026-06-24
+[claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay; iconos de categoría añadidos por Codex — Commit: 777592d + d4424c9 — Fecha: 2026-06-24
+[codex] BOARD-001 — Trazabilidad de GUI-002 corregida para incluir iconos de categoría en d4424c9 — Commit: PENDIENTE — Fecha: 2026-06-24 23:17
 
 ---
 
@@ -197,13 +198,13 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 
 | ID | ✅ | Tipo | Descripción | Zona | Agente | Prioridad |
 |----|----|----|-------------|------|--------|-----------|
-| WATCH-001 | ⬜ | feat | Modo "watch" de screenshots periódicos: captura pantalla cada N segundos, envía al chat como stream de imágenes. Útil para supervisión remota desde iPhone. | `app/tools.py`, `app/api/agent_runner.py`, `app/web/static/app.js` | ambos | media |
-| RELAY-SEC-001 | ⬜ | security | Forzar TOTP en el relay: actualmente `totp_required: false`. Activar 2FA obligatorio para todas las sesiones remotas mejora la seguridad ante robo de contraseña. | `relay/main.py`, `docs/CONNECTION_GUIDE.md` | claude | alta |
-| TEST-002 | ⬜ | test | Tests de integración end-to-end con relay mock: simular PC↔relay↔cliente, verificar reconexión, aprobación de herramientas y reportes. | `tests/test_relay_integration.py` | ambos | media |
-| PERF-001 | ⬜ | refactor | Cache TTL corto para herramientas read-only frecuentes (`system_info`, `gpu_info`, `memory_info`): evitar llamadas duplicadas en la misma sesión cada <30s. | `app/tools.py` | claude | baja |
-| RAG-002 | ⬜ | feat | Ampliar temas del autonomous_learner: añadir CVE feeds (NVD API), exploit-db, threat intelligence. Mejorar relevancia de los documentos auto-aprendidos. | `app/autonomous_learner.py` | codex | media |
-| MULTI-001 | ⬜ | feat | Selector de personalidad del agente en la UI: "Asistente general", "Hacker ofensivo", "Analista defensivo" — cambia el system prompt base sin alterar filtros. | `app/consciousness/system_context.py`, `app/widgets/main_window.py` | ambos | baja |
-| AUDIT-001 | ⬜ | feat | Dashboard de actividad del agente: herramientas más usadas, errores frecuentes, tiempo medio de respuesta por sesión. Visible en tab "Agente". | `app/widgets/agent_panel.py`, `app/agent_log.py` | codex | baja |
+| WATCH-001 | ✅ | feat | Modo "watch" de screenshots periódicos: captura pantalla cada N segundos, envía al chat como stream de imágenes. Útil para supervisión remota desde iPhone. | `app/tools.py`, `app/api/agent_runner.py`, `app/web/static/app.js` | ambos | media |
+| RELAY-SEC-001 | ✅ | security | Forzar TOTP en el relay: actualmente `totp_required: false`. Activar 2FA obligatorio para todas las sesiones remotas mejora la seguridad ante robo de contraseña. | `relay/main.py`, `docs/CONNECTION_GUIDE.md` | claude | alta |
+| TEST-002 | ✅ | test | Tests de integración end-to-end con relay mock: simular PC↔relay↔cliente, verificar reconexión, aprobación de herramientas y reportes. | `tests/test_relay_integration.py` | ambos | media |
+| PERF-001 | ✅ | refactor | Cache TTL corto para herramientas read-only frecuentes (`system_info`, `gpu_info`, `memory_info`): evitar llamadas duplicadas en la misma sesión cada <30s. | `app/tools.py` | claude | baja |
+| RAG-002 | ✅ | feat | Ampliar temas del autonomous_learner: añadir CVE feeds (NVD API), exploit-db, threat intelligence. Mejorar relevancia de los documentos auto-aprendidos. | `app/autonomous_learner.py` | codex | media |
+| MULTI-001 | ✅ | feat | Selector de personalidad del agente en la UI: "Asistente general", "Hacker ofensivo", "Analista defensivo" — cambia el system prompt base sin alterar filtros. | `app/consciousness/system_context.py`, `app/widgets/main_window.py` | ambos | baja |
+| AUDIT-001 | ✅ | feat | Dashboard de actividad del agente: herramientas más usadas, errores frecuentes, tiempo medio de respuesta por sesión. Visible en tab "Agente". | `app/widgets/agent_panel.py`, `app/agent_log.py` | codex | baja |
 
 #### Debates de arquitectura — Decisión del Director
 
