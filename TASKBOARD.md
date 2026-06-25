@@ -176,6 +176,8 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [claude] IOS-001..009 — Backend iOS completo: Package.swift, Models, Auth, Relay, BLE/GPS/USB, LLM local, Network, Permissions, ChatViewModel, DeviceManager, OfflineAgentRunner — Commit: 531865e (parcial, ver commits previos para archivos anteriores) — Fecha: 2026-06-25
 [claude] IOS-APP-GUIDE — Guía de usuario iOS completa en docs/IOS_APP_GUIDE.md — Commit: 531865e — Fecha: 2026-06-25
 [claude] WATCH-001 — Modo vigilancia screenshots: tools.py (start/stop_screenshot_watch), agent_runner.py (watch_config event), server.py (async watch loop), app.js (watch frame render), style.css (watch UI), ios/build_and_deploy.sh, Desktop/CyberAgent_iOS_Deploy.bat — Commit: 531865e — Fecha: 2026-06-25
+[claude] DEBATE-003 — Lazy model loading: fast model keep_alive=-1 (siempre residente), power model 10m (lazy). warm_fast_model() en lifespan startup. — Commit: f72c484 — Fecha: 2026-06-25
+[claude] IOS-FIX-001 — Corrección 2 bugs compilación Swift: AnyCodableSimple (decode eagerly), ChatViewModel.error case closure syntax — Commit: f72c484 — Fecha: 2026-06-25
 
 ---
 
