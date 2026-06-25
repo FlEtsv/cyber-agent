@@ -55,39 +55,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > **Steve escribe aquí.** Los agentes leen esto primero en cada sesión.
 > Si hay texto aquí, tiene prioridad sobre todo el BACKLOG.
 
-*(todos los objetivos han sido implementados y movidos a OBJETIVOS IMPLEMENTADOS)*  
-### OBJ-IO-001: App iOS nativa híbrida con agente local
-- **Prioridad:** alta
-- **Asignado a:** ambos
-- **Estado:** [ ] pendiente
-- **Descripción:** construir una app iOS nativa que se autentique con Google Cloud, conecte con el relay, permita aprobaciones por herramienta y siga funcionando en modo local cuando no haya Internet.
-- **Archivos afectados:** `ios/`, `relay/main.py`, `relay/web/*`, `docs/IOS_EXTENSION_PRD.md`
-- **Criterio de éxito:** el iPhone actúa como cliente nativo, mantiene la conversación, recibe instrucciones del relay y delega decisiones grandes al PC principal sin romper el flujo actual.
-- **Notes:** usar Xcode 17; mantener visión, Bluetooth, GPS y control de dispositivos; limitar el mini LLM a tareas rápidas y seguras.
-    Desarrollar la app para ios nativa 
-        -inicio de sesion conectado a google cloud 
-        -conectarse al relay
-        -funcione el envio de comandos con aprobacion
-        -no usar shortcuts
-        -mantener la funcionalidad de vision por bluetooth
-        -no romper lo que hay actualmente 
-        -usar xcode 17
-        -en caso de que no se pueda conectar a internet, se pueda usar de forma local, pero lo importante es que google cloud siempre respondera mientras haya internet esperando el relay del pc para procesar la peticion.
-        - todos los dispositivos disponibles y visibles para el modelo del pc.
-        -debemos poder hacer uso de todos de la manera mas amplia posible.
-        - detectar dispositivos que se conecten como cargadores, usb,camaras o gadgets y poder hacer uso de ellos y dar informacion sobre ellos.
-        - poder hacer uso de todos de la manera mas amplia posible.
-        - poder ver todos los dispositivos disponibles y poder hacer uso de ellos de la manera mas amplia posible.
-        - la app tendra un mini llm que sera el gestor local y se comunicara con el relay para obtener instrucciones y enviar datos. este mini llm debera tener acceso a todas las tools disponibles en el pc y debera poder hacer uso de ellas de la manera mas amplia posible pero estara alojado en el movil para que si no hay conexion a internet se pueda usar de forma local. 
-        - el mini llm debera tener acceso a todas las herramientas del pc pero con limitaciones de seguridad para no romper nada importante el principal es el modelo grande del pc principal y las decisiones grandes seran suyas. el mini llm es para tareas rapidas y simples que no requieren mucha informacion ni mucha potencia de calculo. el mini llm no deberia tener acceso a herramientas que puedan romper el sistema de forma irreversible.
-        - poder interactuar con todos los dispositivos de la red de forma segura y controlada. 
-        - la app tendra un sistema de permisos para cada herramienta y para cada dispositivo. 
-        - esta app sabe usar gps para seguir las instrucciones, conoce toda la red de dispositivos y sus capacidades, tiene comportamiento de agente. por lo tanto sus respuestas deben ser como las de un agente y debe poder tomar decisiones autonomamente siguiendo las instrucciones. 
-        - esta app debe ser capaz de mantener una conversacion coherente y natural con el usuario. debe ser capaz de responder preguntas sobre si misma, sobre sus capacidades, sobre la red, sobre los dispositivos, sobre las herramientas, etc. deve ser capaz de entender y procesar lenguaje natural y responder de forma coherente y natural. 
-        - se debe de hacer una guia de uso completa y detallada de todas las funcionalidades de la app. 
-        - la se puede elegir el dispositivo desde donde queremos iniciar la interaccion pero si el llm ve que necesita cambiar a realizar la accion desde cloud run o el pc main de inferencia tendra la cajpacidad de hacerlo para poder usar herramientas que solo estan disponibles en esos dispositivos. 
-        - el comportamiento de la app debe ser como la de un agente autonomo inteligente capaz de tomar decisiones y actuar de forma autonoma para cumplir los objetivos del usuario. 
-        -  la gui debe usar ultimas tecnologias y implementar la experiencia de usuario mas fluida y agradable posible, debe ser capaz de mostrar informacion de forma clara y concisa y debe ser capaz de manejar grandes cantidades de informacion de forma eficiente.
+*(todos los objetivos han sido implementados y movidos a OBJETIVOS IMPLEMENTADOS)*
 
         
     
@@ -114,6 +82,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 - **Cada agente tiene manual de instrucciones claro.** Cerrado por `AGENTS.md`+`TASKBOARD.md` — protocolo de turno R1-R10, formato de commit, zonas y cómo coordinar sin bloquearse.
 - **Cada agente tiene su espacio de archivos limpio y ordenado.** Cerrado por `AGENTS.md` — tabla de propiedad de cada archivo y zonas de no-toque documentadas.
 - **Los agentes son los modelos de IA con los que se conecta el usuario final.** Cerrado por `DOC-002`+`AGENTS.md` — guía de modelos disponibles (rápido/potente), routing automático por complejidad, configuración via `CYBERAGENT_FAST_MODEL`/`CYBERAGENT_POWER_MODEL`.
+- **OBJ-IO-001: App iOS nativa híbrida con agente local.** Cerrado por `IOS-001..009` + `IOS-UI-001..007` — app Swift completa: auth JWT/Keychain, WebSocket relay, BLE/GPS/USB, mini LLM offline, sistema de permisos, SwiftUI GitHub-dark, guía de usuario en `docs/IOS_APP_GUIDE.md`, build script `ios/build_and_deploy.sh`. GPU queue `55deb36` cierra la pieza de coordinación multi-cliente.
 
 
 
@@ -179,6 +148,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [claude] DEBATE-003 — Lazy model loading: fast model keep_alive=-1 (siempre residente), power model 10m (lazy). warm_fast_model() en lifespan startup. — Commit: f72c484 — Fecha: 2026-06-25
 [claude] IOS-FIX-001 — Corrección 2 bugs compilación Swift: AnyCodableSimple (decode eagerly), ChatViewModel.error case closure syntax — Commit: f72c484 — Fecha: 2026-06-25
 [codex] OPS-001 — Instancia Windows verificada y operativa: API local standalone en `scripts/start_local_api.py`, smoke test en `scripts/windows_smoke.ps1`, learner compatible con consola Windows. Validación: py_compile + pytest 47/47 + Ollama HTTP 200 + API local HTTP 200 — Commit: ec29df3 — Fecha: 2026-06-25 07:21
+[claude] GPU-QUEUE — Semáforo asyncio.Semaphore(1) serializa inferencias concurrentes PC/relay/iOS. iOS/móvil tiene prioridad. Clientes reciben posición en cola mientras esperan. Guard garantiza liberación aunque AgentRunner falle al construir. — Commit: 55deb36 — Fecha: 2026-06-25
 
 ---
 
