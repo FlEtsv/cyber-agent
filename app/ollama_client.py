@@ -7,9 +7,21 @@ OLLAMA_MODEL = "cyberagent-original"
 MAX_CTX = 12288
 
 # DEBATE-003: lazy model loading.
-# Fast model stays resident (-1 = never unload); power model unloads after inactivity.
-FAST_KEEP_ALIVE  = os.environ.get("CYBERAGENT_FAST_KEEP_ALIVE",  "-1")   # never unload
-POWER_KEEP_ALIVE = os.environ.get("CYBERAGENT_POWER_KEEP_ALIVE", "10m")  # unload after 10 min idle
+# Fast model stays warm for a long session; power model unloads after inactivity.
+def _normalize_keep_alive(value: str | int | float, default: str) -> str | int | float:
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        # Older Ollama builds accepted "-1" as "never unload"; newer versions
+        # parse string keep_alive values as durations and require a unit.
+        if raw in ("-1", "infinite", "forever", "never"):
+            return "24h"
+        if not raw:
+            return default
+    return value
+
+
+FAST_KEEP_ALIVE  = _normalize_keep_alive(os.environ.get("CYBERAGENT_FAST_KEEP_ALIVE",  "24h"), "24h")
+POWER_KEEP_ALIVE = _normalize_keep_alive(os.environ.get("CYBERAGENT_POWER_KEEP_ALIVE", "10m"), "10m")
 PROMPT_BUDGET_TOKENS = 10500
 TOOL_RESULT_CHARS = 4000
 ASSISTANT_HISTORY_CHARS = 6000
@@ -48,7 +60,7 @@ def _autostart_ollama() -> bool:
 
 def warm_fast_model() -> bool:
     """Pre-loads the fast model into Ollama's GPU memory so the first response is instant.
-    Uses keep_alive=-1 so Ollama never evicts it between requests.
+    Uses a long keep_alive so Ollama keeps it hot between requests.
     Safe to call in a background thread at server startup.
     """
     from app.model_router import FAST_MODEL
