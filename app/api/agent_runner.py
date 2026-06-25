@@ -21,6 +21,8 @@ from app.ollama_client import (
     MAX_AGENT_ITERATIONS,
     MAX_TOOL_EXECUTIONS,
     MAX_CTX,
+    FAST_KEEP_ALIVE,
+    POWER_KEEP_ALIVE,
     _brief_args,
     is_context_overflow_error,
     prepare_history_for_ollama,
@@ -331,17 +333,21 @@ class AgentRunner:
 
     def _stream_once(self, history: list, tools: list | None = None) -> tuple[str, dict]:
         import time
+        from app.model_router import FAST_MODEL
 
         _tools_used = tools if tools is not None else TOOLS_SCHEMA
         history = prepare_history_for_ollama(history, _tools_used)
         num_ctx = self._auto_ctx(history)
+        # DEBATE-003: keep fast model always hot; power model evicts after idle period
+        keep_alive = FAST_KEEP_ALIVE if self.model == FAST_MODEL else POWER_KEEP_ALIVE
         payload = {
-            "model":    self.model,
-            "messages": history,
-            "tools":    _tools_used,
-            "stream":   True,
-            "options":  {"num_ctx": num_ctx, "temperature": 0.6, "top_p": 0.9,
-                         "repeat_penalty": 1.05, "top_k": 40},
+            "model":      self.model,
+            "messages":   history,
+            "tools":      _tools_used,
+            "stream":     True,
+            "keep_alive": keep_alive,
+            "options":    {"num_ctx": num_ctx, "temperature": 0.6, "top_p": 0.9,
+                           "repeat_penalty": 1.05, "top_k": 40},
         }
         _t = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
         MAX_ATTEMPTS = 3

@@ -1,10 +1,15 @@
-import json, socket, subprocess, time, httpx
+import json, os, socket, subprocess, time, httpx
 from PySide6.QtCore import QThread, Signal
 from app.tools import TOOLS_SCHEMA, execute_tool, is_dangerous, tool_event_payload
 
 OLLAMA_URL   = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "cyberagent-original"
 MAX_CTX = 12288
+
+# DEBATE-003: lazy model loading.
+# Fast model stays resident (-1 = never unload); power model unloads after inactivity.
+FAST_KEEP_ALIVE  = os.environ.get("CYBERAGENT_FAST_KEEP_ALIVE",  "-1")   # never unload
+POWER_KEEP_ALIVE = os.environ.get("CYBERAGENT_POWER_KEEP_ALIVE", "10m")  # unload after 10 min idle
 PROMPT_BUDGET_TOKENS = 10500
 TOOL_RESULT_CHARS = 4000
 ASSISTANT_HISTORY_CHARS = 6000
@@ -40,6 +45,36 @@ def _autostart_ollama() -> bool:
         if _ollama_is_up():
             return True
     return False
+
+def warm_fast_model() -> bool:
+    """Pre-loads the fast model into Ollama's GPU memory so the first response is instant.
+    Uses keep_alive=-1 so Ollama never evicts it between requests.
+    Safe to call in a background thread at server startup.
+    """
+    from app.model_router import FAST_MODEL
+    try:
+        resp = httpx.post(
+            "http://localhost:11434/api/generate",
+            json={"model": FAST_MODEL, "prompt": "", "keep_alive": FAST_KEEP_ALIVE},
+            timeout=120.0,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+def unload_model(model: str) -> bool:
+    """Explicitly evict a model from Ollama GPU memory (keep_alive=0)."""
+    try:
+        resp = httpx.post(
+            "http://localhost:11434/api/generate",
+            json={"model": model, "prompt": "", "keep_alive": 0},
+            timeout=15.0,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
 
 def _build_base_prompt() -> str:
     from datetime import datetime

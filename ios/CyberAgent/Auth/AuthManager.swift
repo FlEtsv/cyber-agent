@@ -103,17 +103,20 @@ final class AuthManager: ObservableObject {
 }
 
 struct AnyCodableSimple: Codable {
-    var bool: Bool?   { (try? container.decode(Bool.self)) }
-    var string: String? { (try? container.decode(String.self)) }
-    private let container: SingleValueDecodingContainer
+    let bool: Bool?
+    let string: String?
 
     init(from decoder: Decoder) throws {
-        container = try decoder.singleValueContainer()
+        let c = try decoder.singleValueContainer()
+        if let v = try? c.decode(Bool.self)   { bool = v; string = nil; return }
+        if let v = try? c.decode(String.self) { string = v; bool = nil; return }
+        bool = nil; string = nil
     }
+
     func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
-        if let b = bool { try c.encode(b) }
-        else if let s = string { try c.encode(s) }
-        else { try c.encodeNil() }
+        if let b = bool         { try c.encode(b) }
+        else if let s = string  { try c.encode(s) }
+        else                    { try c.encodeNil() }
     }
 }

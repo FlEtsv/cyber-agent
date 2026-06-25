@@ -93,7 +93,10 @@ final class ChatViewModel: ObservableObject {
             isThinking         = false
 
         case .error:
-            let errText = (event.data.flatMap { if case .string(let s) = $0 { return s } else { return nil } }) ?? "Error"
+            let errText: String = {
+                if case .string(let s) = event.data { return s }
+                return "Error"
+            }()
             if let id = streamingMessageId,
                let idx = messages.firstIndex(where: { $0.id == id }) {
                 messages[idx].state = .error

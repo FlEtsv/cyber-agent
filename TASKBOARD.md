@@ -169,10 +169,10 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [codex] GUI-001 — ToolsPanel tab en GUI desktop: catálogo por categoría con badges riesgo, filtro texto+combo+riesgo, panel detalle, botón "Abrir manual" — Archivos: app/widgets/tools_panel.py, app/widgets/main_window.py, app/styles.py, app/tools.py — Commit: d4424c9 — Fecha: 2026-06-24
 [claude/codex] GUI-002 — Badges categoría·riesgo en action rows y approval cards de web/relay; iconos de categoría añadidos por Codex — Commit: 777592d + d4424c9 — Fecha: 2026-06-24
 [codex] BOARD-001 — Trazabilidad de GUI-002 corregida para incluir iconos de categoría en d4424c9 — Commit: d4424c9 — Fecha: 2026-06-24 23:17
-[claude] RELAY-SEC-001 — TOTP obligatorio por defecto en relay (TOTP_OPTIONAL=1 para dev). Warning startup si sin secret. — Commit: PENDIENTE — Fecha: 2026-06-24
-[claude] PERF-001 — Cache TTL 30s en execute_tool para system_info/gpu_info/memory_info (_cached:True en respuesta) — Commit: PENDIENTE — Fecha: 2026-06-24
-[claude] TEST-002 — 35 nuevos tests: test_tool_router.py (keyword/always/route_tools) + test_model_router.py (score/route). 47/47 pasan — Commit: PENDIENTE — Fecha: 2026-06-24
-[claude] DEBATE-002 — Expert mode backend: solo sesiones locales (127.0.0.1). Audit log por dangerous tool auto-aprobada. — Commit: PENDIENTE — Fecha: 2026-06-24
+[claude] RELAY-SEC-001 — TOTP obligatorio por defecto en relay (TOTP_OPTIONAL=1 para dev). Warning startup si sin secret. — Commit: 7416d55 — Fecha: 2026-06-24
+[claude] PERF-001 — Cache TTL 30s en execute_tool para system_info/gpu_info/memory_info (_cached:True en respuesta) — Commit: 7416d55 — Fecha: 2026-06-24
+[claude] TEST-002 — 35 nuevos tests: test_tool_router.py (keyword/always/route_tools) + test_model_router.py (score/route). 47/47 pasan — Commit: 7416d55 — Fecha: 2026-06-24
+[claude] DEBATE-002 — Expert mode backend: solo sesiones locales (127.0.0.1). Audit log por dangerous tool auto-aprobada. — Commit: 7416d55 — Fecha: 2026-06-24
 [claude] IOS-001..009 — Backend iOS completo: Package.swift, Models, Auth, Relay, BLE/GPS/USB, LLM local, Network, Permissions, ChatViewModel, DeviceManager, OfflineAgentRunner — Commit: 531865e (parcial, ver commits previos para archivos anteriores) — Fecha: 2026-06-25
 [claude] IOS-APP-GUIDE — Guía de usuario iOS completa en docs/IOS_APP_GUIDE.md — Commit: 531865e — Fecha: 2026-06-25
 [claude] WATCH-001 — Modo vigilancia screenshots: tools.py (start/stop_screenshot_watch), agent_runner.py (watch_config event), server.py (async watch loop), app.js (watch frame render), style.css (watch UI), ios/build_and_deploy.sh, Desktop/CyberAgent_iOS_Deploy.bat — Commit: 531865e — Fecha: 2026-06-25

@@ -1,5 +1,6 @@
 """CyberAgent Web Server — FastAPI + WebSocket + PWA + Auth."""
 import asyncio, json, os, threading, base64
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Response, Cookie
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
@@ -14,7 +15,22 @@ from app.auth import (
 
 WEB_DIR = Path(__file__).parent.parent / "web"
 
-app = FastAPI(docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def _lifespan(app_):
+    # DEBATE-003: pre-warm fast model in background so first response is instant
+    def _warm():
+        try:
+            from app.ollama_client import warm_fast_model, _autostart_ollama
+            if _autostart_ollama():
+                warm_fast_model()
+        except Exception:
+            pass
+    threading.Thread(target=_warm, daemon=True).start()
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 _CORS_LOCAL = frozenset(["http://localhost:8765", "http://127.0.0.1:8765"])
 
