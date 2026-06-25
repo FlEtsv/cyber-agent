@@ -5,7 +5,6 @@ streams results back through the relay.
 """
 import asyncio, json, os, threading, logging
 import websockets
-from websockets.exceptions import ConnectionClosed
 
 from app.ollama_client import OLLAMA_MODEL
 
@@ -71,7 +70,26 @@ class RelayConnector:
             await asyncio.sleep(backoff)
             backoff = _BACKOFF_INIT if connected else min(backoff * 2, _BACKOFF_MAX)
 
+    async def _announce_models(self, ws):
+        """RELAY-BE-001: push current model list to relay right after connecting."""
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=3) as c:
+                r = await c.get("http://localhost:11434/api/tags")
+            models = [m["name"] for m in r.json().get("models", [])]
+        except Exception:
+            models = []
+        from app.model_router import FAST_MODEL, POWER_MODEL
+        active = FAST_MODEL  # fast model is always warm at startup
+        try:
+            await ws.send(json.dumps({"type": "models", "models": models, "active": active}))
+        except Exception:
+            pass
+
     async def _handle(self, ws):
+        # Announce model list immediately on connect
+        await self._announce_models(ws)
+
         async for raw in ws:
             try:
                 msg = json.loads(raw)
@@ -80,6 +98,14 @@ class RelayConnector:
 
             session_id = msg.get("session_id")
             t = msg.get("type")
+
+            # RELAY-BE-003: relay pings us to confirm we're alive
+            if t == "ping":
+                try:
+                    await ws.send(json.dumps({"type": "pong"}))
+                except Exception:
+                    pass
+                continue
 
             if t == "message":
                 asyncio.create_task(self._on_message(ws, session_id, msg))

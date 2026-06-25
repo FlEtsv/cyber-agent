@@ -5,7 +5,7 @@ Acts as a fixed-URL bridge between the mobile browser and the PC agent.
 PC connects outbound  → wss://<relay>/host?secret=HOST_SECRET
 Mobile browser        → wss://<relay>/ws  (after login)
 """
-import asyncio, collections, json, os, secrets, time, uuid
+import asyncio, collections, json, os, time, uuid
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -36,8 +36,10 @@ if TOTP_REQUIRED and not RELAY_TOTP:
         "Set TOTP_OPTIONAL=1 to disable 2FA (not recommended for production).",
         file=sys.stderr,
     )
-JWT_ALGO      = "HS256"
-JWT_HOURS     = 72
+JWT_ALGO  = "HS256"
+JWT_HOURS = 72
+
+_SESSION_BUFFER_SIZE = 50   # messages kept per session for history restore
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -73,10 +75,29 @@ class RelayState:
         self.host_ws: WebSocket | None = None
         self.host_q:  asyncio.Queue    = asyncio.Queue(maxsize=100)
         self.sessions: dict[str, WebSocket] = {}   # session_id → mobile ws
-        self._send_fn = None  # set/cleared only inside host_ws coroutine
+        self._send_fn = None   # set/cleared only inside host_ws coroutine
+        self._models:  list[str] = []              # RELAY-BE-001: model list from PC
+        self._active_model: str = ""               # fast/power model currently loaded
+
+        # RELAY-BE-002: per-session message buffers (last N messages for history restore)
+        self._buffers: dict[str, collections.deque] = {}
+
+        # RELAY-BE-003: ping/pong tracking
+        self._ping_task: asyncio.Task | None = None
+        self._last_pong: float = 0.0
+        self._ping_miss: int = 0
 
     def pc_online(self) -> bool:
         return self._send_fn is not None
+
+    def session_buffer(self, session_id: str) -> collections.deque:
+        if session_id not in self._buffers:
+            self._buffers[session_id] = collections.deque(maxlen=_SESSION_BUFFER_SIZE)
+        return self._buffers[session_id]
+
+    def drop_session(self, session_id: str):
+        self._buffers.pop(session_id, None)
+        self.sessions.pop(session_id, None)
 
 state = RelayState()
 
@@ -91,7 +112,7 @@ def _verify_login(email: str, pw: str, totp: str) -> bool:
         return False
     if TOTP_REQUIRED:
         if not RELAY_TOTP:
-            return False  # secret not configured → block until admin sets it up
+            return False
         return pyotp.TOTP(RELAY_TOTP).verify(totp, valid_window=1)
     if RELAY_TOTP:
         return pyotp.TOTP(RELAY_TOTP).verify(totp, valid_window=1)
@@ -181,20 +202,73 @@ async def sw():
 
 @app.get("/api/status")
 async def api_status():
-    return {"relay": True, "pc_online": state.pc_online()}
+    return {
+        "relay": True,
+        "pc_online": state.pc_online(),
+        "models": state._models,
+        "active_model": state._active_model,
+    }
 
 
-# ── PC host WebSocket (/host) ─────────────────────────────────────────────────
+# ── RELAY-BE-002: Session history endpoint ────────────────────────────────────
+@app.get("/api/session/{session_id}/history")
+async def session_history(session_id: str, request: Request):
+    if not _check_token(request):
+        raise HTTPException(status_code=401, detail="No autorizado")
+    buf = state._buffers.get(session_id)
+    if buf is None:
+        return JSONResponse([])
+    return JSONResponse(list(buf))
+
+
+# ── Error handlers ────────────────────────────────────────────────────────────
 @app.exception_handler(HTTPException)
 async def _http_exc(request: Request, exc: HTTPException):
     return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
-
 
 @app.exception_handler(Exception)
 async def _generic_exc(request: Request, exc: Exception):
     return JSONResponse({"error": "Error interno del servidor"}, status_code=500)
 
 
+# ── RELAY-BE-003: Ping/pong loop for PC host ──────────────────────────────────
+_PING_INTERVAL = 15   # seconds between pings
+_PING_MISS_MAX = 2    # consecutive misses before marking PC offline
+
+async def _pc_ping_loop():
+    """Sends periodic pings to the PC; marks it offline if it stops responding."""
+    while True:
+        await asyncio.sleep(_PING_INTERVAL)
+        send_fn = state._send_fn
+        if send_fn is None:
+            continue
+        try:
+            await send_fn({"type": "ping"})
+            state._ping_miss += 1
+            if state._ping_miss >= _PING_MISS_MAX:
+                # PC stopped responding — notify all mobile sessions
+                for sid, mob in list(state.sessions.items()):
+                    try:
+                        await mob.send_json({
+                            "type": "error",
+                            "data": "PC no responde (ping timeout). Reconectando…",
+                        })
+                    except Exception:
+                        pass
+                # Force-close the stale host connection
+                if state.host_ws:
+                    try:
+                        await state.host_ws.close(code=1001)
+                    except Exception:
+                        pass
+                state._send_fn = None
+                state.host_ws = None
+                state._ping_miss = 0
+        except Exception:
+            pass
+
+
+# ── PC host WebSocket (/host) ─────────────────────────────────────────────────
 @app.websocket("/host")
 async def host_ws(ws: WebSocket, secret: str = ""):
     await ws.accept()
@@ -202,12 +276,12 @@ async def host_ws(ws: WebSocket, secret: str = ""):
         await ws.close(code=4401)
         return
 
-    # Reject a second PC while one is already connected
     if state.host_ws is not None:
         await ws.close(code=4409, reason="Host already connected")
         return
 
     state.host_ws = ws
+    state._ping_miss = 0
 
     async def _send_to_pc(msg: dict):
         try:
@@ -216,11 +290,15 @@ async def host_ws(ws: WebSocket, secret: str = ""):
             try:
                 state.host_q.put_nowait(msg)
             except asyncio.QueueFull:
-                pass  # queue full — discard silently
+                pass
 
     state._send_fn = _send_to_pc
 
-    # Drain any queued messages (sessions that opened before PC reconnected)
+    # Start ping loop if not running
+    if state._ping_task is None or state._ping_task.done():
+        state._ping_task = asyncio.create_task(_pc_ping_loop())
+
+    # Drain queued messages (sessions that connected before PC)
     while not state.host_q.empty():
         try:
             await ws.send_json(state.host_q.get_nowait())
@@ -233,26 +311,56 @@ async def host_ws(ws: WebSocket, secret: str = ""):
                 msg = json.loads(raw)
             except Exception:
                 continue
+
+            msg_type = msg.get("type")
+
+            # RELAY-BE-003: pong resets miss counter
+            if msg_type == "pong":
+                state._ping_miss = 0
+                continue
+
+            # RELAY-BE-001: PC sends its model list on connect/status change
+            if msg_type == "models":
+                state._models       = msg.get("models", [])
+                state._active_model = msg.get("active", "")
+                # Broadcast updated model info to all mobile sessions
+                for sid, mob in list(state.sessions.items()):
+                    try:
+                        await mob.send_json({
+                            "type": "models",
+                            "data": {
+                                "models": state._models,
+                                "active": state._active_model,
+                            },
+                        })
+                    except Exception:
+                        pass
+                continue
+
             session_id = msg.get("session_id")
             if not session_id:
                 continue
+
             mobile = state.sessions.get(session_id)
             if mobile:
                 payload = {k: v for k, v in msg.items() if k != "session_id"}
                 try:
                     await mobile.send_json(payload)
+                    # RELAY-BE-002: buffer assistant tokens + done events
+                    if msg_type in ("token", "done", "tool_call", "tool_result", "error"):
+                        state.session_buffer(session_id).append(payload)
                 except Exception:
-                    state.sessions.pop(session_id, None)
+                    state.drop_session(session_id)
     except WebSocketDisconnect:
         pass
     finally:
         state.host_ws = None
         state._send_fn = None
-        # Notify all mobile sessions
+        state._models = []
+        state._active_model = ""
         for sid, mob in list(state.sessions.items()):
             try:
-                await mob.send_json({"type": "error",
-                                     "data": "PC desconectado. Reconectando…"})
+                await mob.send_json({"type": "error", "data": "PC desconectado. Reconectando…"})
             except Exception:
                 pass
 
@@ -267,11 +375,15 @@ async def mobile_ws(ws: WebSocket):
     session_id = str(uuid.uuid4())
     state.sessions[session_id] = ws
 
-    # Tell mobile relay status
     await ws.send_json({
         "type": "connected",
-        "data": {"relay": True, "pc_online": state.pc_online(),
-                 "models": [], "session_id": session_id},
+        "data": {
+            "relay":        True,
+            "pc_online":    state.pc_online(),
+            "models":       state._models,
+            "active_model": state._active_model,
+            "session_id":   session_id,
+        },
     })
 
     if not state.pc_online():
@@ -286,21 +398,35 @@ async def mobile_ws(ws: WebSocket):
             except Exception:
                 continue
 
+            msg_type = msg.get("type")
+
+            # RELAY-BE-002: client requests its own history
+            if msg_type == "get_history":
+                history = list(state._buffers.get(session_id, []))
+                await ws.send_json({"type": "history", "data": history})
+                continue
+
             send_fn = state._send_fn
             if send_fn:
-                await send_fn({**msg, "session_id": session_id})
+                fwd = {**msg, "session_id": session_id}
+                await send_fn(fwd)
+                # RELAY-BE-002: buffer outgoing user messages for history
+                if msg_type == "message":
+                    state.session_buffer(session_id).append({
+                        "type": "user_message",
+                        "content": msg.get("content", ""),
+                        "ts": time.time(),
+                    })
             else:
-                await ws.send_json({"type": "error",
-                                    "data": "PC no conectado"})
+                await ws.send_json({"type": "error", "data": "PC no conectado"})
     except WebSocketDisconnect:
         pass
     finally:
-        state.sessions.pop(session_id, None)
+        state.drop_session(session_id)
         send_fn = state._send_fn
         if send_fn:
             try:
-                await send_fn({"type": "session_closed",
-                               "session_id": session_id})
+                await send_fn({"type": "session_closed", "session_id": session_id})
             except Exception:
                 pass
 

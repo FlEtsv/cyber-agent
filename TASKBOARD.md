@@ -104,6 +104,10 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
+[claude] RELAY-BE-001+002+003 — Backend relay: modelos passthrough en connected, buffer de sesión 50 msgs + endpoint /api/session/{id}/history, ping/pong PC cada 15s — Archivos: relay/main.py — Fecha: 2026-06-25
+
+[codex] RELAY-UI-001..005 — Implementar frontend relay remoto: historial localStorage/fetch, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Archivos: `relay/web/app.js`, `relay/web/style.css`, `relay/web/index.html`, `TASKBOARD.md` — Fecha: 2026-06-25 07:38
+
 ---
 
 ## ✅ COMPLETADO
@@ -210,6 +214,71 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 |----|----|-------------|----------|--------|-----------|
 | GUI-001 | ✅ | Panel visual de catálogo de herramientas en la GUI desktop: lista por categoría con badge de riesgo, filtro, y link a manual | `app/widgets/tools_panel.py`, `app/widgets/main_window.py`, `app/styles.py` | codex | media |
 | GUI-002 | ✅ | Badges de categoría y riesgo en action rows del chat web/relay: icono de categoría + color por riesgo (alto=rojo, bajo=verde) | `app/web/static/app.js`, `relay/web/app.js`, `app/web/static/style.css`, `relay/web/style.css` | codex | media |
+
+---
+
+### 🚀 MEJORA CLOUD RUN — Desglose aprobado por Director
+
+> **Objetivo:** elevar la interfaz relay (Cloud Run) al mismo nivel que la interfaz local.  
+> Brechas identificadas por jefe de equipo: sin historial, sin selector de modelo, sin panel de ajustes, sin GPU queue badge, sin watch mode, sin drag & drop.
+
+#### Zona Claude — Backend relay
+
+| ID | ✅ | Descripción | Archivos | Agente | Prioridad |
+|----|----|----|-------------|--------|-----------|
+| RELAY-BE-001 | ✅ | Relay pasa lista de modelos del PC y modelo activo al cliente en el evento `connected`. El PC ya expone `/api/status` con models; el relay los solicita o el PC los manda en el evento init del host. | `relay/main.py` | claude | alta |
+| RELAY-BE-002 | ✅ | Buffer de sesión en memoria: relay guarda últimos 50 mensajes por session_id. Endpoint GET `/api/session/{id}/history` devuelve el buffer para restaurar el historial al recargar. Datos no se persisten al disco (privacidad). | `relay/main.py` | claude | alta |
+| RELAY-BE-003 | ✅ | Ping/pong activo al PC host: relay envía `{"type":"ping"}` cada 15s; si el PC no responde en 2 ciclos (30s), marca `pc_online=false` y notifica a todas las sesiones móviles. Detecta desconexiones silenciosas. | `relay/main.py` | claude | media |
+
+#### Zona Codex — Frontend relay
+
+| ID | ✅ | Descripción | Archivos | Agente | Prioridad |
+|----|----|----|-------------|--------|-----------|
+| RELAY-UI-001 | ✅ | Historial localStorage: al `connected`, solicitar historial al relay vía fetch y restaurar burbujas de conversación. Guardar en localStorage con clave `ca_history_{relayHost}`. Limpiar en logout. | `relay/web/app.js`, `relay/web/style.css` | codex | alta |
+| RELAY-UI-002 | ✅ | Panel lateral de ajustes: botón gear en header abre slide-in panel con: selector modelo fast/power (enviado en el campo `model` del mensaje), toggle session trust, lista de permisos por herramienta (Auto/Preguntar/Bloquear). Guardar preferencias en localStorage. | `relay/web/app.js`, `relay/web/style.css`, `relay/web/index.html` | codex | alta |
+| RELAY-UI-003 | ✅ | GPU queue badge: cuando llega un evento `status` que contenga "GPU ocupada" o "posición", mostrar un badge animado en el header (fondo naranja, texto "Cola: N") en vez del texto genérico. Desaparece cuando llega el primer `token`. | `relay/web/app.js`, `relay/web/style.css` | codex | alta |
+| RELAY-UI-004 | ✅ | Port del watch mode: copiar la lógica de `_watchContainer`, `_handleWatchFrame`, `_endWatchMode` y los handlers de eventos `screenshot`/`watch_ended` de `app/web/static/app.js` al `relay/web/app.js`. Copiar CSS de watch mode de `app/web/static/style.css` a `relay/web/style.css`. | `relay/web/app.js`, `relay/web/style.css` | codex | media |
+| RELAY-UI-005 | ✅ | Drag & drop de imágenes: el área `#input-area` acepta `dragover`/`drop` de archivos imagen. Visual feedback (borde glow al hover). Máximo 4 imágenes. Reutiliza `_attachImage()` existente. | `relay/web/app.js`, `relay/web/style.css` | codex | media |
+
+---
+
+### 📋 Instrucciones detalladas para Codex — RELAY-UI
+
+> **Codex: lee esto antes de empezar. Empieza por RELAY-UI-001, luego en orden.**
+
+#### RELAY-UI-001 — Historial localStorage
+- En `_onMessage`, case `connected`: si hay `data.session_id`, hacer `fetch('/api/session/' + data.session_id + '/history')`. Si responde con array, llamar `_restoreHistory(messages)`.
+- `_restoreHistory(messages)`: iterar mensajes, para cada uno llamar `_addUserBubble()` o `_addRestoredAIBubble()`. Marcar el container con clase `restored` para que sea visualmente tenue.
+- Guardar cada burbuja enviada/recibida en `localStorage.setItem('ca_history_' + location.host, JSON.stringify(last50))`.
+- En `logout`: `localStorage.removeItem('ca_history_' + location.host)`.
+
+#### RELAY-UI-002 — Panel lateral de ajustes
+- Añadir en `index.html` un `<div id="settings-panel">` con clase `settings-panel` (oculto por defecto).
+- Botón gear en header: `<button id="settings-btn">⚙</button>`. Click toggle clase `open` en `#settings-panel`.
+- Contenido del panel:
+  - `<select id="model-select"><option value="">Auto</option><option value="fast">Rápido</option><option value="power">Potente</option></select>`
+  - `<label><input type="checkbox" id="trust-toggle"> Auto-aprobar herramientas (session trust)</label>`
+  - Lista de herramientas con Picker Auto/Preguntar/Bloquear (usar `this.permissions` existente)
+- En `send()`, añadir `model: this.$('model-select').value || undefined` al payload.
+- CSS: panel ancho 280px, slide desde derecha, backdrop semi-transparente al abrir.
+
+#### RELAY-UI-003 — GPU queue badge
+- En `_onMessage`, case `status`: si `data` es string y `/GPU ocupada|posición \d/i.test(data)`, extraer número con regex, actualizar `#queue-badge` (crearlo si no existe en header).
+- Badge: `position: absolute`, fondo `#f0883e`, border-radius 12px, texto `Cola #N`, animar con pulse CSS.
+- Cuando llega `token` o `done`: ocultar badge.
+
+#### RELAY-UI-004 — Watch mode
+- Copiar de `app/web/static/app.js`:
+  - Variables: `_watchContainer`, `_watchFramesEl`, `_watchCounterEl`
+  - Métodos: `_handleWatchFrame(data)`, `_endWatchMode(frames)`
+  - Cases en `_onMessage`: `'screenshot'` → `_handleWatchFrame(data)`, `'watch_ended'` → `_endWatchMode(data.frames)`
+- Copiar de `app/web/static/style.css` todos los estilos `.watch-*`.
+
+#### RELAY-UI-005 — Drag & drop
+- En constructor: `this._bindDragDrop()`.
+- `_bindDragDrop()`: event listeners `dragover` (preventDefault, añadir clase `drag-over`), `dragleave` (quitar clase), `drop` (preventDefault, procesar `e.dataTransfer.files` igual que `openCamera()`).
+- Target del evento: `document.getElementById('input-area')`.
+- CSS: `.drag-over { border: 2px dashed #58a6ff; box-shadow: 0 0 12px #58a6ff44; }`
 
 ---
 
