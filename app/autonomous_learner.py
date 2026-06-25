@@ -364,7 +364,7 @@ def _specialized_results(query: str, tags: list[str]) -> list[dict]:
 def _learn_topic(idx: int):
     """Ejecuta un ciclo de aprendizaje para el topic dado."""
     query, tags, platform, _ = INTEREST_MATRIX[idx]
-    print(f"[Learner] 🔍 Buscando: {query[:60]}...")
+    print(f"[Learner] Buscando: {query[:60]}...")
 
     results = _specialized_results(query, tags)
     results.extend(_web_search_raw(query, max_results=4))
@@ -412,7 +412,7 @@ def _learn_topic(idx: int):
 
     if learned:
         _log_entry(query, learned)
-        print(f"[Learner] ✅ Guardados {len(learned)} docs — {', '.join(learned[:2])}")
+        print(f"[Learner] Guardados {len(learned)} docs - {', '.join(learned[:2])}")
 
 
 def _log_entry(query: str, titles: list):
@@ -472,7 +472,7 @@ def start_learner(interval_check: int = 1800):
             target=_learner_loop, args=(interval_check,), daemon=True, name="AutonomousLearner"
         )
         _learner_thread.start()
-    print(f"[Learner] Iniciado — verificando cada {interval_check//60} min")
+    print(f"[Learner] Iniciado - verificando cada {interval_check//60} min")
     return _learner_thread
 
 

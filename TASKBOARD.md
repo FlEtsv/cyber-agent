@@ -178,6 +178,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 [claude] WATCH-001 — Modo vigilancia screenshots: tools.py (start/stop_screenshot_watch), agent_runner.py (watch_config event), server.py (async watch loop), app.js (watch frame render), style.css (watch UI), ios/build_and_deploy.sh, Desktop/CyberAgent_iOS_Deploy.bat — Commit: 531865e — Fecha: 2026-06-25
 [claude] DEBATE-003 — Lazy model loading: fast model keep_alive=-1 (siempre residente), power model 10m (lazy). warm_fast_model() en lifespan startup. — Commit: f72c484 — Fecha: 2026-06-25
 [claude] IOS-FIX-001 — Corrección 2 bugs compilación Swift: AnyCodableSimple (decode eagerly), ChatViewModel.error case closure syntax — Commit: f72c484 — Fecha: 2026-06-25
+[codex] OPS-001 — Instancia Windows verificada y operativa: API local standalone en `scripts/start_local_api.py`, smoke test en `scripts/windows_smoke.ps1`, learner compatible con consola Windows. Validación: py_compile + pytest 47/47 + Ollama HTTP 200 + API local HTTP 200 — Commit: incluido en commit OPS-001 — Fecha: 2026-06-25 07:21
 
 ---
 
