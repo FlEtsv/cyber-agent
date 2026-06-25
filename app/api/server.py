@@ -275,6 +275,45 @@ def _detect_device(request: Request) -> dict:
     }
 
 
+# ── GPU request queue (one inference at a time) ───────────────────────────────
+# Prevents model thrashing when PC + relay + iOS all send requests simultaneously.
+# Clients receive a queue-position status while waiting; they can cancel without dropping.
+
+_gpu_sem   = asyncio.Semaphore(1)
+_gpu_waiters: list[asyncio.Event] = []   # ordered list so we can count position
+
+
+async def _acquire_gpu(ws: WebSocket, priority: bool = False) -> bool:
+    """Acquire the GPU semaphore. Returns False if the ws disconnects while waiting."""
+    if _gpu_sem._value > 0:  # fast path: GPU free
+        await _gpu_sem.acquire()
+        return True
+
+    # Announce queue position before blocking
+    pos = len(_gpu_waiters) + 1
+    wait_ev = asyncio.Event()
+    if priority:
+        _gpu_waiters.insert(0, wait_ev)
+    else:
+        _gpu_waiters.append(wait_ev)
+    try:
+        await ws.send_json({
+            "type": "status",
+            "data": f"GPU ocupada — posición {pos} en cola. Espera a que termine la tarea anterior…",
+        })
+        await _gpu_sem.acquire()
+        return True
+    except Exception:
+        return False
+    finally:
+        if wait_ev in _gpu_waiters:
+            _gpu_waiters.remove(wait_ev)
+
+
+def _release_gpu():
+    _gpu_sem.release()
+
+
 # ── WebSocket Chat ────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
@@ -386,21 +425,35 @@ async def websocket_chat(ws: WebSocket):
                     except Exception:
                         pass
 
-                runner = AgentRunner(
-                    messages         = list(conv_trimmed),
-                    session_trust    = expert_mode or data.get("session_trust", False),
-                    tool_permissions = data.get("permissions", {}),
-                    device_context   = device_ctx,
-                    expert_mode      = expert_mode,
-                )
+                # GPU queue: one inference at a time. iOS/mobile gets priority (shorter tasks).
+                is_mobile_client = any(k in device_ctx.lower() for k in ("iphone", "ios", "android", "móvil", "movil"))
+                gpu_acquired = await _acquire_gpu(ws, priority=is_mobile_client)
+                if not gpu_acquired:
+                    continue  # WS disconnected while waiting
+
+                try:
+                    runner = AgentRunner(
+                        messages         = list(conv_trimmed),
+                        session_trust    = expert_mode or data.get("session_trust", False),
+                        tool_permissions = data.get("permissions", {}),
+                        device_context   = device_ctx,
+                        expert_mode      = expert_mode,
+                    )
+                except Exception as _runner_exc:
+                    _release_gpu()
+                    await ws.send_json({"type": "error", "data": f"Error iniciando agente: {_runner_exc}"})
+                    continue
 
                 full: list[str] = []
 
                 def _run():
-                    for evt in runner.events():
-                        loop.call_soon_threadsafe(agent_q.put_nowait, evt)
-                        if evt["type"] == "done":
-                            full.append(evt.get("data", ""))
+                    try:
+                        for evt in runner.events():
+                            loop.call_soon_threadsafe(agent_q.put_nowait, evt)
+                            if evt["type"] == "done":
+                                full.append(evt.get("data", ""))
+                    finally:
+                        loop.call_soon_threadsafe(_release_gpu)
 
                 threading.Thread(target=_run, daemon=True).start()
 
