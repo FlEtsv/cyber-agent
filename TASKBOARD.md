@@ -104,8 +104,6 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[codex] RELAY-UI-001..005 — Implementar frontend relay remoto: historial localStorage/fetch, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Archivos: `relay/web/app.js`, `relay/web/style.css`, `relay/web/index.html`, `TASKBOARD.md` — Fecha: 2026-06-25 07:38
-
 ---
 
 ## ✅ COMPLETADO
@@ -114,6 +112,7 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
 [claude] RELAY-BE-001+002+003 — Relay upgrade backend: modelos passthrough, buffer de sesión 50 msgs + endpoint history, ping/pong PC 15s — Commit: c392367 — Fecha: 2026-06-25
+[codex] RELAY-UI-001..005 — Frontend relay remoto: historial remoto/localStorage restaurable, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Validación: node --check relay/web/app.js + pytest 47/47 — Commit: incluido en commit RELAY-UI — Fecha: 2026-06-25 07:45
 `[CODEX] INFRA-001 — Listener read-only de TASKBOARD.md — Commit: 831bae3 — Fecha: 2026-06-24 22:14`
 [codex] OBJ-IO-001 — Formalizar el objetivo global enorme de la app iOS nativa híbrida — Commit: 1e4a9cb — Fecha: 2026-06-24 23:27
 [codex] AUDIT-001 — Dashboard de actividad del agente en tab Agente: métricas de herramientas, errores y tiempos medios — Commit: 9b6fa02 — Fecha: 2026-06-24 23:34

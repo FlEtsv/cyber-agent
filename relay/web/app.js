@@ -61,12 +61,22 @@ class CyberAgent {
     this.pendingApproval = null;
     this.permissions   = {};
     this.sessionTrust  = false;
+    this.selectedModel = '';
+    this.sessionId     = '';
+    this.availableModels = [];
+    this.activeModel   = '';
     this.outbox        = [];
     this.reconnectDelay = 1500;
     this.reconnectTimer = null;
     this.reconnectNoticeTimer = null;
     this.connectionBanner = null;
     this.pcOnline = true;
+    this.queueBadge = null;
+    this.settingsPanel = null;
+    this.settingsBackdrop = null;
+    this._watchContainer = null;
+    this._watchFramesEl  = null;
+    this._watchCounterEl = null;
     this.report = {
       startedAt: new Date().toISOString(),
       messages: [],
@@ -94,9 +104,13 @@ class CyberAgent {
     this.statusDot  = document.querySelector('.status-dot');
     this.statusText = document.getElementById('status-text');
 
+    this._loadPreferences();
     this._ensureConnectionBanner();
+    this._ensureQueueBadge();
+    this._initSettingsPanel();
     this._installReportButton();
     this._bindUI();
+    this._bindDragDrop();
     this._connect();
   }
 
@@ -160,6 +174,10 @@ class CyberAgent {
     switch (type) {
       case 'connected':
         this.pcOnline = data?.pc_online !== false;
+        this.sessionId = data?.session_id || '';
+        this.availableModels = data?.models || [];
+        this.activeModel = data?.active_model || '';
+        this._syncModelSelect();
         if (!this.pcOnline) {
           this._setConnectionState('offline', 'PC offline', 'El PC principal no esta conectado al relay.', true);
         } else {
@@ -172,14 +190,35 @@ class CyberAgent {
             data.models[0] ||
             '';
         }
+        this._requestHistory();
         this._showWelcome();
         break;
 
+      case 'models':
+        this.availableModels = data?.models || [];
+        this.activeModel = data?.active || data?.active_model || '';
+        this._syncModelSelect();
+        if (this.availableModels.length) {
+          document.querySelector('.header-model').textContent =
+            this.activeModel ||
+            this.availableModels.find(m => m === 'cyberagent-original') ||
+            this.availableModels.find(m => m.includes('cyber')) ||
+            this.availableModels[0] ||
+            '';
+        }
+        break;
+
+      case 'history':
+        this._restoreHistory(Array.isArray(data) ? data : []);
+        break;
+
       case 'status':
+        if (this._handleQueueStatus(data)) break;
         this._setStatus('thinking', data);
         break;
 
       case 'token':
+        this._hideQueueBadge();
         this._ensureAIBubble();
         this.currentBubble._raw += data;
         this._renderCurrentBubble();
@@ -203,7 +242,16 @@ class CyberAgent {
         this._setStatus('thinking', data);
         break;
 
+      case 'screenshot':
+        this._handleWatchFrame(data);
+        break;
+
+      case 'watch_ended':
+        this._endWatchMode(data?.frames ?? 0);
+        break;
+
       case 'done':
+        this._hideQueueBadge();
         this._finalizeAIBubble();
         this._endStreaming();
         break;
@@ -217,6 +265,96 @@ class CyberAgent {
         this._endStreaming();
         break;
     }
+  }
+
+  // ── GPU queue badge ────────────────────────────────────────────────────────
+
+  _ensureQueueBadge() {
+    this.queueBadge = document.getElementById('queue-badge');
+    if (this.queueBadge) return;
+    const header = document.querySelector('header');
+    if (!header) return;
+    this.queueBadge = document.createElement('span');
+    this.queueBadge.id = 'queue-badge';
+    this.queueBadge.hidden = true;
+    header.appendChild(this.queueBadge);
+  }
+
+  _handleQueueStatus(data) {
+    if (typeof data !== 'string' || !/GPU ocupada|posici[oó]n\s+\d/i.test(data)) return false;
+    const pos = data.match(/posici[oó]n\s+(\d+)/i)?.[1] || '';
+    this._ensureQueueBadge();
+    if (this.queueBadge) {
+      this.queueBadge.textContent = pos ? `Cola #${pos}` : 'Cola GPU';
+      this.queueBadge.hidden = false;
+    }
+    this._setStatus('thinking', pos ? `cola GPU #${pos}` : 'cola GPU');
+    return true;
+  }
+
+  _hideQueueBadge() {
+    this._ensureQueueBadge();
+    if (this.queueBadge) this.queueBadge.hidden = true;
+  }
+
+  // ── Watch mode ─────────────────────────────────────────────────────────────
+
+  _handleWatchFrame(data) {
+    if (!this._watchContainer) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg watch-mode';
+      wrap.innerHTML = `
+        <div class="watch-header">
+          <span class="watch-icon">cam</span>
+          <span class="watch-label">Modo Vigilancia</span>
+          <button class="watch-stop-btn" title="Detener vigilancia">Stop</button>
+          <span class="watch-counter">0 capturas</span>
+        </div>
+        <div class="watch-frames"></div>
+      `;
+      wrap.querySelector('.watch-stop-btn').addEventListener('click', () => {
+        this._send({ type: 'watch_stop' });
+      });
+      this._watchContainer = wrap;
+      this._watchFramesEl = wrap.querySelector('.watch-frames');
+      this._watchCounterEl = wrap.querySelector('.watch-counter');
+      this._removeWelcome();
+      this.messages.appendChild(wrap);
+    }
+
+    const { b64, fmt, size, seq, elapsed, duration } = data || {};
+    if (!b64 || !this._watchFramesEl) return;
+    const img = document.createElement('img');
+    img.src = `data:image/${fmt || 'jpeg'};base64,${b64}`;
+    img.className = 'watch-frame';
+    img.title = `#${(seq || 0) + 1} - ${size || ''} - +${elapsed || 0}s`;
+    img.loading = 'lazy';
+
+    this._watchFramesEl.appendChild(img);
+    const frames = this._watchFramesEl.querySelectorAll('.watch-frame');
+    if (frames.length > 6) frames[0].remove();
+
+    const count = (seq || 0) + 1;
+    const pct = duration ? Math.min(100, Math.round((elapsed || 0) / duration * 100)) : 0;
+    if (this._watchCounterEl) {
+      this._watchCounterEl.textContent = `${count} captura${count !== 1 ? 's' : ''} - ${pct}%`;
+    }
+    this._scrollBottom();
+  }
+
+  _endWatchMode(frames) {
+    if (!this._watchContainer) return;
+    const hdr = this._watchContainer.querySelector('.watch-header');
+    if (hdr) {
+      hdr.querySelector('.watch-stop-btn')?.remove();
+      const lbl = hdr.querySelector('.watch-label');
+      if (lbl) lbl.textContent = 'Vigilancia finalizada';
+      const ctr = hdr.querySelector('.watch-counter');
+      if (ctr) ctr.textContent = `${frames} capturas`;
+    }
+    this._watchContainer = null;
+    this._watchFramesEl = null;
+    this._watchCounterEl = null;
   }
 
   // â”€â”€ Send message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -239,6 +377,7 @@ class CyberAgent {
       images:        this.attachedImgs.map(i => i.b64),
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
+      model:         this.selectedModel || undefined,
       device:        `${this.isMobile ? 'movil' : 'PC'} ${this.platform}`,
     });
 
@@ -253,15 +392,18 @@ class CyberAgent {
 
   // â”€â”€ UI: message bubbles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  _addUserBubble(text, imageSrcs = []) {
-    this.report.messages.push({
-      ts: new Date().toISOString(),
-      role: 'user',
-      text: redactReportValue(text),
-      images: imageSrcs.length,
-    });
+  _addUserBubble(text, imageSrcs = [], opts = {}) {
+    if (!opts.restored) {
+      this.report.messages.push({
+        ts: new Date().toISOString(),
+        role: 'user',
+        text: redactReportValue(text),
+        images: imageSrcs.length,
+      });
+      this._persistHistoryMessage({ role: 'user', text, images: imageSrcs, ts: Date.now() });
+    }
     const wrap = document.createElement('div');
-    wrap.className = 'msg user';
+    wrap.className = `msg user${opts.restored ? ' restored' : ''}`;
 
     const avatar = document.createElement('div');
     avatar.className = 'msg-avatar';
@@ -366,7 +508,108 @@ class CyberAgent {
       role: 'assistant',
       text: redactReportValue(this.currentBubble._raw),
     });
+    this._persistHistoryMessage({ role: 'assistant', text: this.currentBubble._raw, ts: Date.now() });
     this.currentBubble = null;
+  }
+
+  _addRestoredAIBubble(text) {
+    if (!text) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ai restored';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = 'AI';
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'msg-content';
+    contentEl.innerHTML = renderMd(text);
+    body.appendChild(contentEl);
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(body);
+    this._removeWelcome();
+    this.messages.appendChild(wrap);
+  }
+
+  _historyKey() {
+    return `ca_history_${location.host}`;
+  }
+
+  _loadLocalHistory() {
+    try {
+      const raw = localStorage.getItem(this._historyKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  _persistHistoryMessage(message) {
+    const history = this._loadLocalHistory();
+    history.push(message);
+    localStorage.setItem(this._historyKey(), JSON.stringify(history.slice(-50)));
+  }
+
+  async _requestHistory() {
+    if (!this.sessionId || this.messages.querySelector('.msg.restored, .msg.user, .msg.ai')) return;
+    let remote = [];
+    try {
+      const resp = await fetch(`/api/session/${encodeURIComponent(this.sessionId)}/history`, {
+        credentials: 'same-origin',
+      });
+      if (resp.ok) remote = await resp.json();
+    } catch {
+      remote = [];
+    }
+    if (!Array.isArray(remote) || remote.length === 0) {
+      remote = this._loadLocalHistory();
+    }
+    this._restoreHistory(remote);
+  }
+
+  _restoreHistory(messages) {
+    if (!Array.isArray(messages) || !messages.length || this.messages.querySelector('.msg.restored')) return;
+    let assistantText = '';
+    let restored = 0;
+
+    const flushAssistant = () => {
+      if (!assistantText.trim()) return;
+      this._addRestoredAIBubble(assistantText);
+      assistantText = '';
+      restored++;
+    };
+
+    for (const item of messages.slice(-50)) {
+      const type = item?.type;
+      const role = item?.role;
+      if (role === 'user' || type === 'user_message') {
+        flushAssistant();
+        this._addUserBubble(item.text || item.content || '', item.images || [], { restored: true });
+        restored++;
+      } else if (role === 'assistant') {
+        flushAssistant();
+        this._addRestoredAIBubble(item.text || item.content || '');
+        restored++;
+      } else if (type === 'token') {
+        assistantText += item.data || '';
+      } else if (type === 'done') {
+        flushAssistant();
+      } else if (type === 'error') {
+        flushAssistant();
+        this._addRestoredAIBubble(`Error anterior: ${item.data || item.error || ''}`);
+        restored++;
+      }
+    }
+    flushAssistant();
+    if (restored) {
+      this._removeWelcome();
+      this._scrollBottom();
+    }
   }
 
   _addErrorMsg(msg) {
@@ -477,7 +720,11 @@ class CyberAgent {
     this.approvalOverlay.classList.remove('visible');
     this.approvalOverlay.innerHTML = '';
     this.pendingApproval = null;
-    if (always) this.permissions[name] = 'auto';
+    if (always) {
+      this.permissions[name] = 'auto';
+      this._savePreferences();
+      this._renderPermissionsList();
+    }
     // Send directly — must NOT go into outbox (server timeout may have already expired)
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'approve', tool_id: id, approved }));
@@ -498,13 +745,7 @@ class CyberAgent {
     input.type   = 'file';
     input.accept = 'image/*';
     input.multiple = true;
-    input.onchange = e => {
-      Array.from(e.target.files).slice(0, 4).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = ev => this._attachImage(ev.target.result);
-        reader.readAsDataURL(file);
-      });
-    };
+    input.onchange = e => this._attachFiles(e.target.files);
     input.click();
   }
 
@@ -531,6 +772,10 @@ class CyberAgent {
   }
 
   _attachImage(dataUrl) {
+    if (this.attachedImgs.length >= 4) {
+      this._setStatus('error', 'maximo 4 imagenes');
+      return;
+    }
     const b64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
     this.attachedImgs.push({ dataUrl, b64 });
 
@@ -549,6 +794,17 @@ class CyberAgent {
     thumb.appendChild(img);
     thumb.appendChild(rm);
     this.attachEl.appendChild(thumb);
+  }
+
+  _attachFiles(files) {
+    Array.from(files || [])
+      .filter(file => file.type?.startsWith('image/'))
+      .slice(0, Math.max(0, 4 - this.attachedImgs.length))
+      .forEach(file => {
+        const reader = new FileReader();
+        reader.onload = ev => this._attachImage(ev.target.result);
+        reader.readAsDataURL(file);
+      });
   }
 
   _resetAttachments() {
@@ -681,6 +937,115 @@ class CyberAgent {
     this.connectionBanner.textContent = '';
   }
 
+  _prefsKey() {
+    return `ca_prefs_${location.host}`;
+  }
+
+  _loadPreferences() {
+    try {
+      const prefs = JSON.parse(localStorage.getItem(this._prefsKey()) || '{}');
+      this.selectedModel = prefs.selectedModel || '';
+      this.sessionTrust = !!prefs.sessionTrust;
+      this.permissions = prefs.permissions && typeof prefs.permissions === 'object' ? prefs.permissions : {};
+    } catch {
+      this.selectedModel = '';
+      this.sessionTrust = false;
+      this.permissions = {};
+    }
+  }
+
+  _savePreferences() {
+    localStorage.setItem(this._prefsKey(), JSON.stringify({
+      selectedModel: this.selectedModel,
+      sessionTrust: this.sessionTrust,
+      permissions: this.permissions,
+    }));
+  }
+
+  _initSettingsPanel() {
+    this.settingsPanel = document.getElementById('settings-panel');
+    this.settingsBackdrop = document.getElementById('settings-backdrop');
+    const settingsBtn = document.getElementById('settings-btn');
+    if (!this.settingsPanel || !settingsBtn) return;
+
+    settingsBtn.addEventListener('click', () => this._toggleSettingsPanel());
+    this.settingsBackdrop?.addEventListener('click', () => this._toggleSettingsPanel(false));
+    this.$('settings-close')?.addEventListener('click', () => this._toggleSettingsPanel(false));
+    this.$('model-select')?.addEventListener('change', e => {
+      this.selectedModel = e.target.value;
+      this._savePreferences();
+    });
+    this.$('trust-toggle')?.addEventListener('change', e => {
+      this.sessionTrust = e.target.checked;
+      this._savePreferences();
+    });
+    this.$('permissions-list')?.addEventListener('change', e => {
+      if (e.target?.dataset?.tool) {
+        this.permissions[e.target.dataset.tool] = e.target.value;
+        this._savePreferences();
+      }
+    });
+    this._syncSettingsPanel();
+  }
+
+  _toggleSettingsPanel(force) {
+    if (!this.settingsPanel) return;
+    const open = force ?? !this.settingsPanel.classList.contains('open');
+    this.settingsPanel.classList.toggle('open', open);
+    this.settingsBackdrop?.classList.toggle('open', open);
+  }
+
+  _syncSettingsPanel() {
+    const trust = this.$('trust-toggle');
+    if (trust) trust.checked = this.sessionTrust;
+    this._syncModelSelect();
+    this._renderPermissionsList();
+  }
+
+  _syncModelSelect() {
+    const select = this.$('model-select');
+    if (!select) return;
+    const known = [
+      { value: '', label: 'Auto' },
+      { value: 'fast', label: 'Rapido' },
+      { value: 'power', label: 'Potente' },
+      ...this.availableModels.map(model => ({ value: model, label: model })),
+    ];
+    const seen = new Set();
+    select.innerHTML = '';
+    known.forEach(opt => {
+      if (seen.has(opt.value)) return;
+      seen.add(opt.value);
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.label;
+      select.appendChild(el);
+    });
+    select.value = seen.has(this.selectedModel) ? this.selectedModel : '';
+  }
+
+  _renderPermissionsList() {
+    const list = this.$('permissions-list');
+    if (!list) return;
+    const toolNames = Array.from(new Set([
+      ...Object.keys(TOOL_ICONS),
+      ...Object.keys(this.permissions),
+    ])).sort();
+    list.innerHTML = toolNames.map(name => `
+      <label class="permission-row">
+        <span>${escHtml(name)}</span>
+        <select data-tool="${escHtml(name)}">
+          <option value="ask">Preguntar</option>
+          <option value="auto">Auto</option>
+          <option value="block">Bloquear</option>
+        </select>
+      </label>
+    `).join('');
+    list.querySelectorAll('select[data-tool]').forEach(sel => {
+      sel.value = this.permissions[sel.dataset.tool] || 'ask';
+    });
+  }
+
   _installReportButton() {
     if (document.getElementById('report-btn')) return;
     const btn = document.createElement('button');
@@ -808,6 +1173,26 @@ class CyberAgent {
     this.$('camera-btn').addEventListener('click', () => this.openCamera());
     this.$('screen-btn').addEventListener('click', () => this.captureScreen());
     this.$('voice-btn').addEventListener('click',  () => this.toggleVoice());
+  }
+
+  _bindDragDrop() {
+    const area = document.getElementById('input-area');
+    if (!area) return;
+    ['dragenter', 'dragover'].forEach(type => {
+      area.addEventListener(type, e => {
+        e.preventDefault();
+        area.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(type => {
+      area.addEventListener(type, e => {
+        e.preventDefault();
+        area.classList.remove('drag-over');
+      });
+    });
+    area.addEventListener('drop', e => {
+      this._attachFiles(e.dataTransfer?.files || []);
+    });
   }
 }
 

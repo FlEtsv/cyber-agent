@@ -24,9 +24,37 @@
     <div class="header-status">
       <span class="status-dot"></span>
       <span id="status-text">conectando...</span>
-      <button id="logout-btn" title="Cerrar sesion" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">Salir</button>
+      <button id="settings-btn" class="icon-btn header-icon-btn" title="Ajustes">set</button>
+      <button id="logout-btn" title="Cerrar sesion" onclick="localStorage.removeItem('ca_history_' + location.host); fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">Salir</button>
     </div>
   </header>
+
+  <div id="settings-backdrop" class="settings-backdrop"></div>
+  <aside id="settings-panel" class="settings-panel" aria-label="Ajustes de sesion">
+    <div class="settings-panel-header">
+      <h2>Ajustes</h2>
+      <button id="settings-close" class="icon-btn" title="Cerrar">x</button>
+    </div>
+
+    <label class="settings-field">
+      <span>Modelo</span>
+      <select id="model-select">
+        <option value="">Auto</option>
+        <option value="fast">Rapido</option>
+        <option value="power">Potente</option>
+      </select>
+    </label>
+
+    <label class="settings-toggle">
+      <input type="checkbox" id="trust-toggle">
+      <span>Auto-aprobar herramientas en esta sesion</span>
+    </label>
+
+    <section class="settings-section">
+      <h3>Permisos por herramienta</h3>
+      <div id="permissions-list" class="permissions-list"></div>
+    </section>
+  </aside>
 
   <!-- Messages -->
   <main id="messages"></main>
