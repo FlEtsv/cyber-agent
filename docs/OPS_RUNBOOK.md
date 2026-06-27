@@ -51,6 +51,17 @@ The restart script only targets Python processes whose command line contains thi
 - `scripts/start_local_api.py`
 - `scripts/taskboard_listener.py` unless `-KeepTaskboardListener` is passed
 
+Before starting the child process, the script refreshes the current process environment from the Windows User environment for:
+
+- `CYBERAGENT_FAST_MODEL`
+- `CYBERAGENT_POWER_MODEL`
+- `CYBERAGENT_MISTRAL_MODEL`
+- `CYBERAGENT_FAST_KEEP_ALIVE`
+- `CYBERAGENT_POWER_KEEP_ALIVE`
+- Mistral connection variables, without printing secrets
+
+After changing model environment variables with `setx`, System Properties, or `scripts/setup_model_council.ps1 -PersistEnv`, use this controlled restart so the desktop/API child process inherits the latest values.
+
 ## Expected Model Setup
 
 ```powershell

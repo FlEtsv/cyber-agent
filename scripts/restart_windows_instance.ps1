@@ -44,6 +44,26 @@ function Wait-HttpOk {
     return $false
 }
 
+function Import-UserEnvForChild {
+    $names = @(
+        "CYBERAGENT_FAST_MODEL",
+        "CYBERAGENT_POWER_MODEL",
+        "CYBERAGENT_MISTRAL_MODEL",
+        "CYBERAGENT_FAST_KEEP_ALIVE",
+        "CYBERAGENT_POWER_KEEP_ALIVE",
+        "MISTRAL_API_KEY",
+        "MISTRAL_STUDIO_API_KEY",
+        "MISTRAL_BASE_URL"
+    )
+
+    foreach ($name in $names) {
+        $value = [Environment]::GetEnvironmentVariable($name, "User")
+        if ($null -ne $value -and $value -ne "") {
+            Set-Item -Path "Env:$name" -Value $value
+        }
+    }
+}
+
 if (-not (Test-Path $Python)) {
     throw "Python venv no encontrado: $Python"
 }
@@ -70,6 +90,17 @@ if ($DryRun) {
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "logs") | Out-Null
+Import-UserEnvForChild
+
+if ($env:CYBERAGENT_FAST_MODEL) {
+    Write-Host "Child env: CYBERAGENT_FAST_MODEL=$env:CYBERAGENT_FAST_MODEL" -ForegroundColor DarkGray
+}
+if ($env:CYBERAGENT_POWER_MODEL) {
+    Write-Host "Child env: CYBERAGENT_POWER_MODEL=$env:CYBERAGENT_POWER_MODEL" -ForegroundColor DarkGray
+}
+if ($env:CYBERAGENT_MISTRAL_MODEL) {
+    Write-Host "Child env: CYBERAGENT_MISTRAL_MODEL=$env:CYBERAGENT_MISTRAL_MODEL" -ForegroundColor DarkGray
+}
 
 if ($ApiOnly) {
     Write-Host "Starting standalone local API..." -ForegroundColor Cyan
