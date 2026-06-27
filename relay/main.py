@@ -86,9 +86,23 @@ class RelayState:
         self._ping_task: asyncio.Task | None = None
         self._last_pong: float = 0.0
         self._ping_miss: int = 0
+        self._host_id: int = 0
 
     def pc_online(self) -> bool:
         return self._send_fn is not None
+
+    async def replace_host(self, ws: WebSocket) -> int:
+        old_ws = self.host_ws
+        self._host_id += 1
+        host_id = self._host_id
+        self.host_ws = ws
+        self._ping_miss = 0
+        if old_ws is not None and old_ws is not ws:
+            try:
+                await old_ws.close(code=1012, reason="Host replaced")
+            except Exception:
+                pass
+        return host_id
 
     def session_buffer(self, session_id: str) -> collections.deque:
         if session_id not in self._buffers:
@@ -276,12 +290,7 @@ async def host_ws(ws: WebSocket, secret: str = ""):
         await ws.close(code=4401)
         return
 
-    if state.host_ws is not None:
-        await ws.close(code=4409, reason="Host already connected")
-        return
-
-    state.host_ws = ws
-    state._ping_miss = 0
+    host_id = await state.replace_host(ws)
 
     async def _send_to_pc(msg: dict):
         try:
@@ -311,6 +320,8 @@ async def host_ws(ws: WebSocket, secret: str = ""):
                 msg = json.loads(raw)
             except Exception:
                 continue
+            if state._host_id != host_id:
+                break
 
             msg_type = msg.get("type")
 
@@ -354,15 +365,16 @@ async def host_ws(ws: WebSocket, secret: str = ""):
     except WebSocketDisconnect:
         pass
     finally:
-        state.host_ws = None
-        state._send_fn = None
-        state._models = []
-        state._active_model = ""
-        for sid, mob in list(state.sessions.items()):
-            try:
-                await mob.send_json({"type": "error", "data": "PC desconectado. Reconectando…"})
-            except Exception:
-                pass
+        if state._host_id == host_id:
+            state.host_ws = None
+            state._send_fn = None
+            state._models = []
+            state._active_model = ""
+            for sid, mob in list(state.sessions.items()):
+                try:
+                    await mob.send_json({"type": "error", "data": "PC desconectado. Reconectando..."})
+                except Exception:
+                    pass
 
 
 # ── Mobile chat WebSocket (/ws) ───────────────────────────────────────────────

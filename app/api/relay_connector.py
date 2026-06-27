@@ -12,12 +12,14 @@ log = logging.getLogger("relay_connector")
 
 _BACKOFF_INIT = 5    # seconds before first retry
 _BACKOFF_MAX  = 60   # cap for exponential backoff
+_ANNOUNCE_INTERVAL = 20
 
 
 class RelayConnector:
     def __init__(self, relay_url: str, host_secret: str):
         # relay_url: wss://xxx.run.app  (no trailing slash)
         self.ws_url     = relay_url.rstrip("/").replace("https://", "wss://").replace("http://", "ws://")
+        self.http_url   = relay_url.rstrip("/").replace("wss://", "https://").replace("ws://", "http://")
         self.host_secret = host_secret
         self._runners: dict[str, object] = {}   # session_id → AgentRunner
         self._convs:   dict[str, list]   = {}   # session_id → conversation history
@@ -70,7 +72,7 @@ class RelayConnector:
             await asyncio.sleep(backoff)
             backoff = _BACKOFF_INIT if connected else min(backoff * 2, _BACKOFF_MAX)
 
-    async def _announce_models(self, ws):
+    async def _announce_models(self, ws) -> bool:
         """RELAY-BE-001: push current model list to relay right after connecting."""
         try:
             import httpx
@@ -83,45 +85,82 @@ class RelayConnector:
         active = FAST_MODEL  # fast model is always warm at startup
         try:
             await ws.send(json.dumps({"type": "models", "models": models, "active": active}))
+            return True
         except Exception:
-            pass
+            return False
+
+    async def _remote_reports_pc_online(self) -> bool:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5) as c:
+                r = await c.get(f"{self.http_url}/api/status", params={"t": str(os.getpid())})
+            if r.status_code != 200:
+                return True
+            data = r.json()
+            return bool(data.get("pc_online"))
+        except Exception:
+            return True
+
+    async def _announce_loop(self, ws):
+        while self._running:
+            await asyncio.sleep(_ANNOUNCE_INTERVAL)
+            if not await self._announce_models(ws):
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                return
+            if not await self._remote_reports_pc_online():
+                log.warning("[relay] La revision activa no ve el PC online; forzando reconexion")
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                return
 
     async def _handle(self, ws):
         # Announce model list immediately on connect
-        await self._announce_models(ws)
+        if not await self._announce_models(ws):
+            return
+        announce_task = asyncio.create_task(self._announce_loop(ws))
 
-        async for raw in ws:
-            try:
-                msg = json.loads(raw)
-            except Exception:
-                continue
-
-            session_id = msg.get("session_id")
-            t = msg.get("type")
-
-            # RELAY-BE-003: relay pings us to confirm we're alive
-            if t == "ping":
+        try:
+            async for raw in ws:
                 try:
-                    await ws.send(json.dumps({"type": "pong"}))
+                    msg = json.loads(raw)
                 except Exception:
-                    pass
-                continue
+                    continue
 
-            if t == "message":
-                asyncio.create_task(self._on_message(ws, session_id, msg))
-            elif t == "approve":
-                runner = self._runners.get(session_id)
-                if runner:
-                    runner.approve(msg.get("tool_id", ""), bool(msg.get("approved", False)))
-            elif t == "stop":
-                runner = self._runners.get(session_id)
-                if runner:
-                    runner.stop()
-            elif t == "session_closed":
-                runner = self._runners.pop(session_id, None)
-                if runner:
-                    runner.stop()
-                self._convs.pop(session_id, None)
+                session_id = msg.get("session_id")
+                t = msg.get("type")
+
+                # RELAY-BE-003: relay pings us to confirm we're alive
+                if t == "ping":
+                    try:
+                        await ws.send(json.dumps({"type": "pong"}))
+                    except Exception:
+                        break
+                    if not await self._announce_models(ws):
+                        break
+                    continue
+
+                if t == "message":
+                    asyncio.create_task(self._on_message(ws, session_id, msg))
+                elif t == "approve":
+                    runner = self._runners.get(session_id)
+                    if runner:
+                        runner.approve(msg.get("tool_id", ""), bool(msg.get("approved", False)))
+                elif t == "stop":
+                    runner = self._runners.get(session_id)
+                    if runner:
+                        runner.stop()
+                elif t == "session_closed":
+                    runner = self._runners.pop(session_id, None)
+                    if runner:
+                        runner.stop()
+                    self._convs.pop(session_id, None)
+        finally:
+            announce_task.cancel()
 
     async def _on_message(self, ws, session_id: str, msg: dict):
         from app.api.agent_runner import AgentRunner

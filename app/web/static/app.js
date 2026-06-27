@@ -175,6 +175,24 @@ class CyberAgent {
       this.ws.send(JSON.stringify(this.outbox.shift()));
     }
   }
+
+  _preferredModelLabel(models = [], activeModel = '') {
+    const list = Array.isArray(models) ? models : [];
+    return activeModel ||
+      list.find(m => /qwen3-14b/i.test(m)) ||
+      list.find(m => /qwen/i.test(m)) ||
+      list.find(m => m === 'cyberagent-original' || m === 'cyberagent-original:latest') ||
+      list.find(m => /cyber/i.test(m)) ||
+      list[0] ||
+      '';
+  }
+
+  _setHeaderModel(models = [], activeModel = '') {
+    const modelEl = document.querySelector('.header-model');
+    if (!modelEl) return;
+    modelEl.textContent = this._preferredModelLabel(models, activeModel);
+  }
+
   // â”€â”€ Incoming events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   _onMessage(evt) {
@@ -189,13 +207,7 @@ class CyberAgent {
         } else {
           this._setConnectionState('', 'conectado');
         }
-        if (data?.models?.length) {
-          document.querySelector('.header-model').textContent =
-            data.models.find(m => m === 'cyberagent-original') ||
-            data.models.find(m => m.includes('cyber')) ||
-            data.models[0] ||
-            '';
-        }
+        this._setHeaderModel(data?.models, data?.active_model || data?.active || '');
         this._showWelcome();
         break;
 

@@ -23,6 +23,7 @@ def relay_client(monkeypatch):
     relay.state._active_model = ""
     relay.state._buffers.clear()
     relay.state._ping_miss = 0
+    relay.state._host_id = 0
     if relay.state._ping_task is not None:
         relay.state._ping_task.cancel()
         relay.state._ping_task = None
@@ -38,6 +39,7 @@ def relay_client(monkeypatch):
         relay.state._models = []
         relay.state._active_model = ""
         relay.state._buffers.clear()
+        relay.state._host_id = 0
         if relay.state._ping_task is not None:
             relay.state._ping_task.cancel()
             relay.state._ping_task = None
@@ -116,3 +118,32 @@ def test_relay_bridges_models_messages_approvals_and_history(relay_client):
             history_event = mobile.receive_json()
             assert history_event["type"] == "history"
             assert history_event["data"] == events
+
+
+def test_new_host_connection_replaces_stale_host(relay_client):
+    with relay_client.websocket_connect("/host?secret=host-secret") as stale_host:
+        stale_host.send_json({
+            "type": "models",
+            "models": ["old-model"],
+            "active": "old-model",
+        })
+
+        with relay_client.websocket_connect("/host?secret=host-secret") as fresh_host:
+            fresh_host.send_json({
+                "type": "models",
+                "models": ["fresh-model"],
+                "active": "fresh-model",
+            })
+
+            status = relay_client.get("/api/status").json()
+            assert status["pc_online"] is True
+            assert status["models"] == ["fresh-model"]
+            assert status["active_model"] == "fresh-model"
+
+            with relay_client.websocket_connect("/ws") as mobile:
+                connected = mobile.receive_json()
+                assert connected["data"]["pc_online"] is True
+                assert connected["data"]["models"] == ["fresh-model"]
+
+            status = relay_client.get("/api/status").json()
+            assert status["models"] == ["fresh-model"]

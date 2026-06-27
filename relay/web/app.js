@@ -86,6 +86,8 @@ class CyberAgent {
     this.sessionId     = '';
     this.availableModels = [];
     this.activeModel   = '';
+    this.currentConversationId = '';
+    this.conversations = [];
     this.outbox        = [];
     this.reconnectDelay = 1500;
     this.reconnectTimer = null;
@@ -124,12 +126,16 @@ class CyberAgent {
     this.approvalOverlay = document.getElementById('approval-overlay');
     this.statusDot  = document.querySelector('.status-dot');
     this.statusText = document.getElementById('status-text');
+    this.conversationList = document.getElementById('conversation-list');
+    this.activityList = document.getElementById('activity-list');
 
     this._loadPreferences();
+    this._loadConversations();
     this._ensureConnectionBanner();
     this._ensureQueueBadge();
     this._initSettingsPanel();
     this._installReportButton();
+    this._initConversationPanel();
     this._bindUI();
     this._bindDragDrop();
     this._connect();
@@ -186,6 +192,24 @@ class CyberAgent {
       this.ws.send(JSON.stringify(this.outbox.shift()));
     }
   }
+
+  _preferredModelLabel(models = [], activeModel = '') {
+    const list = Array.isArray(models) ? models : [];
+    return activeModel ||
+      list.find(m => /qwen3-14b/i.test(m)) ||
+      list.find(m => /qwen/i.test(m)) ||
+      list.find(m => m === 'cyberagent-original' || m === 'cyberagent-original:latest') ||
+      list.find(m => /cyber/i.test(m)) ||
+      list[0] ||
+      '';
+  }
+
+  _setHeaderModel(models = [], activeModel = '') {
+    const modelEl = document.querySelector('.header-model');
+    if (!modelEl) return;
+    modelEl.textContent = this._preferredModelLabel(models, activeModel);
+  }
+
   // â”€â”€ Incoming events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   _onMessage(evt) {
@@ -204,13 +228,7 @@ class CyberAgent {
         } else {
           this._setConnectionState('', 'conectado');
         }
-        if (data?.models?.length) {
-          document.querySelector('.header-model').textContent =
-            data.models.find(m => m === 'cyberagent-original') ||
-            data.models.find(m => m.includes('cyber')) ||
-            data.models[0] ||
-            '';
-        }
+        this._setHeaderModel(this.availableModels, this.activeModel);
         this._requestHistory();
         this._showWelcome();
         break;
@@ -219,14 +237,7 @@ class CyberAgent {
         this.availableModels = data?.models || [];
         this.activeModel = data?.active || data?.active_model || '';
         this._syncModelSelect();
-        if (this.availableModels.length) {
-          document.querySelector('.header-model').textContent =
-            this.activeModel ||
-            this.availableModels.find(m => m === 'cyberagent-original') ||
-            this.availableModels.find(m => m.includes('cyber')) ||
-            this.availableModels[0] ||
-            '';
-        }
+        this._setHeaderModel(this.availableModels, this.activeModel);
         break;
 
       case 'history':
@@ -236,6 +247,7 @@ class CyberAgent {
       case 'status':
         if (this._handleQueueStatus(data)) break;
         this._setStatus('thinking', data);
+        this._renderActivity('estado', data);
         break;
 
       case 'token':
@@ -249,18 +261,22 @@ class CyberAgent {
       case 'tool_call':
         this._ensureAIBubble();
         this._addToolActivity(data.id, data.name, data.args, data);
+        this._renderActivity('herramienta', data?.name || 'tool_call');
         break;
 
       case 'need_approval':
         this._showApproval(data.id, data.name, data.args, data);
+        this._renderActivity('aprobacion', data?.name || 'herramienta');
         break;
 
       case 'tool_result':
         this._setToolDone(data.id, data.result ?? data.output ?? data.content ?? data);
+        this._renderActivity('resultado', data?.name || data?.id || 'tool_result');
         break;
 
       case 'vision_processing':
         this._setStatus('thinking', data);
+        this._renderActivity('vision', data);
         break;
 
       case 'screenshot':
@@ -274,6 +290,7 @@ class CyberAgent {
       case 'done':
         this._hideQueueBadge();
         this._finalizeAIBubble();
+        this._renderActivity('respuesta', 'completada');
         this._endStreaming();
         break;
 
@@ -283,6 +300,7 @@ class CyberAgent {
           this._setConnectionState('offline', 'PC offline', data, true);
         }
         this._addErrorMsg(data);
+        this._renderActivity('error', data);
         this._endStreaming();
         break;
     }
@@ -422,6 +440,7 @@ class CyberAgent {
         images: imageSrcs.length,
       });
       this._persistHistoryMessage({ role: 'user', text, images: imageSrcs, ts: Date.now() });
+      this._touchConversation(text);
     }
     const wrap = document.createElement('div');
     wrap.className = `msg user${opts.restored ? ' restored' : ''}`;
@@ -447,7 +466,7 @@ class CyberAgent {
     if (text) {
       const content = document.createElement('div');
       content.className = 'msg-content';
-      content.textContent = text;
+      content.innerHTML = renderMd(text);
       body.appendChild(content);
     }
 
@@ -530,6 +549,7 @@ class CyberAgent {
       text: redactReportValue(this.currentBubble._raw),
     });
     this._persistHistoryMessage({ role: 'assistant', text: this.currentBubble._raw, ts: Date.now() });
+    this._touchConversation(this.currentBubble._raw, 'assistant');
     this.currentBubble = null;
   }
 
@@ -556,8 +576,134 @@ class CyberAgent {
     this.messages.appendChild(wrap);
   }
 
+  _conversationsKey() {
+    return `ca_conversations_${location.host}`;
+  }
+
+  _loadConversations() {
+    try {
+      const raw = localStorage.getItem(this._conversationsKey());
+      this.conversations = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(this.conversations)) this.conversations = [];
+    } catch {
+      this.conversations = [];
+    }
+    if (!this.conversations.length) {
+      this.conversations = [{
+        id: `chat_${Date.now()}`,
+        title: 'Nuevo chat',
+        updatedAt: Date.now(),
+        count: 0,
+      }];
+    }
+    this.currentConversationId = this.conversations[0].id;
+    this._saveConversations();
+  }
+
+  _saveConversations() {
+    localStorage.setItem(this._conversationsKey(), JSON.stringify(this.conversations.slice(0, 30)));
+  }
+
+  _initConversationPanel() {
+    this.$('new-chat-btn')?.addEventListener('click', () => this._newConversation());
+    this.conversationList?.addEventListener('click', e => {
+      const button = e.target.closest?.('[data-conversation-id]');
+      if (button) this._switchConversation(button.dataset.conversationId);
+    });
+    this._renderConversationList();
+    this._renderActivity('system', 'Web lista');
+  }
+
+  _newConversation() {
+    this.currentConversationId = `chat_${Date.now()}`;
+    this.conversations.unshift({
+      id: this.currentConversationId,
+      title: 'Nuevo chat',
+      updatedAt: Date.now(),
+      count: 0,
+    });
+    this._saveConversations();
+    this._clearConversationView();
+    this._renderConversationList();
+    this._showWelcome();
+  }
+
+  _switchConversation(id) {
+    if (!id || id === this.currentConversationId) return;
+    this.currentConversationId = id;
+    this._clearConversationView();
+    this._restoreHistory(this._loadLocalHistory(), { force: true });
+    this._renderConversationList();
+    this._showWelcome();
+  }
+
+  _clearConversationView() {
+    this.toolRows.clear();
+    this.currentBubble = null;
+    this._hideApproval();
+    this.messages.innerHTML = '';
+  }
+
+  _touchConversation(text = '', role = 'user') {
+    let conv = this.conversations.find(item => item.id === this.currentConversationId);
+    if (!conv) {
+      conv = { id: this.currentConversationId || `chat_${Date.now()}`, title: 'Nuevo chat', updatedAt: Date.now(), count: 0 };
+      this.currentConversationId = conv.id;
+      this.conversations.unshift(conv);
+    }
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (role === 'user' && clean && (!conv.title || conv.title === 'Nuevo chat')) {
+      conv.title = clean.slice(0, 58);
+    }
+    conv.updatedAt = Date.now();
+    conv.count = (conv.count || 0) + 1;
+    this.conversations = [conv, ...this.conversations.filter(item => item.id !== conv.id)]
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    this._saveConversations();
+    this._renderConversationList();
+  }
+
+  _renderConversationList() {
+    if (!this.conversationList) return;
+    this.conversationList.innerHTML = '';
+    for (const conv of this.conversations.slice(0, 30)) {
+      const item = document.createElement('button');
+      item.className = `conversation-item${conv.id === this.currentConversationId ? ' active' : ''}`;
+      item.dataset.conversationId = conv.id;
+      const title = document.createElement('div');
+      title.className = 'conversation-title';
+      title.textContent = conv.title || 'Nuevo chat';
+      const meta = document.createElement('div');
+      meta.className = 'conversation-meta';
+      meta.textContent = `${conv.count || 0} eventos · ${this._formatTime(conv.updatedAt)}`;
+      item.appendChild(title);
+      item.appendChild(meta);
+      this.conversationList.appendChild(item);
+    }
+  }
+
+  _renderActivity(kind, text) {
+    if (!this.activityList) return;
+    const item = document.createElement('div');
+    item.className = 'activity-item';
+    item.innerHTML = `<strong>${escHtml(kind)}</strong><br>${escHtml(String(text || '').slice(0, 180))}<div class="activity-meta">${this._formatTime(Date.now())}</div>`;
+    this.activityList.prepend(item);
+    while (this.activityList.children.length > 20) {
+      this.activityList.lastElementChild.remove();
+    }
+  }
+
+  _formatTime(ts) {
+    if (!ts) return '';
+    try {
+      return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }
+
   _historyKey() {
-    return `ca_history_${location.host}`;
+    return `ca_history_${location.host}_${this.currentConversationId || 'default'}`;
   }
 
   _loadLocalHistory() {
@@ -593,8 +739,9 @@ class CyberAgent {
     this._restoreHistory(remote);
   }
 
-  _restoreHistory(messages) {
-    if (!Array.isArray(messages) || !messages.length || this.messages.querySelector('.msg.restored')) return;
+  _restoreHistory(messages, opts = {}) {
+    if (!Array.isArray(messages) || !messages.length) return;
+    if (!opts.force && this.messages.querySelector('.msg.restored')) return;
     let assistantText = '';
     let restored = 0;
 

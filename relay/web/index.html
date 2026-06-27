@@ -25,7 +25,7 @@
       <span class="status-dot"></span>
       <span id="status-text">conectando...</span>
       <button id="settings-btn" class="icon-btn header-icon-btn" title="Ajustes">set</button>
-      <button id="logout-btn" title="Cerrar sesion" onclick="localStorage.removeItem('ca_history_' + location.host); fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">Salir</button>
+      <button id="logout-btn" title="Cerrar sesion" onclick="Object.keys(localStorage).filter(k=>k.startsWith('ca_history_' + location.host) || k === 'ca_conversations_' + location.host).forEach(k=>localStorage.removeItem(k)); fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">Salir</button>
     </div>
   </header>
 
@@ -56,8 +56,22 @@
     </section>
   </aside>
 
-  <!-- Messages -->
-  <main id="messages"></main>
+  <div class="workspace">
+    <aside id="conversation-panel" class="conversation-panel" aria-label="Conversaciones">
+      <div class="panel-head">
+        <span>Chats</span>
+        <button id="new-chat-btn" class="mini-btn" title="Nuevo chat">Nuevo</button>
+      </div>
+      <div id="conversation-list" class="conversation-list"></div>
+      <div class="panel-head activity-head">
+        <span>Actividad</span>
+      </div>
+      <div id="activity-list" class="activity-list"></div>
+    </aside>
+
+    <!-- Messages -->
+    <main id="messages"></main>
+  </div>
 
   <!-- Approval overlay (shown above input when tool needs approval) -->
   <div id="approval-overlay"></div>
