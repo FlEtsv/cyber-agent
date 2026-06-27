@@ -95,6 +95,7 @@ class ToolApprovalCard(QFrame):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(16, 14, 16, 14)
         lay.setSpacing(12)
+        always_ask = name == "mistral_consult"
 
         icon = TOOL_ICONS.get(name, "○")
         color = "#f85149" if dangerous else "#58a6ff"
@@ -106,6 +107,19 @@ class ToolApprovalCard(QFrame):
         )
         hdr.setTextFormat(Qt.RichText)
         lay.addWidget(hdr)
+
+        if always_ask:
+            note = QLabel(
+                "Consulta externa: esta accion siempre se aprueba por llamada "
+                "y se redacta por defecto."
+            )
+            note.setWordWrap(True)
+            note.setStyleSheet(
+                "color:#e3b341; background:rgba(227,179,65,0.10);"
+                "border:1px solid rgba(227,179,65,0.24);"
+                "border-radius:6px; padding:7px 9px; font-size:12px;"
+            )
+            lay.addWidget(note)
 
         args_box = QTextEdit()
         args_box.setPlainText(json.dumps(args, indent=2, ensure_ascii=False))
@@ -129,6 +143,8 @@ class ToolApprovalCard(QFrame):
         self.btn_always.clicked.connect(
             lambda: self.approved.emit(self.tool_id, self.tool_name, True)
         )
+        if always_ask:
+            self.btn_always.hide()
         self.btn_reject = QPushButton("Rechazar")
         self.btn_reject.setObjectName("btn_reject")
         self.btn_reject.setMinimumHeight(34)

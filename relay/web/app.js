@@ -13,6 +13,11 @@ const CATEGORY_ICONS = {
   network:'net', forensics:'lab', encode:'enc', rag:'rag',
   council:'ai', self:'self', mobile:'mob', other:'tool',
 };
+const ALWAYS_ASK_TOOLS = new Set(['mistral_consult']);
+
+function isAlwaysAskTool(name, meta = {}) {
+  return ALWAYS_ASK_TOOLS.has(name) || meta.category === 'council';
+}
 
 // â”€â”€ Markdown renderer (via marked CDN) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderMd(text) {
@@ -707,8 +712,15 @@ class CyberAgent {
   _showApproval(id, name, args, meta = {}) {
     this.pendingApproval = id;
     const dangerous = !!meta.dangerous;
+    const alwaysAsk = isAlwaysAskTool(name, meta);
     const icon  = TOOL_ICONS[name] || 'tool';
     const color = dangerous ? 'approval-label-dangerous' : 'approval-label-safe';
+    const cloudNote = alwaysAsk
+      ? '<div class="approval-note">Consulta externa: esta acción siempre se aprueba por llamada y se redacta por defecto.</div>'
+      : '';
+    const alwaysBtn = alwaysAsk
+      ? ''
+      : '<button class="btn btn-always"  id="ap-always">Permitir siempre</button>';
 
     this.approvalOverlay.innerHTML = `
       <div class="approval-card ${dangerous ? 'dangerous' : ''}">
@@ -717,10 +729,11 @@ class CyberAgent {
           <span class="approval-warning">${escHtml(meta.category || 'tool')} · ${escHtml(meta.risk || 'low')}</span>
         </div>
         <div class="approval-guide">${escHtml(meta.guide || 'Revisa argumentos antes de ejecutar.')}</div>
+        ${cloudNote}
         <pre class="approval-args">${escHtml(JSON.stringify(args, null, 2))}</pre>
         <div class="approval-btns">
           <button class="btn btn-execute" id="ap-exec">Ejecutar</button>
-          <button class="btn btn-always"  id="ap-always">Permitir siempre</button>
+          ${alwaysBtn}
           <button class="btn btn-reject"  id="ap-reject">Rechazar</button>
         </div>
       </div>`;
@@ -728,7 +741,7 @@ class CyberAgent {
     this.approvalOverlay.classList.add('visible');
 
     document.getElementById('ap-exec').onclick   = () => this._decide(id, name, true,  false);
-    document.getElementById('ap-always').onclick = () => this._decide(id, name, true,  true);
+    document.getElementById('ap-always')?.addEventListener('click', () => this._decide(id, name, true, true));
     document.getElementById('ap-reject').onclick = () => this._decide(id, name, false, false);
   }
 
@@ -736,7 +749,7 @@ class CyberAgent {
     this.approvalOverlay.classList.remove('visible');
     this.approvalOverlay.innerHTML = '';
     this.pendingApproval = null;
-    if (always) {
+    if (always && !isAlwaysAskTool(name)) {
       this.permissions[name] = 'auto';
       this._savePreferences();
       this._renderPermissionsList();
@@ -1047,18 +1060,24 @@ class CyberAgent {
       ...Object.keys(TOOL_ICONS),
       ...Object.keys(this.permissions),
     ])).sort();
-    list.innerHTML = toolNames.map(name => `
+    list.innerHTML = toolNames.map(name => {
+      const locked = isAlwaysAskTool(name);
+      const note = locked ? '<small>cloud: preguntar siempre</small>' : '';
+      const auto = locked ? '' : '<option value="auto">Auto</option>';
+      return `
       <label class="permission-row">
-        <span>${escHtml(name)}</span>
+        <span>${escHtml(name)}${note}</span>
         <select data-tool="${escHtml(name)}">
           <option value="ask">Preguntar</option>
-          <option value="auto">Auto</option>
+          ${auto}
           <option value="block">Bloquear</option>
         </select>
-      </label>
-    `).join('');
+      </label>`;
+    }).join('');
     list.querySelectorAll('select[data-tool]').forEach(sel => {
-      sel.value = this.permissions[sel.dataset.tool] || 'ask';
+      const name = sel.dataset.tool;
+      const value = this.permissions[name] || 'ask';
+      sel.value = isAlwaysAskTool(name) && value === 'auto' ? 'ask' : value;
     });
   }
 

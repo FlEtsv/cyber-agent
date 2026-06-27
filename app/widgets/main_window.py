@@ -735,7 +735,7 @@ class MainWindow(QMainWindow):
             poller.stop()
         if not self._approval_pollers:
             self.notification_pending.emit(False)
-        if always:
+        if always and tool_name != "mistral_consult":
             self.trusted_tools.add(tool_name)
         if self.worker:
             self.worker.approve(True)
