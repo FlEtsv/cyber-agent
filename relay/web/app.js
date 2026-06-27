@@ -5,22 +5,38 @@ const TOOL_ICONS = {
   list_directory:'dir', web_fetch:'web', list_processes:'proc',
   screenshot:'screen', screenshot_pc:'screen', install_package:'install',
   uninstall_package:'remove', system_info:'info',
+  mistral_consult:'ai',
 };
 
 const CATEGORY_ICONS = {
   core:'core', web:'web', files:'file', system:'sys', desktop:'desk',
   network:'net', forensics:'lab', encode:'enc', rag:'rag',
-  self:'self', mobile:'mob', other:'tool',
+  council:'ai', self:'self', mobile:'mob', other:'tool',
 };
 
 // â”€â”€ Markdown renderer (via marked CDN) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderMd(text) {
   if (!text) return '';
   try {
-    return marked.parse(text, { breaks: true, gfm: true });
+    return sanitizeHtml(marked.parse(text, { breaks: true, gfm: true }));
   } catch {
     return escHtml(text);
   }
+}
+function sanitizeHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html);
+  template.content.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(el => el.remove());
+  template.content.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || '').trim().toLowerCase();
+      if (name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:text/html')) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.innerHTML;
 }
 function escHtml(s) {
   return String(s)

@@ -27,9 +27,20 @@ _COMPLEX_PATTERNS = [
     r"(escribe|crea|genera).{0,20}(framework|sistema completo|librería completa)",
     r"investiga (todo|a fondo|en profundidad)",
     r"plan (detallado|completo|paso a paso).{0,30}(para|de)",
+    r"auditor[iÃ­]a (extensa|meticulosa|profunda|completa)",
+    r"(threat model|modelo de amenazas|razonamiento profundo)",
 ]
 
 _COMPLEX_RE = re.compile("|".join(_COMPLEX_PATTERNS), re.IGNORECASE)
+_EXTRA_COMPLEX_PATTERNS = [
+    r"disena (todo|el sistema|la infraestructura|desde cero)",
+    r"diseña (todo|el sistema|la infraestructura|desde cero)",
+    r"auditoria (extensa|meticulosa|profunda|completa)",
+    r"auditoría (extensa|meticulosa|profunda|completa)",
+    r"autenticacion completo desde cero",
+    r"autenticación completo desde cero",
+]
+_EXTRA_COMPLEX_RE = re.compile("|".join(_EXTRA_COMPLEX_PATTERNS), re.IGNORECASE)
 
 # Palabras simples que fuerzan el modelo rápido independientemente del resto
 _FAST_KEYWORDS = {
@@ -56,8 +67,8 @@ def score_complexity(message: str) -> float:
     score += min(words / 300, 0.35)
 
     # Patrones de complejidad alta
-    if _COMPLEX_RE.search(msg):
-        score += 0.5
+    if _COMPLEX_RE.search(msg) or _EXTRA_COMPLEX_RE.search(msg):
+        score += 0.6
 
     # Bloques de código en el mensaje (contexto largo)
     if msg.count("```") >= 2:
@@ -78,5 +89,5 @@ def route(message: str, threshold: float = 0.6) -> tuple[str, str]:
     """
     s = score_complexity(message)
     if s >= threshold:
-        return POWER_MODEL, f"tarea compleja (score={s:.2f}) → modelo potente"
+        return POWER_MODEL, f"complejo: tarea compleja (score={s:.2f}) → modelo potente"
     return FAST_MODEL, f"tarea estándar (score={s:.2f}) → modelo rápido"

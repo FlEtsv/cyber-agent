@@ -33,7 +33,8 @@ CATEGORIES: dict[str, set[str]] = {
                   "ssl_info", "http_headers_check", "dir_bruteforce", "web_crawl",
                   "strings_extract", "hex_dump", "file_entropy", "pe_info",
                   "registry_query", "list_services", "check_persistence",
-                  "web_search", "network_connections", "process_tree"},
+                  "web_search", "network_connections", "process_tree",
+                  "mistral_consult"},
     # Análisis forense local: binarios, registros, servicios, persistencia
     "forensics": {"strings_extract", "hex_dump", "file_entropy", "pe_info",
                   "file_metadata", "registry_query", "list_services",
@@ -51,6 +52,7 @@ CATEGORIES: dict[str, set[str]] = {
                   "windows_notify", "open_browser"},
     # Base de conocimiento vectorial interna del agente
     "rag":       {"rag_search", "rag_add"},
+    "council":   {"mistral_consult"},
     # Auto-inspección y reinicio del propio agente
     "self":      {"list_self_files", "syntax_check", "restart_self"},
 }
@@ -79,6 +81,10 @@ _KW: dict[str, set[str]] = {
                   "red team","osint","exposure","expuesto","ataque","attack",
                   "exploit","payload","inyeccion","injection","bypass","escalad",
                   "privilege","privesc","footprint","fingerprint"},
+    "council":   {"mistral","consejo","segunda opinion","segunda opini",
+                  "revisor externo","razonamiento externo","razonamiento profundo",
+                  "threat model","modelo externo","consultor","critica",
+                  "blind spot","punto ciego","arquitectura segura"},
     "forensics": {"malware","virus","exploit","vulnerabilidad","vulnerability",
                   "registro","registry","servicio","service","persistencia",
                   "persistence","strings","hex","entropia","entropy","pe",
@@ -144,6 +150,7 @@ registro de Windows, servicios, persistencia, malware
 - desktop: controlar el escritorio Windows — screenshots, clicks, teclado, OCR, \
 ventanas, formularios, credenciales del sistema, portapapeles
 - rag: consultar o guardar en la base de conocimiento interna del agente
+- council: consultar Mistral Studio como revisor externo aprobado y con redaccion
 - self: listar, verificar sintaxis o reiniciar el propio agente
 
 REGLAS DE DESAMBIGUACIÓN:
@@ -163,6 +170,7 @@ Ejemplos:
   "instala nmap" → system
   "¿cuánta RAM tiene?" → system
   "auditoría completa del servidor" → hacking,web
+  "pide segunda opinion a Mistral" → council
 """
 
 

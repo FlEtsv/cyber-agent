@@ -245,7 +245,7 @@ class AgentRunner:
 
                     if perm == "block":
                         result = {"blocked": True}
-                    elif dangerous and not self.session_trust and perm != "auto":
+                    elif name == "mistral_consult" or (dangerous and not self.session_trust and perm != "auto"):
                         ev = threading.Event()
                         self._approvals[tid] = ev
                         _emit_status(f"`{name}` necesita aprobación porque puede cambiar el sistema.")

@@ -564,10 +564,13 @@ class AgentWorker(QThread):
                         continue
 
                     needs_ok = (
-                        dangerous
-                        and not self.session_trust
-                        and name not in self.trusted_tools
-                        and perm != "auto"
+                        name == "mistral_consult"
+                        or (
+                            dangerous
+                            and not self.session_trust
+                            and name not in self.trusted_tools
+                            and perm != "auto"
+                        )
                     )
 
                     if needs_ok:

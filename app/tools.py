@@ -625,6 +625,22 @@ TOOLS_SCHEMA = [
     }},
     # ── Watch mode (WATCH-001) ─────────────────────────────────────────────────
     {"type": "function", "function": {
+        "name": "mistral_consult",
+        "description": "Consulta Mistral Studio como revisor externo para auditorias, arquitectura, "
+                       "debug o threat modeling. Envia datos a la nube: por defecto redacta secretos "
+                       "y debe usarse solo cuando el usuario apruebe la consulta externa.",
+        "parameters": {"type": "object", "properties": {
+            "task": {"type": "string", "description": "Pregunta o decision que debe revisar Mistral"},
+            "context": {"type": "string", "description": "Contexto tecnico opcional; se redacta por defecto"},
+            "mode": {"type": "string",
+                     "enum": ["audit", "architecture", "code_review", "threat_model", "debug", "plan"],
+                     "description": "Tipo de revision externa (default: audit)"},
+            "allow_sensitive": {"type": "boolean",
+                                "description": "Si true envia contexto sin redaccion automatica. Requiere aprobacion explicita."},
+            "max_tokens": {"type": "integer", "description": "Respuesta maxima de Mistral (128-4096, default 900)"},
+        }, "required": ["task"]}
+    }},
+    {"type": "function", "function": {
         "name": "start_screenshot_watch",
         "description": "Activa el modo vigilancia: captura la pantalla del PC automáticamente cada N segundos "
                        "y envía cada captura al chat en tiempo real. Útil para supervisión remota desde iPhone, "
@@ -659,6 +675,7 @@ ACTIVE_SECURITY_TOOLS = {
 SENSITIVE_ACCESS_TOOLS = {
     "credential_lookup", "clipboard_read", "clipboard_write", "click_screen",
     "type_text", "hotkey", "fill_form", "focus_window", "restart_self",
+    "mistral_consult",
 }
 
 DANGEROUS_TOOLS |= ACTIVE_SECURITY_TOOLS | SENSITIVE_ACCESS_TOOLS
@@ -698,6 +715,7 @@ TOOL_CATEGORIES = {
     },
     "encode": {"encode_decode"},
     "rag": {"rag_search", "rag_add"},
+    "council": {"mistral_consult"},
     "self": {"list_self_files", "syntax_check", "restart_self"},
 }
 
@@ -711,6 +729,7 @@ TOOL_USE_GUIDES = {
     "core": "Ejecucion basica y lectura/escritura local.",
     "encode": "Transforma datos para analisis tecnico.",
     "rag": "Consulta o amplia la base de conocimiento local.",
+    "council": "Consulta modelos externos con redaccion de secretos y aprobacion previa.",
     "self": "Inspecciona o reinicia el propio agente.",
 }
 
@@ -945,6 +964,12 @@ def execute_tool(name: str, args: dict) -> dict:
             "list_self_files":      lambda: _sa_module().list_self_files(),
             "syntax_check":         lambda: _sa_module().syntax_check(args["path"]),
             "restart_self":         lambda: _sa_module().restart_self(),
+            "mistral_consult":      lambda: _mistral_consult(
+                                        args["task"],
+                                        args.get("context", ""),
+                                        args.get("mode", "audit"),
+                                        bool(args.get("allow_sensitive", False)),
+                                        int(args.get("max_tokens", 900))),
             # Watch mode (WATCH-001) — returns config; server drives the loop
             "start_screenshot_watch": lambda: {
                 "watch_started": True,
@@ -1012,6 +1037,24 @@ def _shell(command: str, shell_type: str = "powershell", timeout: int = 60) -> d
         }
     except subprocess.TimeoutExpired:
         return {"error": f"Timeout ({timeout}s)"}
+
+
+def _mistral_consult(
+    task: str,
+    context: str = "",
+    mode: str = "audit",
+    allow_sensitive: bool = False,
+    max_tokens: int = 900,
+) -> dict:
+    from app.mistral_client import consult_mistral
+
+    return consult_mistral(
+        task=task,
+        context=context,
+        mode=mode,
+        allow_sensitive=allow_sensitive,
+        max_tokens=max_tokens,
+    )
 
 
 def _read_file(path: str, offset: int = 0, limit=None) -> dict:

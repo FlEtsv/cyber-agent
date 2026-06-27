@@ -88,6 +88,7 @@ DEFAULT_PERMISSIONS = {
     "list_self_files":      "auto",
     "syntax_check":         "auto",
     "restart_self":         "ask",   # reiniciar pide confirmación por seguridad
+    "mistral_consult":      "ask",   # envia contexto a nube; siempre supervisado
 }
 
 PERM_LABELS = {"ask": "🔴 Pedir", "auto": "🟢 Auto", "block": "⛔ Bloquear"}
@@ -104,6 +105,7 @@ TOOL_ICONS = {
     "web_fetch":         "🌐",
     "list_processes":    "⚙️",
     "system_info":       "💻",
+    "mistral_consult":   "AI",
 }
 
 

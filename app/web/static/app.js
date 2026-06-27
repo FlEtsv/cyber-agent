@@ -5,22 +5,38 @@ const TOOL_ICONS = {
   list_directory:'dir', web_fetch:'web', list_processes:'proc',
   screenshot:'screen', screenshot_pc:'screen', install_package:'install',
   uninstall_package:'remove', system_info:'info',
+  mistral_consult:'ai',
 };
 
 const CATEGORY_ICONS = {
   core:'core', web:'web', files:'file', system:'sys', desktop:'desk',
   network:'net', forensics:'lab', encode:'enc', rag:'rag',
-  self:'self', mobile:'mob', other:'tool',
+  council:'ai', self:'self', mobile:'mob', other:'tool',
 };
 
 // â”€â”€ Markdown renderer (via marked CDN) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderMd(text) {
   if (!text) return '';
   try {
-    return marked.parse(text, { breaks: true, gfm: true });
+    return sanitizeHtml(marked.parse(text, { breaks: true, gfm: true }));
   } catch {
     return escHtml(text);
   }
+}
+function sanitizeHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html);
+  template.content.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(el => el.remove());
+  template.content.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || '').trim().toLowerCase();
+      if (name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:text/html')) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.innerHTML;
 }
 function escHtml(s) {
   return String(s)
@@ -252,14 +268,16 @@ class CyberAgent {
       this._watchContainer = wrap;
       this._watchFramesEl = wrap.querySelector('.watch-frames');
       this._watchCounterEl = wrap.querySelector('.watch-counter');
-      this.msgsEl.appendChild(wrap);
+      this._removeWelcome();
+      this.messages.appendChild(wrap);
     }
 
-    const { b64, fmt, size, seq, elapsed, duration } = data;
+    const { b64, fmt, size, seq, elapsed, duration } = data || {};
+    if (!b64 || !this._watchFramesEl) return;
     const img = document.createElement('img');
     img.src = `data:image/${fmt || 'jpeg'};base64,${b64}`;
     img.className = 'watch-frame';
-    img.title = `#${seq + 1} · ${size} · +${elapsed}s`;
+    img.title = `#${(seq || 0) + 1} - ${size || ''} - +${elapsed || 0}s`;
     img.loading = 'lazy';
 
     // Keep only last 6 frames visible for performance
@@ -267,9 +285,11 @@ class CyberAgent {
     const frames = this._watchFramesEl.querySelectorAll('.watch-frame');
     if (frames.length > 6) frames[0].remove();
 
-    const count = (seq + 1);
-    const pct   = duration ? Math.min(100, Math.round(elapsed / duration * 100)) : 0;
-    this._watchCounterEl.textContent = `${count} captura${count !== 1 ? 's' : ''} · ${pct}%`;
+    const count = (seq || 0) + 1;
+    const pct = duration ? Math.min(100, Math.round((elapsed || 0) / duration * 100)) : 0;
+    if (this._watchCounterEl) {
+      this._watchCounterEl.textContent = `${count} captura${count !== 1 ? 's' : ''} - ${pct}%`;
+    }
     this._scrollBottom();
   }
 

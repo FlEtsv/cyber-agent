@@ -108,6 +108,10 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 
 ## ✅ COMPLETADO
 
+[codex] COUNCIL-001 — Consejo multi-modelo local-first implementado: Qwen3-14B abliterated como fast model privado, `cyberagent-original` como power model, Mistral Studio como `mistral_consult` externo con redacción por defecto, aprobación obligatoria por llamada y setup sin guardar API key — Archivos: `app/mistral_client.py`, `app/tools.py`, `app/tool_router.py`, `app/model_router.py`, `scripts/setup_model_council.ps1`, `docs/MODEL_COUNCIL.md`, tests — ⚠️ zona ajena: `app/model_router.py` para corregir ruteo real fast/power al activar Qwen3-14B — Verificación: `pytest -q` 54 passed; `node --check` local/relay; `ollama pull richardyoung/qwen3-14b-abliterated:Q5_K_M` OK — Fecha: 2026-06-27 17:55
+
+[codex] AUDIT-WEBPC-001 — Auditoría/adecuación web+PC excluyendo `ios/`: corregido modo vigilancia local (`this.messages`), saneado HTML generado por Markdown en PWA local/relay, iconos/categoría `council`, permiso GUI `mistral_consult=ask`, endpoints local/relay smokeados y router fast/power corregido para tareas complejas reales — Archivos: `app/web/static/app.js`, `relay/web/app.js`, `app/widgets/main_window.py`, `app/widgets/tool_card.py`, `app/api/agent_runner.py`, `app/ollama_client.py`, `app/model_router.py` — ⚠️ zona ajena: `app/api/agent_runner.py`, `app/ollama_client.py`, `app/model_router.py` por privacidad cloud y ruteo multi-modelo — Verificación: compileall, `pytest -q` 54 passed, TestClient local/relay static/status OK — Fecha: 2026-06-27 17:55
+
 > Mover aquí desde EN PROGRESO al terminar.
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 

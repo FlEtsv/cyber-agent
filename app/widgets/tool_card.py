@@ -8,6 +8,7 @@ TOOL_ICONS = {
     "read_file": "▤", "list_directory": "▥", "web_fetch": "◎",
     "list_processes": "◈", "screenshot": "⊡",
     "install_package": "⬇", "uninstall_package": "⬆", "system_info": "◉",
+    "mistral_consult": "AI",
 }
 
 
