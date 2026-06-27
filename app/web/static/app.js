@@ -82,6 +82,8 @@ class CyberAgent {
     this.pendingApproval = null;
     this.permissions   = {};
     this.sessionTrust  = false;
+    this.currentConversationId = '';
+    this.conversations = [];
     this.outbox        = [];
     this.reconnectDelay = 1500;
     this.reconnectTimer = null;
@@ -117,9 +119,13 @@ class CyberAgent {
     this.approvalOverlay = document.getElementById('approval-overlay');
     this.statusDot  = document.querySelector('.status-dot');
     this.statusText = document.getElementById('status-text');
+    this.conversationList = document.getElementById('conversation-list');
+    this.activityList = document.getElementById('activity-list');
 
+    this._loadConversations();
     this._ensureConnectionBanner();
     this._installReportButton();
+    this._initConversationPanel();
     this._bindUI();
     this._connect();
   }
@@ -213,6 +219,7 @@ class CyberAgent {
 
       case 'status':
         this._setStatus('thinking', data);
+        this._renderActivity('estado', data);
         break;
 
       case 'token':
@@ -225,18 +232,22 @@ class CyberAgent {
       case 'tool_call':
         this._ensureAIBubble();
         this._addToolActivity(data.id, data.name, data.args, data);
+        this._renderActivity('herramienta', data?.name || 'tool_call');
         break;
 
       case 'need_approval':
         this._showApproval(data.id, data.name, data.args, data);
+        this._renderActivity('aprobacion', data?.name || 'herramienta');
         break;
 
       case 'tool_result':
         this._setToolDone(data.id, data.result ?? data.output ?? data.content ?? data);
+        this._renderActivity('resultado', data?.name || data?.id || 'tool_result');
         break;
 
       case 'vision_processing':
         this._setStatus('thinking', data);
+        this._renderActivity('vision', data);
         break;
 
       case 'screenshot':
@@ -249,6 +260,7 @@ class CyberAgent {
 
       case 'done':
         this._finalizeAIBubble();
+        this._renderActivity('respuesta', 'completada');
         this._endStreaming();
         break;
 
@@ -258,6 +270,7 @@ class CyberAgent {
           this._setConnectionState('offline', 'PC offline', data, true);
         }
         this._addErrorMsg(data);
+        this._renderActivity('error', data);
         this._endStreaming();
         break;
     }
@@ -360,15 +373,19 @@ class CyberAgent {
 
   // â”€â”€ UI: message bubbles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  _addUserBubble(text, imageSrcs = []) {
-    this.report.messages.push({
-      ts: new Date().toISOString(),
-      role: 'user',
-      text: redactReportValue(text),
-      images: imageSrcs.length,
-    });
+  _addUserBubble(text, imageSrcs = [], opts = {}) {
+    if (!opts.restored) {
+      this.report.messages.push({
+        ts: new Date().toISOString(),
+        role: 'user',
+        text: redactReportValue(text),
+        images: imageSrcs.length,
+      });
+      this._persistHistoryMessage({ role: 'user', text, images: imageSrcs, ts: Date.now() });
+      this._touchConversation(text);
+    }
     const wrap = document.createElement('div');
-    wrap.className = 'msg user';
+    wrap.className = `msg user${opts.restored ? ' restored' : ''}`;
 
     const avatar = document.createElement('div');
     avatar.className = 'msg-avatar';
@@ -391,7 +408,7 @@ class CyberAgent {
     if (text) {
       const content = document.createElement('div');
       content.className = 'msg-content';
-      content.textContent = text;
+      content.innerHTML = renderMd(text);
       body.appendChild(content);
     }
 
@@ -473,7 +490,170 @@ class CyberAgent {
       role: 'assistant',
       text: redactReportValue(this.currentBubble._raw),
     });
+    this._persistHistoryMessage({ role: 'assistant', text: this.currentBubble._raw, ts: Date.now() });
+    this._touchConversation(this.currentBubble._raw, 'assistant');
     this.currentBubble = null;
+  }
+
+  _addRestoredAIBubble(text) {
+    if (!text) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ai restored';
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = 'AI';
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+    const contentEl = document.createElement('div');
+    contentEl.className = 'msg-content';
+    contentEl.innerHTML = renderMd(text);
+    body.appendChild(contentEl);
+    wrap.appendChild(avatar);
+    wrap.appendChild(body);
+    this._removeWelcome();
+    this.messages.appendChild(wrap);
+  }
+
+  _conversationsKey() {
+    return `ca_local_conversations_${location.host}`;
+  }
+
+  _historyKey() {
+    return `ca_local_history_${location.host}_${this.currentConversationId || 'default'}`;
+  }
+
+  _loadConversations() {
+    try {
+      const raw = localStorage.getItem(this._conversationsKey());
+      this.conversations = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(this.conversations)) this.conversations = [];
+    } catch {
+      this.conversations = [];
+    }
+    if (!this.conversations.length) {
+      this.conversations = [{ id: `chat_${Date.now()}`, title: 'Nuevo chat', updatedAt: Date.now(), count: 0 }];
+    }
+    this.currentConversationId = this.conversations[0].id;
+    this._saveConversations();
+  }
+
+  _saveConversations() {
+    localStorage.setItem(this._conversationsKey(), JSON.stringify(this.conversations.slice(0, 30)));
+  }
+
+  _initConversationPanel() {
+    this.$('new-chat-btn')?.addEventListener('click', () => this._newConversation());
+    this.conversationList?.addEventListener('click', e => {
+      const button = e.target.closest?.('[data-conversation-id]');
+      if (button) this._switchConversation(button.dataset.conversationId);
+    });
+    this._renderConversationList();
+    this._renderActivity('system', 'Web local lista');
+    this._restoreHistory(this._loadLocalHistory(), { force: true });
+  }
+
+  _newConversation() {
+    this.currentConversationId = `chat_${Date.now()}`;
+    this.conversations.unshift({ id: this.currentConversationId, title: 'Nuevo chat', updatedAt: Date.now(), count: 0 });
+    this._saveConversations();
+    this._clearConversationView();
+    this._renderConversationList();
+    this._showWelcome();
+  }
+
+  _switchConversation(id) {
+    if (!id || id === this.currentConversationId) return;
+    this.currentConversationId = id;
+    this._clearConversationView();
+    this._restoreHistory(this._loadLocalHistory(), { force: true });
+    this._renderConversationList();
+    this._showWelcome();
+  }
+
+  _clearConversationView() {
+    this.toolRows.clear();
+    this.currentBubble = null;
+    this._hideApproval();
+    this.messages.innerHTML = '';
+  }
+
+  _loadLocalHistory() {
+    try {
+      const raw = localStorage.getItem(this._historyKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  _persistHistoryMessage(message) {
+    const history = this._loadLocalHistory();
+    history.push(message);
+    localStorage.setItem(this._historyKey(), JSON.stringify(history.slice(-80)));
+  }
+
+  _restoreHistory(messages, opts = {}) {
+    if (!Array.isArray(messages) || !messages.length) return;
+    if (!opts.force && this.messages.querySelector('.msg.restored')) return;
+    for (const item of messages.slice(-80)) {
+      if (item?.role === 'user') {
+        this._addUserBubble(item.text || '', item.images || [], { restored: true });
+      } else if (item?.role === 'assistant') {
+        this._addRestoredAIBubble(item.text || '');
+      }
+    }
+    this._removeWelcome();
+    this._scrollBottom();
+  }
+
+  _touchConversation(text = '', role = 'user') {
+    let conv = this.conversations.find(item => item.id === this.currentConversationId);
+    if (!conv) {
+      conv = { id: this.currentConversationId || `chat_${Date.now()}`, title: 'Nuevo chat', updatedAt: Date.now(), count: 0 };
+      this.currentConversationId = conv.id;
+      this.conversations.unshift(conv);
+    }
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (role === 'user' && clean && (!conv.title || conv.title === 'Nuevo chat')) {
+      conv.title = clean.slice(0, 58);
+    }
+    conv.updatedAt = Date.now();
+    conv.count = (conv.count || 0) + 1;
+    this.conversations = [conv, ...this.conversations.filter(item => item.id !== conv.id)]
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    this._saveConversations();
+    this._renderConversationList();
+  }
+
+  _renderConversationList() {
+    if (!this.conversationList) return;
+    this.conversationList.innerHTML = '';
+    for (const conv of this.conversations.slice(0, 30)) {
+      const item = document.createElement('button');
+      item.className = `conversation-item${conv.id === this.currentConversationId ? ' active' : ''}`;
+      item.dataset.conversationId = conv.id;
+      item.innerHTML = `<div class="conversation-title">${escHtml(conv.title || 'Nuevo chat')}</div><div class="conversation-meta">${conv.count || 0} eventos · ${this._formatTime(conv.updatedAt)}</div>`;
+      this.conversationList.appendChild(item);
+    }
+  }
+
+  _renderActivity(kind, text) {
+    if (!this.activityList) return;
+    const item = document.createElement('div');
+    item.className = 'activity-item';
+    item.innerHTML = `<strong>${escHtml(kind)}</strong><br>${escHtml(String(text || '').slice(0, 180))}<div class="activity-meta">${this._formatTime(Date.now())}</div>`;
+    this.activityList.prepend(item);
+    while (this.activityList.children.length > 20) this.activityList.lastElementChild.remove();
+  }
+
+  _formatTime(ts) {
+    if (!ts) return '';
+    try {
+      return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   }
 
   _addErrorMsg(msg) {

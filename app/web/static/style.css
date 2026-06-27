@@ -131,6 +131,105 @@ header {
   color: var(--accent);
 }
 
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.conversation-panel {
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: rgba(15,18,23,0.82);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mini-btn {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 6px 9px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.conversation-list,
+.activity-list {
+  overflow-y: auto;
+  padding: 0 8px 10px;
+}
+
+.conversation-list {
+  flex: 1;
+  min-height: 120px;
+}
+
+.conversation-item,
+.activity-item {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 7px;
+  padding: 9px;
+  text-align: left;
+}
+
+.conversation-item {
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+}
+.conversation-item:hover,
+.conversation-item.active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.conversation-title {
+  font-size: 12px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-meta,
+.activity-meta {
+  color: var(--dim);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+.activity-head {
+  border-top: 1px solid var(--border);
+}
+.activity-list {
+  max-height: 210px;
+}
+.activity-item {
+  border-top: 1px solid rgba(48,57,70,0.55);
+  border-radius: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.activity-item strong { color: var(--text); }
+
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
 
 /* ── Messages ──────────────────────────────────────────────────────────── */
@@ -667,6 +766,26 @@ header {
   .header-status { gap: 5px; font-size: 11px; }
   #status-text { max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #report-btn { padding: 6px 8px; font-size: 10px; }
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .conversation-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    max-height: 176px;
+  }
+  .conversation-list {
+    display: flex;
+    gap: 6px;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+  }
+  .conversation-item { min-width: 180px; }
+  .activity-head,
+  .activity-list { display: none; }
   #messages { padding: 14px 10px; gap: 12px; }
   #input-area { padding: 8px 10px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .input-row { gap: 6px; }

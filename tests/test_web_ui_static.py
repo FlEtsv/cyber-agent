@@ -37,3 +37,16 @@ def test_relay_exposes_conversation_and_activity_shell():
     assert "_switchConversation" in js
     assert "_renderActivity" in js
     assert "content.innerHTML = renderMd(text);" in js
+
+
+def test_local_web_exposes_conversation_and_activity_shell():
+    html = _read("app/web/index.html")
+    js = _read("app/web/static/app.js")
+
+    assert 'id="conversation-panel"' in html
+    assert 'id="conversation-list"' in html
+    assert 'id="activity-list"' in html
+    assert "_conversationsKey" in js
+    assert "_switchConversation" in js
+    assert "_renderActivity" in js
+    assert "content.innerHTML = renderMd(text);" in js
