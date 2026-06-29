@@ -134,6 +134,7 @@ class CyberAgent {
     this._ensureConnectionBanner();
     this._ensureQueueBadge();
     this._initSettingsPanel();
+    this._initBackground();
     this._installReportButton();
     this._initConversationPanel();
     this._bindUI();
@@ -750,6 +751,33 @@ class CyberAgent {
     else if (a === '5') { if (!confirm('¿Borrar la carpeta? Las conversaciones NO se borran.')) return; await this._workspace('folder_delete', { id: f.id }); }
     else { return; }
     await this._loadFolders();
+  }
+
+  // ── A7: fondo de chat personalizado (color o imagen), persistente ──
+  _bgKey() { return `ca_bg_${location.host}`; }
+  _initBackground() {
+    try { this._applyBackground(JSON.parse(localStorage.getItem(this._bgKey()) || 'null')); } catch {}
+    const color = this.$('bg-color'), img = this.$('bg-image'), clr = this.$('bg-clear');
+    if (color) color.addEventListener('input', () => this._setBackground({ type: 'color', value: color.value }));
+    if (img) img.addEventListener('change', e => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = ev => this._setBackground({ type: 'image', value: ev.target.result });
+      rd.readAsDataURL(f);
+    });
+    if (clr) clr.addEventListener('click', () => this._setBackground(null));
+  }
+  _setBackground(bg) {
+    try { localStorage.setItem(this._bgKey(), JSON.stringify(bg)); } catch {}
+    this._applyBackground(bg);
+  }
+  _applyBackground(bg) {
+    const el = this.messages;
+    if (!el) return;
+    if (!bg) { el.style.background = ''; return; }
+    if (bg.type === 'color') el.style.background = bg.value;
+    else if (bg.type === 'image') el.style.background = `center/cover no-repeat fixed url("${bg.value}")`;
   }
 
   _conversationsKey() {
