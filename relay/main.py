@@ -45,7 +45,14 @@ JWT_HOURS = 72
 
 _SESSION_BUFFER_SIZE = 50   # messages kept per session for history restore
 
+# La web es un producto unico en apps/web. En la imagen de Cloud Run se copia a
+# relay/web (deploy.ps1); si se corre el relay desde el repo sin sincronizar,
+# caemos directamente a apps/web.
 WEB_DIR = Path(__file__).parent / "web"
+if not (WEB_DIR / "index.html").exists():
+    _alt = Path(__file__).parent.parent / "apps" / "web"
+    if (_alt / "index.html").exists():
+        WEB_DIR = _alt
 
 app = FastAPI(docs_url=None, redoc_url=None)
 

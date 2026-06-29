@@ -21,6 +21,20 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com `
     --project=$Project --quiet
 
 Write-Host "[3/4] Construyendo y subiendo imagen..." -ForegroundColor Cyan
+
+# La web es un producto unico en apps/web. El relay solo la transporta, asi que
+# sincronizamos apps/web -> relay/web (artefacto de build, no versionado) antes
+# de empaquetar la imagen, ya que el contexto de Cloud Build es ./relay.
+$webSrc = Join-Path $PSScriptRoot "..\apps\web"
+$webDst = Join-Path $PSScriptRoot "web"
+if (-not (Test-Path $webSrc)) {
+    Write-Host "  ERROR: no existe apps\web (fuente de la web)" -ForegroundColor Red
+    exit 1
+}
+if (Test-Path $webDst) { Remove-Item $webDst -Recurse -Force }
+Copy-Item $webSrc $webDst -Recurse -Force
+Write-Host "  Web sincronizada: apps\web -> relay\web" -ForegroundColor Green
+
 $ImageUrl = "gcr.io/$Project/$ServiceName"
 gcloud builds submit ./relay `
     --tag=$ImageUrl `

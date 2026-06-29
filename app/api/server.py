@@ -13,7 +13,11 @@ from app.auth import (
     create_token, verify_token, get_totp_qr_svg,
 )
 
-WEB_DIR = Path(__file__).parent.parent / "web"
+WEB_DIR = Path(__file__).parent.parent / "web"          # runtime local (served/)
+# La web es un producto unico en apps/web; tanto el PC como el relay la consumen.
+WEB_PRODUCT = Path(__file__).parent.parent.parent / "apps" / "web"
+if not (WEB_PRODUCT / "index.html").exists():
+    WEB_PRODUCT = WEB_DIR  # fallback de seguridad
 
 
 @asynccontextmanager
@@ -79,8 +83,9 @@ async def _generic_exc(request: Request, exc: Exception):
     return JSONResponse({"error": "Error interno del servidor"}, status_code=500)
 
 
-if (WEB_DIR / "static").exists():
-    app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+# /static -> producto web (apps/web es plano, igual que sirve el relay)
+_STATIC = (WEB_PRODUCT / "static") if (WEB_PRODUCT / "static").exists() else WEB_PRODUCT
+app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
 # Archivos generados por el agente (documentos, imágenes) servidos por URL pública.
 _SERVED = WEB_DIR / "served"
@@ -156,19 +161,19 @@ async def auth_logout():
 async def index(request: Request):
     if not _auth_ok(request):
         return RedirectResponse("/login")
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(WEB_PRODUCT / "index.html")
 
 @app.get("/login")
 async def login_page():
-    return FileResponse(WEB_DIR / "login.html")
+    return FileResponse(WEB_PRODUCT / "login.html")
 
 @app.get("/manifest.json")
 async def manifest():
-    return FileResponse(WEB_DIR / "manifest.json", media_type="application/manifest+json")
+    return FileResponse(WEB_PRODUCT / "manifest.json", media_type="application/manifest+json")
 
 @app.get("/sw.js")
 async def service_worker():
-    return FileResponse(WEB_DIR / "sw.js", media_type="application/javascript")
+    return FileResponse(WEB_PRODUCT / "sw.js", media_type="application/javascript")
 
 
 # ── Status ────────────────────────────────────────────────────────────────────
