@@ -694,42 +694,128 @@ class CyberAgent {
     return c ? (c.folderId || null) : null;
   }
 
+  // A6: modal y menú sobrios (reemplazan prompt/confirm)
+  _modal({ title, fields = [], submitLabel = 'Guardar', danger = false }) {
+    return new Promise((resolve) => {
+      const back = document.createElement('div');
+      back.className = 'modal-backdrop';
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML = `<div class="modal-title">${escHtml(title)}</div>`;
+      const body = document.createElement('div'); body.className = 'modal-body';
+      const inputs = {};
+      for (const f of fields) {
+        const row = document.createElement('label'); row.className = 'modal-field';
+        row.innerHTML = `<span>${escHtml(f.label)}</span>`;
+        let input;
+        if (f.type === 'select') {
+          input = document.createElement('select');
+          (f.options || []).forEach(o => {
+            const op = document.createElement('option'); op.value = o.value; op.textContent = o.label;
+            input.appendChild(op);
+          });
+          if (f.value != null) input.value = String(f.value);
+        } else if (f.type === 'textarea') {
+          input = document.createElement('textarea'); input.rows = 3;
+          if (f.value) input.value = f.value;
+        } else {
+          input = document.createElement('input'); input.type = f.type || 'text';
+          if (f.value != null) input.value = f.value;
+          if (f.placeholder) input.placeholder = f.placeholder;
+        }
+        input.className = 'modal-input';
+        inputs[f.name] = input; row.appendChild(input); body.appendChild(row);
+      }
+      box.appendChild(body);
+      const btns = document.createElement('div'); btns.className = 'modal-btns';
+      const cancel = document.createElement('button'); cancel.className = 'modal-btn'; cancel.textContent = 'Cancelar';
+      const ok = document.createElement('button'); ok.className = 'modal-btn primary' + (danger ? ' danger' : ''); ok.textContent = submitLabel;
+      btns.appendChild(cancel); btns.appendChild(ok); box.appendChild(btns);
+      back.appendChild(box); document.body.appendChild(back);
+      requestAnimationFrame(() => back.classList.add('open'));
+      const close = (v) => { back.classList.remove('open'); setTimeout(() => back.remove(), 180); resolve(v); };
+      cancel.onclick = () => close(null);
+      back.onclick = (e) => { if (e.target === back) close(null); };
+      ok.onclick = () => { const out = {}; for (const k in inputs) out[k] = inputs[k].value; close(out); };
+      const first = body.querySelector('input,textarea,select'); if (first) setTimeout(() => first.focus(), 60);
+    });
+  }
+
+  _menu(title, items) {
+    return new Promise((resolve) => {
+      const back = document.createElement('div'); back.className = 'modal-backdrop';
+      const box = document.createElement('div'); box.className = 'modal-box menu';
+      if (title) box.innerHTML = `<div class="modal-title">${escHtml(title)}</div>`;
+      const list = document.createElement('div'); list.className = 'menu-list';
+      const close = (v) => { back.classList.remove('open'); setTimeout(() => back.remove(), 180); resolve(v); };
+      items.forEach(it => {
+        const b = document.createElement('button');
+        b.className = 'menu-item' + (it.danger ? ' danger' : '');
+        b.textContent = it.label; b.onclick = () => close(it.value);
+        list.appendChild(b);
+      });
+      box.appendChild(list); back.appendChild(box); document.body.appendChild(back);
+      requestAnimationFrame(() => back.classList.add('open'));
+      back.onclick = (e) => { if (e.target === back) close(null); };
+    });
+  }
+
+  _modelOptions() {
+    const opts = [{ value: '', label: '(heredar / auto)' }];
+    (this.availableModels || []).forEach(m => opts.push({ value: m, label: m.replace(/:latest$/, '') }));
+    ['codestral-latest', 'mistral-medium-latest', 'mistral-large-latest'].forEach(m => {
+      if (!opts.find(o => o.value === m)) opts.push({ value: m, label: m });
+    });
+    return opts;
+  }
+
   async _createFolder() {
-    const name = prompt('Nombre de la categoría (carpeta):');
-    if (!name || !name.trim()) return null;
-    const context = prompt('Contexto para esta carpeta (ej: "Eres un ingeniero senior"). Opcional:') || '';
-    const r = await this._workspace('folder_create', { name: name.trim(), context });
-    if (r.error) { alert('Error: ' + r.error); return null; }
+    const r = await this._modal({ title: 'Nueva categoría', submitLabel: 'Crear', fields: [
+      { name: 'name', label: 'Nombre', placeholder: 'Ingeniería' },
+      { name: 'context', label: 'Contexto (opcional)', type: 'textarea', placeholder: 'Eres un ingeniero senior…' },
+      { name: 'color', label: 'Color', type: 'color', value: '#54c7d8' },
+      { name: 'default_model', label: 'Modelo por defecto', type: 'select', options: this._modelOptions() },
+    ]});
+    if (!r || !r.name.trim()) return null;
+    const res = await this._workspace('folder_create', {
+      name: r.name.trim(), context: r.context || '', color: r.color, default_model: r.default_model || null });
+    if (res.error) { this._menu('Error: ' + res.error, [{ label: 'OK', value: 1 }]); return null; }
     await this._loadFolders();
-    return r.id || null;
+    return res.id || null;
   }
 
   async _pickFolder(title = '¿Para quién es este chat?') {
-    const folders = this.folders || [];
-    const labels = ['(Sin carpeta)', ...folders.map(f => f.name), '+ Nueva categoría…'];
-    const choice = prompt(title + '\n\n' + labels.map((l, i) => `${i}. ${l}`).join('\n') + '\n\nEscribe el número:');
-    if (choice === null) return undefined;            // cancelado
-    const idx = parseInt(choice, 10);
-    if (isNaN(idx) || idx === 0) return null;          // sin carpeta
-    if (idx === labels.length - 1) return await this._createFolder();
-    const f = folders[idx - 1];
-    return f ? f.id : null;
+    const items = [{ label: '📂 Sin carpeta', value: '__none__' },
+      ...(this.folders || []).map(f => ({ label: '📁 ' + f.name, value: f.id })),
+      { label: '＋ Nueva categoría…', value: '__new__' }];
+    const choice = await this._menu(title, items);
+    if (choice === null) return undefined;
+    if (choice === '__none__') return null;
+    if (choice === '__new__') return await this._createFolder();
+    return choice;
   }
 
   async _convMenu(convId) {
-    const a = prompt('Conversación:\n1. Mover a carpeta\n2. Color\n3. Borrar\n\nNúmero:');
     const conv = this.conversations.find(c => c.id === convId);
     if (!conv) return;
-    if (a === '1') {
+    const act = await this._menu('Conversación', [
+      { label: '📁 Mover a carpeta', value: 'move' },
+      { label: '🎨 Color', value: 'color' },
+      { label: '🗑 Borrar', value: 'del', danger: true },
+    ]);
+    if (act === 'move') {
       const fid = await this._pickFolder('Mover a:');
       if (fid === undefined) return;
-      conv.folderId = fid || null;
-    } else if (a === '2') {
-      const col = prompt('Color hex (ej #54c7d8), vacío = quitar:', conv.color || '');
-      if (col === null) return;
-      conv.color = col.trim() || null;
-    } else if (a === '3') {
-      if (!confirm('¿Borrar esta conversación?')) return;
+      conv.folderId = (typeof fid === 'number') ? fid : null;
+    } else if (act === 'color') {
+      const r = await this._modal({ title: 'Color de la conversación', submitLabel: 'Aplicar',
+        fields: [{ name: 'color', label: 'Color', type: 'color', value: conv.color || '#54c7d8' }] });
+      if (!r) return;
+      conv.color = r.color || null;
+    } else if (act === 'del') {
+      const ok = await this._menu('¿Borrar esta conversación?', [
+        { label: 'Sí, borrar', value: 'yes', danger: true }, { label: 'Cancelar', value: 'no' }]);
+      if (ok !== 'yes') return;
       this.conversations = this.conversations.filter(c => c.id !== convId);
       if (this.currentConversationId === convId) {
         this.currentConversationId = (this.conversations[0] || {}).id || null;
@@ -743,13 +829,23 @@ class CyberAgent {
   async _editFolder(fid) {
     const f = this._folderById(fid);
     if (!f) return;
-    const a = prompt(`Carpeta "${f.name}":\n1. Renombrar\n2. Contexto\n3. Color\n4. Modelo por defecto\n5. Borrar\n\nNúmero:`);
-    if (a === '1') { const n = prompt('Nuevo nombre:', f.name); if (n) await this._workspace('folder_update', { id: f.id, name: n }); }
-    else if (a === '2') { const c = prompt('Contexto (eres…):', f.context || ''); if (c !== null) await this._workspace('folder_update', { id: f.id, context: c }); }
-    else if (a === '3') { const c = prompt('Color hex:', f.color || '#54c7d8'); if (c !== null) await this._workspace('folder_update', { id: f.id, color: c }); }
-    else if (a === '4') { const m = prompt('Modelo por defecto (cyberagent-24b, codestral-latest…; vacío = ninguno):', f.default_model || ''); if (m !== null) await this._workspace('folder_update', { id: f.id, default_model: m.trim() || null }); }
-    else if (a === '5') { if (!confirm('¿Borrar la carpeta? Las conversaciones NO se borran.')) return; await this._workspace('folder_delete', { id: f.id }); }
-    else { return; }
+    const act = await this._menu(`Carpeta «${f.name}»`, [
+      { label: '✏️ Editar', value: 'edit' },
+      { label: '🗑 Borrar carpeta', value: 'del', danger: true },
+    ]);
+    if (act === 'edit') {
+      const r = await this._modal({ title: 'Editar categoría', fields: [
+        { name: 'name', label: 'Nombre', value: f.name },
+        { name: 'context', label: 'Contexto', type: 'textarea', value: f.context || '' },
+        { name: 'color', label: 'Color', type: 'color', value: f.color || '#54c7d8' },
+        { name: 'default_model', label: 'Modelo por defecto', type: 'select', options: this._modelOptions(), value: f.default_model || '' },
+      ]});
+      if (!r) return;
+      await this._workspace('folder_update', {
+        id: f.id, name: r.name, context: r.context, color: r.color, default_model: r.default_model || null });
+    } else if (act === 'del') {
+      await this._workspace('folder_delete', { id: f.id });
+    } else { return; }
     await this._loadFolders();
   }
 
