@@ -93,6 +93,22 @@ _SERVED.mkdir(parents=True, exist_ok=True)
 app.mount("/served", StaticFiles(directory=str(_SERVED)), name="served")
 
 
+@app.get("/download/{name:path}")
+def download_file(name: str):
+    """Descarga forzada (Content-Disposition: attachment) de un archivo servido.
+    Para PDFs y demás: /served/x.pdf lo abre en el navegador; /download/x.pdf lo baja."""
+    # Resuelve dentro de _SERVED evitando path traversal.
+    target = (_SERVED / name).resolve()
+    try:
+        target.relative_to(_SERVED.resolve())
+    except ValueError:
+        return JSONResponse({"error": "ruta no permitida"}, status_code=400)
+    if not target.is_file():
+        return JSONResponse({"error": "no encontrado"}, status_code=404)
+    return FileResponse(str(target), filename=target.name,
+                        media_type="application/octet-stream")
+
+
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 
 def _get_token(request: Request) -> str | None:

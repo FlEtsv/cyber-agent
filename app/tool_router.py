@@ -29,8 +29,8 @@ CATEGORIES: dict[str, set[str]] = {
                   "mistral_studio", "browse_page"},
     # Herramientas nativas de Mistral Studio + delegación al modelo local
     "studio":    {"mistral_studio", "local_llm_consult"},
-    # Generación y entrega de documentos por URL
-    "documents": {"generate_document", "serve_file"},
+    # Generación y entrega de documentos por URL + despliegue de apps/scripts
+    "documents": {"generate_document", "serve_file", "deploy_app"},
     # 2.0: git, lectura de documentos del usuario, navegador headless
     "devtools":  {"git_op", "read_document", "browse_page"},
     # 2.0: programación de tareas autónomas + mensajería saliente
@@ -121,7 +121,10 @@ _KW: dict[str, set[str]] = {
     "documents": {"documento","pdf","informe","reporte","entrega","entregable",
                   "genera un pdf","genera documento","exporta","exportar","docx",
                   "enlace","link","url","descargar","sirve","servir","comparte",
-                  "compartir","archivo para descargar"},
+                  "compartir","archivo para descargar","despliega","desplegar",
+                  "publica","publicar","hostea","hostear","host","aloja","alojar",
+                  "ponlo online","accede desde fuera","accede remoto","mi app online",
+                  "sirve la app","levanta el servidor","deploy","túnel","tunnel"},
     "devtools":  {"git","commit","push","clone","repositorio","repo","rama","branch",
                   "pull request","diff","navegador","navega","headless","playwright",
                   "rellena formulario","login web","spa","javascript","lee este pdf",

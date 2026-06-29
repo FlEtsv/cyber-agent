@@ -688,6 +688,24 @@ TOOLS_SCHEMA = [
         }, "required": ["op"]}
     }},
     {"type": "function", "function": {
+        "name": "deploy_app",
+        "description": "Despliega y sirve REMOTAMENTE una app o script creado para el usuario y devuelve "
+                       "una URL pública. Autodetecta el tipo: una web estática (HTML/CSS/JS) se sirve por el "
+                       "túnel existente; una app dinámica (Python/Node con servidor propio) instala sus "
+                       "dependencias, arranca en un puerto libre (lee la env PORT) y obtiene su propio túnel "
+                       "Cloudflare. Úsalo cuando el usuario quiera acceder desde fuera a algo que has creado. "
+                       "Acción sensible (ejecuta código/instala deps): requiere aprobación. Usa op para "
+                       "gestionar: 'publish' (def.), 'list', 'stop'.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Ruta de la carpeta del proyecto o archivo suelto (.html/.py/.js) a publicar"},
+            "name": {"type": "string", "description": "Nombre legible (define el slug de la URL en estáticos)"},
+            "kind": {"type": "string", "description": "static|python|node (autodetecta si se omite)"},
+            "run_cmd": {"type": "string", "description": "Comando de arranque para apps dinámicas (opcional; debe escuchar en $PORT)"},
+            "op": {"type": "string", "description": "publish (default) | list | stop"},
+            "slug": {"type": "string", "description": "Slug del despliegue a parar (con op='stop')"},
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
         "name": "generate_document",
         "description": "Genera un documento (PDF, HTML, Markdown o TXT) a partir de contenido y lo deja "
                        "listo para servir por URL pública al usuario. Ideal para entregar informes, "
@@ -1087,7 +1105,7 @@ TOOLS_SCHEMA = [
 
 DANGEROUS_TOOLS = {"shell", "write_file", "edit_file", "multi_edit", "run_python", "install_package",
                    "uninstall_package", "kill_process", "env_vars",
-                   "run_tests", "apply_patch", "gmail_send", "apps_script"} | MOBILE_DANGEROUS
+                   "run_tests", "apply_patch", "gmail_send", "apps_script", "deploy_app"} | MOBILE_DANGEROUS
 
 ACTIVE_SECURITY_TOOLS = {
     "port_scan", "dir_bruteforce", "ping_sweep", "banner_grab",
@@ -1406,6 +1424,7 @@ def execute_tool(name: str, args: dict) -> dict:
                                         args["prompt"],
                                         args.get("connectors"),
                                         args.get("model")),
+            "deploy_app":           lambda: _deploy_app(args),
             "apps_script":          lambda: __import__("app.apps_script", fromlist=["run"]).run(
                                         args.get("op", ""),
                                         args.get("params") or {},
@@ -2726,6 +2745,23 @@ def _web_search(query: str, max_results: int = 5, fetch_content: bool = True) ->
         }
     except Exception as e:
         return {"error": str(e), "query": query}
+
+
+def _deploy_app(args: dict) -> dict:
+    """Despliega/sirve apps y scripts del usuario por URL pública (ver app.deployer)."""
+    try:
+        from app import deployer
+    except Exception as e:
+        return {"ok": False, "error": f"deployer no disponible: {e}"}
+    op = (args.get("op") or "publish").lower()
+    if op == "list":
+        return deployer.list_deployments()
+    if op == "stop":
+        slug = args.get("slug") or args.get("name") or ""
+        return deployer.stop(slug)
+    path = args.get("path") or ""
+    return deployer.publish(path, name=args.get("name"),
+                            kind=args.get("kind"), run_cmd=args.get("run_cmd"))
 
 
 def _rag_search(query: str, n_results: int = 3) -> dict:
