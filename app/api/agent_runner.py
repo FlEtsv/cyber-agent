@@ -85,6 +85,19 @@ class AgentRunner:
             # Auto-routing
             last_user = next((m["content"] for m in reversed(self.messages)
                               if m["role"] == "user"), "")
+            # A3: carpeta del workspace (contexto + modelo por defecto)
+            self._folder = None
+            try:
+                from app import database as _db
+                self._folder = _db.get_conversation_folder(self.conversation_id)
+            except Exception:
+                self._folder = None
+            # El modelo por defecto de la carpeta MANDA si el usuario está en auto/local
+            if (self._folder and self._folder.get("default_model")
+                    and self.model in (OLLAMA_MODEL, "auto")):
+                self.model = self._folder["default_model"]
+                self._q.put({"type": "reasoning",
+                             "data": f"📁 Carpeta «{self._folder['name']}» → modelo {self.model}"})
             from app.brain import is_mistral_model, is_fused, resolve_model
             if self.model in (OLLAMA_MODEL, "auto"):
                 try:
@@ -109,6 +122,11 @@ class AgentRunner:
                 f"- iPhone: usa ios_shell (SSH).\n"
                 f"- PC: acceso total al sistema Windows."
             )
+
+            # A3: contexto específico de la carpeta (p.ej. "eres ingeniero…")
+            if self._folder and (self._folder.get("context") or "").strip():
+                system += (f"\n\n## CONTEXTO DE LA CARPETA «{self._folder['name']}»\n"
+                           + self._folder["context"].strip()[:2000])
 
             last_user = next(
                 (m["content"] for m in reversed(self.messages) if m["role"] == "user"), ""

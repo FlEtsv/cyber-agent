@@ -235,3 +235,15 @@ def move_conversation(conv_id, folder_id):
 def set_conversation_color(conv_id, color):
     with get_conn() as c:
         c.execute("UPDATE conversations SET color=? WHERE id=?", (color, conv_id))
+
+
+def get_conversation_folder(conv_id):
+    """Devuelve la carpeta (dict) de una conversación, o None. Para inyectar
+    contexto y modelo por defecto de la carpeta (A3)."""
+    if conv_id is None:
+        return None
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT f.* FROM folders f JOIN conversations c ON c.folder_id = f.id "
+            "WHERE c.id = ?", (conv_id,)).fetchone()
+        return dict(row) if row else None

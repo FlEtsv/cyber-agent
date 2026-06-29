@@ -456,6 +456,11 @@ class AgentWorker(QThread):
 
     def _build_system_with_rag(self) -> str:
         system = self.system_prompt if self.system_prompt is not None else _build_base_prompt()
+        # A3: contexto específico de la carpeta (p.ej. "eres ingeniero…")
+        folder = getattr(self, "_folder", None)
+        if folder and (folder.get("context") or "").strip():
+            system += (f"\n\n## CONTEXTO DE LA CARPETA «{folder['name']}»\n"
+                       + folder["context"].strip()[:2000])
         last_user = ""
         for m in reversed(self.messages):
             if m["role"] == "user":
@@ -491,6 +496,17 @@ class AgentWorker(QThread):
             last_user = next((m["content"] for m in reversed(self.messages)
                               if m["role"] == "user"), "")
             log("INFO", "run", "Mensaje usuario", {"msg": last_user[:200]})
+            # A3: carpeta del workspace (contexto + modelo por defecto)
+            self._folder = None
+            try:
+                from app import database as _db
+                self._folder = _db.get_conversation_folder(self.conversation_id)
+            except Exception:
+                self._folder = None
+            if (self._folder and self._folder.get("default_model")
+                    and self.model in (OLLAMA_MODEL, "auto")):
+                self.model = self._folder["default_model"]
+                self.reasoning.emit(f"📁 Carpeta «{self._folder['name']}» → modelo {self.model}")
             from app.brain import is_mistral_model, is_fused, resolve_model
             if self.model in (OLLAMA_MODEL, "auto"):  # solo si no fue forzado manualmente
                 try:
