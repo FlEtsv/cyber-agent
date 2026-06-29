@@ -169,11 +169,14 @@ class RelayConnector:
                     if k in msg})
                 data = {"ok": True}
             elif action == "folder_delete":
-                db.delete_folder(msg["id"]); data = {"ok": True}
+                db.delete_folder(msg["id"])
+                data = {"ok": True}
             elif action == "conv_move":
-                db.move_conversation(msg["conv_id"], msg.get("folder_id")); data = {"ok": True}
+                db.move_conversation(msg["conv_id"], msg.get("folder_id"))
+                data = {"ok": True}
             elif action == "conv_color":
-                db.set_conversation_color(msg["conv_id"], msg.get("color")); data = {"ok": True}
+                db.set_conversation_color(msg["conv_id"], msg.get("color"))
+                data = {"ok": True}
             else:
                 data = {"error": f"acción desconocida: {action}"}
         except Exception as e:
