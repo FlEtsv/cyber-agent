@@ -223,6 +223,7 @@ class RelayConnector:
                 tool_permissions = msg.get("permissions", {}) or {},
                 device_context   = "móvil (relay)",
                 expert_mode      = False,   # nunca auto-aprobar peligrosas en remoto
+                folder_id        = msg.get("folder_id"),
             )
         except Exception as e:
             try:

@@ -41,6 +41,7 @@ class AgentRunner:
         device_context: str     = "PC (escritorio)",
         conversation_id         = None,
         expert_mode: bool       = False,
+        folder_id               = None,
     ):
         self.messages         = messages
         self.model            = model
@@ -49,6 +50,7 @@ class AgentRunner:
         self.device_context   = device_context
         self.conversation_id  = conversation_id
         self.expert_mode      = expert_mode
+        self.folder_id        = folder_id
         self._q               = queue.Queue()
         self._approvals: dict[str, threading.Event] = {}
         self._approval_res: dict[str, bool]         = {}
@@ -89,7 +91,8 @@ class AgentRunner:
             self._folder = None
             try:
                 from app import database as _db
-                self._folder = _db.get_conversation_folder(self.conversation_id)
+                self._folder = (_db.get_folder(self.folder_id) if self.folder_id
+                                else _db.get_conversation_folder(self.conversation_id))
             except Exception:
                 self._folder = None
             # El modelo por defecto de la carpeta MANDA si el usuario está en auto/local
