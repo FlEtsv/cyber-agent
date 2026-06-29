@@ -333,6 +333,10 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 | WEBPROD-014 | ✅ | Adjuntar archivos NO-imagen (scripts, docs, pdf, csv…) desde la web | `app/attachments.py`, `apps/web/*`, `app/api/*` | HECHO `fdddfdc` |
 | WEBPROD-015 | ✅ | Suite Google: implementación cómoda y usable (conexión OAuth fácil + acciones Gmail/Drive/Calendar desde la UI) | `app/google_suite.py`, `app/api/relay_connector.py`, `apps/web/*` | HECHO `98e80ec` (falta que Steve coloque google_credentials.json — ver docs/SETUP_GOOGLE.md) |
 | WEBPROD-016 | ✅ | Puente Apps Script: acciones avanzadas arbitrarias en el Workspace (Sheets/Docs/Slides/Gmail/Drive/Calendar; catálogo + `op:exec`), con aprobación como consentimiento | `integrations/apps_script/Code.gs`, `app/apps_script.py`, `app/tools.py`, `app/tool_router.py` | CÓDIGO HECHO `303bc07` — falta que Steve despliegue la webapp y ponga APPS_SCRIPT_URL/SECRET (docs/SETUP_GOOGLE.md) |
+| WEBPROD-017 | ✅ | BUG: mensajes duplicados en el chat web (varios sockets procesando cada evento + backend reañadía el turno del usuario al escalar) | `apps/web/app.js`, `app/api/relay_connector.py`, `app/api/server.py` | HECHO `1de52ad` |
+| WEBPROD-018 | ✅ | Selector de modelos diferenciado (optgroups Automático/🟢 Local·gratis/☁️ Nube·de pago) + Codestral 22B local cableado (`codestral:22b` → Ollama, `codestral-latest` → Mistral) | `apps/web/app.js`, `app/brain.py` | HECHO `25528b7` |
+| WEBPROD-019 | ⏸️ | Conector RunPod: gpt-oss-120b vía vLLM en A100 (start/stop desde la app + auto-apagado por inactividad 10 min). Scaffold listo, sin cablear | `app/runpod.py` | SCAFFOLD `968a8f3` — EN PAUSA (problemas técnicos del modelo, por orden de Steve) |
+| WEBPROD-020 | ⬜ | BUG: al actualizar y pulsar "Reiniciar" la app se cierra pero no se reabre, y al abrir manualmente vuelve a pedir actualizar sin aplicar cambios. Causa raíz: local va 96 commits por delante de origin → `updater.py` compara HEAD vs sha remoto de GitHub → siempre reporta update y `git pull --ff-only` falla; revisar también `_restart_app` (carrera mutex/visibilidad tray) | `app/updater.py`, `main.py` | PENDIENTE |
 
 ---
 
