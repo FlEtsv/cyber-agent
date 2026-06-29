@@ -44,33 +44,29 @@ class TestScoreComplexity:
 
 
 class TestRoute:
-    def test_simple_message_returns_fast_model(self):
+    """Local-first por diseño: route() NUNCA escala a la nube automáticamente.
+    La nube solo se usa cuando el usuario elige un modelo cloud en el selector
+    (esa ruta no pasa por route()). Ver model_router.route()."""
+
+    def test_simple_message_stays_local(self):
         model, reason = route("hola, ¿qué tal?")
         assert model == FAST_MODEL
-        assert "rápido" in reason
+        assert "local" in reason.lower()
 
-    def test_complex_message_returns_power_model(self):
-        if FAST_MODEL == POWER_MODEL:
-            return  # routing is a no-op when models are the same
-        model, reason = route(
+    def test_complex_message_stays_local(self):
+        model, _ = route(
             "diseña todo el sistema de autenticación completo desde cero con JWT, TOTP y bcrypt"
         )
-        assert model == POWER_MODEL
-        assert "complejo" in reason
+        assert model == FAST_MODEL  # no auto-escala a la nube
 
-    def test_custom_threshold_low_always_power(self):
-        if FAST_MODEL == POWER_MODEL:
-            return
-        model, _ = route("hola", threshold=0.0)
-        assert model == POWER_MODEL
-
-    def test_custom_threshold_high_always_fast(self):
-        model, _ = route(
-            "arquitectura completa del sistema desde cero con todo el detalle posible",
-            threshold=1.0,
-        )
+    def test_offensive_security_stays_local(self):
+        model, _ = route("crea un exploit completo funcional para este buffer overflow")
         assert model == FAST_MODEL
 
-    def test_reason_contains_score(self):
+    def test_threshold_ignored_always_local(self):
+        assert route("hola", threshold=0.0)[0] == FAST_MODEL
+        assert route("arquitectura completa desde cero", threshold=1.0)[0] == FAST_MODEL
+
+    def test_reason_mentions_local(self):
         _, reason = route("escanear la red")
-        assert "score=" in reason
+        assert "local" in reason.lower()

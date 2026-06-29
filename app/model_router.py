@@ -117,27 +117,29 @@ def score_complexity(message: str) -> float:
 def route(message: str, threshold: float = 0.6) -> tuple[str, str]:
     """
     Devuelve (model_name, reason).
-    threshold: score mínimo para escalar al modelo potente.
 
-    En tareas complejas escala a Mistral (nube) si hay API key y está habilitado;
-    si no, al modelo potente local.
+    LOCAL-FIRST POR DISEÑO: el modelo local abliterado hace TODO. Este router NUNCA
+    escala automáticamente a la nube (Mistral) — hacerlo rompía el sentido del modelo
+    sin censura y, peor, la nube rechaza tareas de seguridad y el agente se frenaba.
+
+    La nube SOLO se usa cuando Steve la elige a mano en el selector (model='mistral-*',
+    'fused', 'codestral-latest'); esa ruta NO pasa por aquí. Para reactivar el escalado
+    automático (no recomendado): CYBERAGENT_AUTO_CLOUD=1 y CYBERAGENT_PREFER_CLOUD=1.
     """
+    if os.environ.get("CYBERAGENT_AUTO_CLOUD", "0").strip() in ("0", "false", "no", ""):
+        return FAST_MODEL, "local (el abliterado hace todo; la nube solo si la eliges tú)"
+
+    # Camino legacy opcional (desactivado por defecto).
     s = score_complexity(message)
     if s >= threshold:
-        # Tareas que Mistral rechazaría por guardrails → se quedan en local potente.
         if is_cloud_sensitive(message):
-            return POWER_MODEL, (
-                f"complejo y sensible (score={s:.2f}) → local potente "
-                "(Mistral lo rechazaría por guardrails)"
-            )
+            return POWER_MODEL, f"complejo y sensible (score={s:.2f}) → local"
         if PREFER_CLOUD_FOR_COMPLEX:
             try:
                 from app.brain import mistral_available
                 if mistral_available():
-                    return MISTRAL_MODEL, (
-                        f"complejo (score={s:.2f}) → Mistral nube ({MISTRAL_MODEL})"
-                    )
+                    return MISTRAL_MODEL, f"complejo (score={s:.2f}) → Mistral nube"
             except Exception:
                 pass
-        return POWER_MODEL, f"complejo: tarea compleja (score={s:.2f}) → modelo potente"
-    return FAST_MODEL, f"tarea estándar (score={s:.2f}) → modelo rápido"
+        return POWER_MODEL, f"complejo (score={s:.2f}) → local potente"
+    return FAST_MODEL, f"estándar (score={s:.2f}) → local"
