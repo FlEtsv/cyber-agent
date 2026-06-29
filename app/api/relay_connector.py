@@ -158,6 +158,22 @@ class RelayConnector:
                     r = self._runners.get(msg.get("session_id", ""))
                     if r:
                         r.stop()
+                elif msg_type == "approve":
+                    # Aprobación de herramienta peligrosa desde el móvil. Sin esto,
+                    # el runner se quedaba esperando para siempre → la acción fallaba.
+                    sid = msg.get("session_id", "")
+                    r = self._runners.get(sid)
+                    if r is None and len(self._runners) == 1:
+                        r = next(iter(self._runners.values()))
+                    if r:
+                        r.approve(msg.get("tool_id", ""), bool(msg.get("approved", False)))
+                elif msg_type in ("watch_start", "watch_stop"):
+                    # El modo vigilancia (captura de pantalla en bucle) solo existe en
+                    # la sesión local; en remoto lo ignoramos sin romper el bucle.
+                    if msg_type == "watch_start":
+                        await ws.send(json.dumps({
+                            "type": "status", "session_id": msg.get("session_id", ""),
+                            "data": "El modo vigilancia solo está disponible en el PC."}))
                 elif msg_type == "session:new":
                     await self._handle_new_session(ws, msg)
                 elif msg_type == "session:resume":
