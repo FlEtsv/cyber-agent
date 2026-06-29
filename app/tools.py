@@ -2603,11 +2603,48 @@ def _memory_info(top_n: int = 10) -> dict:
         return {"error": str(e)}
 
 
-def _web_search(query: str, max_results: int = 5) -> dict:
-    """Búsqueda web. Prefiere Mistral (real, con fuentes); fallback DuckDuckGo HTML."""
+def _html_to_text(html: str, limit: int = 1800) -> str:
+    """Extrae texto legible de una página: quita script/style/nav y colapsa espacios."""
     import re as _re
+    html = _re.sub(r'(?is)<(script|style|noscript|template|svg)[^>]*>.*?</\1>', ' ', html)
+    html = _re.sub(r'(?is)<(header|footer|nav|aside)[^>]*>.*?</\1>', ' ', html)
+    text = _re.sub(r'(?s)<[^>]+>', ' ', html)
+    for a, b in (("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'),
+                 ("&#39;", "'"), ("&nbsp;", " "), ("&aacute;", "á"), ("&eacute;", "é"),
+                 ("&iacute;", "í"), ("&oacute;", "ó"), ("&uacute;", "ú"), ("&ntilde;", "ñ")):
+        text = text.replace(a, b)
+    text = _re.sub(r'[ \t\r\f]+', ' ', text)
+    text = _re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+    text = text.strip()
+    return text[:limit]
+
+
+def _fetch_readable(url: str, limit: int = 1800, timeout: float = 12.0) -> str:
+    """Descarga una URL y devuelve su texto legible (vacío si falla o no es HTML)."""
+    try:
+        import httpx
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        }
+        r = httpx.get(url, headers=headers, timeout=timeout, follow_redirects=True)
+        if r.status_code >= 400 or "html" not in r.headers.get("content-type", "html"):
+            return ""
+        return _html_to_text(r.text, limit=limit)
+    except Exception:
+        return ""
+
+
+def _web_search(query: str, max_results: int = 5, fetch_content: bool = True) -> dict:
+    """Búsqueda web tipo ChatGPT/Claude: resultados con URLs reales + contenido de
+    las páginas top + fuentes numeradas para que el modelo sintetice con citas [1][2].
+    Prefiere Mistral (real, con fuentes); si no, DuckDuckGo HTML + fetch de páginas."""
+    import re as _re
+    from urllib.parse import unquote, urlparse, parse_qs
     max_results = min(int(max_results), 10)
-    # 1) Búsqueda real vía Mistral si hay API key
+
+    # 1) Búsqueda real vía Mistral si hay API key (ya devuelve respuesta con fuentes)
     try:
         from app.mistral_studio import available as _ms_avail, run as _ms_run
         if _ms_avail():
@@ -2620,7 +2657,8 @@ def _web_search(query: str, max_results: int = 5) -> dict:
                         "answer": res["text"], "tools_used": res.get("tools_used", [])}
     except Exception:
         pass
-    # 2) Fallback DuckDuckGo HTML scraping
+
+    # 2) Fallback DuckDuckGo HTML scraping (URLs reales + contenido de las top)
     try:
         import httpx
         headers = {
@@ -2636,23 +2674,56 @@ def _web_search(query: str, max_results: int = 5) -> dict:
             follow_redirects=True,
         )
         html = r.text
+
         def clean(s):
             s = _re.sub(r'<[^>]+>', '', s)
             return s.strip().replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"')
 
-        titles   = [clean(m) for m in _re.findall(r'class="result__a"[^>]*>(.*?)</a>', html, _re.DOTALL)]
+        def real_url(href: str) -> str:
+            # DDG envuelve los enlaces en /l/?uddg=<url codificada>
+            if "uddg=" in href:
+                try:
+                    q = parse_qs(urlparse(href).query)
+                    if q.get("uddg"):
+                        return unquote(q["uddg"][0])
+                except Exception:
+                    pass
+            if href.startswith("//"):
+                return "https:" + href
+            return href
+
+        # title + href juntos, en orden
+        pairs = _re.findall(r'<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, _re.DOTALL)
         snippets = [clean(m) for m in _re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', html, _re.DOTALL)]
-        urls_raw = [clean(m) for m in _re.findall(r'class="result__url"[^>]*>\s*(.*?)\s*</span>', html, _re.DOTALL)]
 
         results = []
-        for i in range(min(max_results, len(titles))):
+        for i in range(min(max_results, len(pairs))):
+            href, title = pairs[i]
             results.append({
-                "title":   titles[i],
+                "n":       i + 1,
+                "title":   clean(title),
+                "url":     real_url(clean(href)),
                 "snippet": snippets[i] if i < len(snippets) else "",
-                "url":     urls_raw[i] if i < len(urls_raw) else "",
             })
 
-        return {"query": query, "results": results, "count": len(results)}
+        # Trae el contenido de los 3 primeros para que el modelo cite con material real
+        if fetch_content:
+            for item in results[:3]:
+                if item.get("url", "").startswith("http"):
+                    content = _fetch_readable(item["url"])
+                    if content:
+                        item["content"] = content
+
+        return {
+            "query": query,
+            "engine": "duckduckgo",
+            "results": results,
+            "count": len(results),
+            "instructions": ("Sintetiza una respuesta directa y completa a partir de "
+                             "estas fuentes y cita en línea con [n] (p.ej. [1], [2]) "
+                             "enlazando al número de fuente. Termina con una lista "
+                             "'Fuentes:' numerada con título y URL."),
+        }
     except Exception as e:
         return {"error": str(e), "query": query}
 
