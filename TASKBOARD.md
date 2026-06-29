@@ -200,6 +200,8 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 [claude] WEBPROD-005 — Crear imágenes (FLUX) desde la web (botón 🎨 → generate_image directo) — Commit: 410f49d — Fecha: 2026-06-29
 [claude] WEBPROD-009 — Menú de gasto por mensaje ($ → modal individual + acumulado mensual) — Commit: 8cbefe2 — Fecha: 2026-06-29
 [claude] WEBPROD-010 — Subcategorías/proyectos + herencia de contexto padre→hija — Commit: 7e45da4 — Fecha: 2026-06-29
+[claude] WEBPROD-007+008 — Compositor móvil pro + gzip/cache en Cloud Run — Commit: 436f0f0 — Fecha: 2026-06-29
+[claude] WEBPROD-015 — Suite Google cómoda: conectar/desconectar + acciones rápidas (falta credenciales de Steve) — Commit: 98e80ec — Fecha: 2026-06-29
 
 [claude] RELAY-BE-001+002+003 — Relay upgrade backend: modelos passthrough, buffer de sesión 50 msgs + endpoint history, ping/pong PC 15s — Commit: c392367 — Fecha: 2026-06-25
 [codex] RELAY-UI-001..005 — Frontend relay remoto: historial remoto/localStorage restaurable, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Validación: node --check relay/web/app.js + pytest 47/47 — Commit: 0ba9c1e — Fecha: 2026-06-25 07:45
@@ -320,15 +322,15 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 | WEBPROD-004 | ✅ | "Modelo local" en la UI + footer "¿Es útil?"/"Escalar" con escalera reactiva (prog→Codestral→Large; resto→Medium→Large) | `apps/web/app.js`, `apps/web/style.css` | HECHO `9f45d7f` |
 | WEBPROD-005 | ✅ | Mistral creación de imágenes accesible desde la web (botón 🎨 → FLUX directo) | `app/api/relay_connector.py`, `apps/web/*` | HECHO `410f49d` |
 | WEBPROD-006 | ✅ | Mistral interpretación de imágenes (visión Pixtral) sobre adjuntos | `app/vision.py`, `app/api/*` | HECHO `43ba89b` (visión local→Pixtral) |
-| WEBPROD-007 | ✅ | Web mobile-first "hecha y derecha" (responsive pro, gestos, layout móvil) | `apps/web/style.css`, `apps/web/index.html`, `apps/web/app.js` | pendiente |
-| WEBPROD-008 | ✅ | Improve total dentro de límites Cloud Run con coste mínimo (caché, compresión, min-instances) | `relay/main.py`, `relay/deploy.ps1`, `apps/web/sw.js` | pendiente |
+| WEBPROD-007 | ✅ | Web mobile-first "hecha y derecha" (responsive pro, gestos, layout móvil) | `apps/web/style.css` | HECHO `436f0f0` (compositor móvil; resto ya existía) |
+| WEBPROD-008 | ✅ | Improve total dentro de límites Cloud Run con coste mínimo (caché, compresión, min-instances) | `relay/main.py` | HECHO `436f0f0` (gzip + cache headers; min-instances=0 ya) |
 | WEBPROD-009 | ✅ | Menú de gasto por mensaje: icono $ → modal coste por tokens/€ individual + acumulado mensual de todos los modelos | `apps/web/app.js`, `apps/web/style.css`, `app/api/agent_runner.py`, `app/mistral_usage.py`, `app/local_usage.py` | HECHO `8cbefe2` |
 | WEBPROD-010 | ✅ | Carpetas/categorías/proyectos con contexto y modelo por defecto (terminar jerarquía y aplicación de contexto) | `app/database.py`, `app/api/*`, `apps/web/app.js` | HECHO `7e45da4` (subcategorías + herencia de contexto) |
 | WEBPROD-011 | ✅ | Adjuntos automáticos por conversación (archivos/links/scripts subidos o generados → archivos de esa conversación) | `app/database.py`, `app/attachments.py`, `app/api/*`, `apps/web/*` | HECHO `db7d59a`+`686d11a` |
 | WEBPROD-012 | ✅ | Favoritos: persistir adjuntos aunque se borre la conversación (flag favorite; al borrar conv, conservar favoritos) | `app/database.py`, `app/api/*`, `apps/web/*` | HECHO `db7d59a`+`686d11a` |
 | WEBPROD-013 | ✅ | BUG: adjuntar imágenes desde la web no funciona (no envía fotos) | `app/vision.py`, `app/api/relay_connector.py` | HECHO `43ba89b` (relay descartaba las imágenes) |
 | WEBPROD-014 | ✅ | Adjuntar archivos NO-imagen (scripts, docs, pdf, csv…) desde la web | `app/attachments.py`, `apps/web/*`, `app/api/*` | HECHO `fdddfdc` |
-| WEBPROD-015 | ✅ | Suite Google: implementación cómoda y usable (conexión OAuth fácil + acciones Gmail/Drive/Calendar desde la UI) | `app/google_suite.py`, `app/tools.py`, `apps/web/*` | pendiente |
+| WEBPROD-015 | ✅ | Suite Google: implementación cómoda y usable (conexión OAuth fácil + acciones Gmail/Drive/Calendar desde la UI) | `app/google_suite.py`, `app/api/relay_connector.py`, `apps/web/*` | HECHO `98e80ec` (falta que Steve coloque google_credentials.json — ver docs/SETUP_GOOGLE.md) |
 | WEBPROD-016 | ✅ | Integración con Google Apps Script para controlar emails y el ecosistema Google. **LA ÚLTIMA**: requiere interacción de Steve (autorizar script, desplegar webapp) | `app/*`, `apps/web/*`, `relay/apps_script_email_code.gs` | pendiente (última, necesita Steve) |
 
 ---
