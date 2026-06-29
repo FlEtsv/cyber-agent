@@ -672,6 +672,22 @@ TOOLS_SCHEMA = [
         }, "required": ["prompt"]}
     }},
     {"type": "function", "function": {
+        "name": "apps_script",
+        "description": "Ejecuta acciones AVANZADAS en la cuenta Google del usuario vía su webapp de Apps "
+                       "Script: crear/modificar Google Sheets, Docs, Slides; gestionar y coordinar Gmail "
+                       "(buscar, enviar, etiquetar/archivar en lote); Drive y Calendar. Usa una operación "
+                       "del catálogo (op) o, para algo a medida, op='exec' con 'code' de Apps Script que "
+                       "devuelve un valor. Acción sensible: requiere aprobación del usuario. Úsalo cuando "
+                       "el usuario pida tareas reales sobre su Workspace que la API básica no cubre.",
+        "parameters": {"type": "object", "properties": {
+            "op": {"type": "string", "description": "Operación: sheets_create/sheets_append/sheets_read, "
+                   "doc_create/doc_append, slides_create, gmail_search/gmail_send/gmail_label, drive_list, "
+                   "calendar_create, o 'exec' para código arbitrario."},
+            "params": {"type": "object", "description": "Parámetros de la operación (p.ej. {title, rows} o {to, subject, body})"},
+            "code": {"type": "string", "description": "Solo con op='exec': código Apps Script que recibe `params` y hace return de un valor serializable."},
+        }, "required": ["op"]}
+    }},
+    {"type": "function", "function": {
         "name": "generate_document",
         "description": "Genera un documento (PDF, HTML, Markdown o TXT) a partir de contenido y lo deja "
                        "listo para servir por URL pública al usuario. Ideal para entregar informes, "
@@ -1071,7 +1087,7 @@ TOOLS_SCHEMA = [
 
 DANGEROUS_TOOLS = {"shell", "write_file", "edit_file", "multi_edit", "run_python", "install_package",
                    "uninstall_package", "kill_process", "env_vars",
-                   "run_tests", "apply_patch", "gmail_send"} | MOBILE_DANGEROUS
+                   "run_tests", "apply_patch", "gmail_send", "apps_script"} | MOBILE_DANGEROUS
 
 ACTIVE_SECURITY_TOOLS = {
     "port_scan", "dir_bruteforce", "ping_sweep", "banner_grab",
@@ -1390,6 +1406,10 @@ def execute_tool(name: str, args: dict) -> dict:
                                         args["prompt"],
                                         args.get("connectors"),
                                         args.get("model")),
+            "apps_script":          lambda: __import__("app.apps_script", fromlist=["run"]).run(
+                                        args.get("op", ""),
+                                        args.get("params") or {},
+                                        args.get("code", "")),
             "generate_document":    lambda: _generate_document(
                                         args["content"],
                                         args.get("filename", "documento"),

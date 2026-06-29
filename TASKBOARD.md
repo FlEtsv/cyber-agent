@@ -202,6 +202,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 [claude] WEBPROD-010 — Subcategorías/proyectos + herencia de contexto padre→hija — Commit: 7e45da4 — Fecha: 2026-06-29
 [claude] WEBPROD-007+008 — Compositor móvil pro + gzip/cache en Cloud Run — Commit: 436f0f0 — Fecha: 2026-06-29
 [claude] WEBPROD-015 — Suite Google cómoda: conectar/desconectar + acciones rápidas (falta credenciales de Steve) — Commit: 98e80ec — Fecha: 2026-06-29
+[claude] WEBPROD-016 — Puente Apps Script (catálogo + exec, tool peligrosa con consentimiento); falta despliegue de Steve — Commit: (este) — Fecha: 2026-06-29
 
 [claude] RELAY-BE-001+002+003 — Relay upgrade backend: modelos passthrough, buffer de sesión 50 msgs + endpoint history, ping/pong PC 15s — Commit: c392367 — Fecha: 2026-06-25
 [codex] RELAY-UI-001..005 — Frontend relay remoto: historial remoto/localStorage restaurable, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Validación: node --check relay/web/app.js + pytest 47/47 — Commit: 0ba9c1e — Fecha: 2026-06-25 07:45
@@ -331,7 +332,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 | WEBPROD-013 | ✅ | BUG: adjuntar imágenes desde la web no funciona (no envía fotos) | `app/vision.py`, `app/api/relay_connector.py` | HECHO `43ba89b` (relay descartaba las imágenes) |
 | WEBPROD-014 | ✅ | Adjuntar archivos NO-imagen (scripts, docs, pdf, csv…) desde la web | `app/attachments.py`, `apps/web/*`, `app/api/*` | HECHO `fdddfdc` |
 | WEBPROD-015 | ✅ | Suite Google: implementación cómoda y usable (conexión OAuth fácil + acciones Gmail/Drive/Calendar desde la UI) | `app/google_suite.py`, `app/api/relay_connector.py`, `apps/web/*` | HECHO `98e80ec` (falta que Steve coloque google_credentials.json — ver docs/SETUP_GOOGLE.md) |
-| WEBPROD-016 | ✅ | Integración con Google Apps Script para controlar emails y el ecosistema Google. **LA ÚLTIMA**: requiere interacción de Steve (autorizar script, desplegar webapp) | `app/*`, `apps/web/*`, `relay/apps_script_email_code.gs` | pendiente (última, necesita Steve) |
+| WEBPROD-016 | ✅ | Puente Apps Script: acciones avanzadas arbitrarias en el Workspace (Sheets/Docs/Slides/Gmail/Drive/Calendar; catálogo + `op:exec`), con aprobación como consentimiento | `integrations/apps_script/Code.gs`, `app/apps_script.py`, `app/tools.py`, `app/tool_router.py` | CÓDIGO HECHO `<pendiente>` — falta que Steve despliegue la webapp y ponga APPS_SCRIPT_URL/SECRET (docs/SETUP_GOOGLE.md) |
 
 ---
 

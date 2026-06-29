@@ -29,25 +29,37 @@ estado, **Conectar**, **Desconectar** y acciones rápidas (no leídos / eventos 
 
 ---
 
-## WEBPROD-016 — Apps Script (controlar emails y ecosistema Google) — LA ÚLTIMA
+## WEBPROD-016 — Apps Script (acciones avanzadas en tu Workspace) — LA ÚLTIMA
 
-La API de Google (015) ya cubre leer/enviar correo, Drive y Calendar. Apps Script
-añade automatización avanzada (triggers, Sheets, acciones personalizadas) vía una
-**webapp** que tú despliegas y que el agente llama con un secreto compartido.
+**Ya implementado y listo para desplegar.** No es un catálogo cerrado: es un
+**puente flexible**. Cuando pidas algo de Google, el agente entra en tu Apps
+Script y ejecuta acciones avanzadas arbitrarias — crear/modificar Sheets, Docs,
+Slides, gestionar/coordinar Gmail, Drive, Calendar — vía:
+- un **catálogo** de operaciones (`sheets_create`, `doc_append`, `slides_create`,
+  `gmail_label`, `calendar_create`, …), o
+- **`op:"exec"`** con código Apps Script a medida para cualquier cosa ("etc…").
 
-### Lo que necesito decidir contigo antes de implementar
-- ¿Qué acciones concretas quieres que el agente dispare por Apps Script?
-  (ej.: etiquetar/archivar correos en lote, responder con plantillas, escribir en
-  una Sheet, crear eventos, mover archivos…).
-- Confirmar el modelo: webapp de Apps Script desplegada **como tú**, con un token
-  secreto; el PC la llama por HTTPS.
+Cada acción pasa por la **tarjeta de aprobación** del agente (tool `apps_script`
+es peligrosa) → tú das el consentimiento en el momento.
 
-### Tu parte (cuando definamos las acciones)
-1. **script.google.com** → nuevo proyecto → pego el código que prepararé.
-2. **Implementar → Nueva implementación → Aplicación web** → ejecutar **como tú**,
-   acceso "solo yo".
-3. Me pasas la **URL de la webapp** + el **secreto**; los pongo en `.env`
-   (`APPS_SCRIPT_URL`, `APPS_SCRIPT_SECRET`) y conecto la tool.
+### Tu parte (una vez)
+1. Abre **script.google.com** → Nuevo proyecto.
+2. Pega el contenido de **`integrations/apps_script/Code.gs`** (de este repo).
+3. **Configuración del proyecto → Propiedades de script** → añade
+   `SHARED_SECRET` = un secreto largo aleatorio.
+4. **Implementar → Nueva implementación → Aplicación web**:
+   - *Ejecutar como*: **Yo**
+   - *Quién tiene acceso*: **Solo yo**
+   - Autoriza los permisos (Sheets/Docs/Slides/Gmail/Drive/Calendar).
+5. Copia la **URL `/exec`** de la implementación.
+6. En el `.env` del PC añade y reinicia:
+   ```
+   APPS_SCRIPT_URL=https://script.google.com/macros/s/XXXX/exec
+   APPS_SCRIPT_SECRET=<el mismo SHARED_SECRET>
+   ```
+7. Listo: pide al agente cosas como *"crea una hoja con estos datos"*, *"archiva
+   y etiqueta los correos de facturas"*, *"haz una presentación con este guion"*.
 
-> Plantilla de arranque existente: `relay/apps_script_email_code.gs` (envío de
-> códigos por email). La ampliaremos con las acciones que elijas.
+> Backend: `app/apps_script.py` (conector) + tool `apps_script` (en DANGEROUS_TOOLS,
+> categoría router `google`). Sin las dos variables de entorno, la tool avisa de
+> que falta configurar y no hace nada.

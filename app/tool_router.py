@@ -76,7 +76,7 @@ CATEGORIES: dict[str, set[str]] = {
     "council":   {"mistral_consult"},
     # Google Workspace: Gmail, Drive, Calendar (leer/buscar/enviar)
     "google":    {"gmail_search", "gmail_read", "gmail_send",
-                  "gdrive_search", "gdrive_read", "gcalendar_events"},
+                  "gdrive_search", "gdrive_read", "gcalendar_events", "apps_script"},
     # Auto-inspección y reinicio del propio agente
     "self":      {"list_self_files", "syntax_check", "restart_self"},
 }
@@ -150,7 +150,9 @@ _KW: dict[str, set[str]] = {
     "google":    {"gmail","correo","email","e-mail","bandeja","inbox","drive",
                   "google drive","documento de google","hoja de cálculo","sheet",
                   "calendario","calendar","evento","agenda google","cita","reunión",
-                  "mis correos","leer correo","envía un correo","manda un correo"},
+                  "mis correos","leer correo","envía un correo","manda un correo",
+                  "apps script","sheets","slides","presentación","google docs",
+                  "etiqueta","archiva correos","crea una hoja","crea un doc"},
     "rag":       {"recuerda","remember","aprende","learn","conocimiento",
                   "knowledge","rag","guardar conocimiento","base de datos","vectorial"},
     "self":      {"código propio","tu código","modif","repair","mejora",
