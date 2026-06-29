@@ -36,7 +36,7 @@
     document.querySelectorAll('.nav-item[data-view]').forEach(n =>
       n.classList.toggle('active', n.dataset.view === viewId));
     if (viewId === 'view-tools') renderTools();
-    if (viewId === 'view-files') renderFiles();
+    if (viewId === 'view-files') loadDbFiles();
   }
   document.querySelectorAll('.nav-item[data-view]').forEach(btn =>
     btn.addEventListener('click', () => showView(btn.dataset.view)));
@@ -151,28 +151,89 @@
     if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
     return (n / 1048576).toFixed(1) + ' MB';
   }
+  // WEBPROD-011/012: archivos de la BD (adjuntos por conversación + favoritos),
+  // fusionados con los vistos en vivo (resultados de herramienta en localStorage).
+  state.filter = 'all';
+  state.dbFiles = [];
+
+  async function loadDbFiles() {
+    if (!app || typeof app._workspace !== 'function') { renderFiles(); return; }
+    const payload = {};
+    if (state.filter === 'conv') payload.conversation_id = app.currentConversationId || '__none__';
+    if (state.filter === 'fav') payload.favorites_only = true;
+    try {
+      const r = await app._workspace('files_get', payload);
+      state.dbFiles = Array.isArray(r.files) ? r.files : [];
+    } catch { state.dbFiles = []; }
+    renderFiles();
+  }
+
+  function _fileCard(f) {
+    const url = f.url || '#';
+    const name = (f.name || '').replace(/</g, '&lt;');
+    const ext = (f.ext || (name.split('.').pop() || '')).toUpperCase();
+    const isImg = f.kind === 'image' || /\.(png|jpe?g|webp|gif)$/i.test(name);
+    const thumb = isImg && f.url ? `<img src="${url}" alt="${name}" loading="lazy">` : (KIND_ICON[f.kind] || '📎');
+    const fav = f.id != null
+      ? `<button class="file-fav ${f.favorite ? 'on' : ''}" data-fav="${f.id}" data-on="${f.favorite ? 1 : 0}" title="Favorito (persiste al borrar el chat)">${f.favorite ? '⭐' : '☆'}</button>`
+      : '';
+    return `<div class="file-card">${fav}
+      <a class="file-open" href="${url}" target="_blank" rel="noopener">
+        <div class="file-thumb">${thumb}</div>
+        <div class="file-meta">
+          <span class="file-name">${name}</span>
+          <span class="file-info">${ext} ${fmtBytes(f.bytes)}</span>
+        </div>
+      </a></div>`;
+  }
+
   function renderFiles() {
     const grid = $('files-grid');
     if (!grid) return;
-    if (!state.files.length) {
-      grid.innerHTML = '<div class="files-empty">Aún no hay archivos. Pide al agente generar un PDF, una imagen o servir un resultado por URL.</div>';
+    let list;
+    if (state.filter === 'all') {
+      const seen = new Set(state.dbFiles.map(f => f.url || f.name));
+      list = state.dbFiles.concat(state.files.filter(f => !seen.has(f.url || f.name)));
+    } else {
+      list = state.dbFiles;
+    }
+    if (!list.length) {
+      const msg = state.filter === 'fav'
+        ? 'No tienes favoritos. Marca ⭐ en cualquier archivo para conservarlo aunque borres la conversación.'
+        : state.filter === 'conv'
+          ? 'Esta conversación no tiene archivos adjuntos todavía.'
+          : 'Aún no hay archivos. Adjunta un documento o pide al agente generar un PDF/imagen.';
+      grid.innerHTML = `<div class="files-empty">${msg}</div>`;
       return;
     }
-    grid.innerHTML = state.files.map(f => {
-      const thumb = f.kind === 'image' && f.url
-        ? `<img src="${f.url}" alt="${f.name}" loading="lazy">`
-        : (KIND_ICON[f.kind] || '📎');
-      return `<a class="file-card" href="${f.url || '#'}" target="_blank" rel="noopener">
-        <div class="file-thumb">${thumb}</div>
-        <div class="file-meta">
-          <span class="file-name">${(f.name || '').replace(/</g, '&lt;')}</span>
-          <span class="file-info">${(f.ext || '').toUpperCase()} ${fmtBytes(f.bytes)}</span>
-        </div>
-      </a>`;
-    }).join('');
+    grid.innerHTML = list.map(_fileCard).join('');
   }
+
+  // Filtros Todos / Esta conversación / Favoritos
+  document.querySelectorAll('#files-filter .files-tab').forEach(tab =>
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('#files-filter .files-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      state.filter = tab.dataset.filter;
+      loadDbFiles();
+    }));
+
+  // Toggle de favorito (delegado)
+  const filesGrid = $('files-grid');
+  if (filesGrid) filesGrid.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.file-fav');
+    if (!btn) return;
+    e.preventDefault();
+    const id = Number(btn.dataset.fav);
+    const on = btn.dataset.on === '1';
+    if (app && typeof app._workspace === 'function') {
+      await app._workspace('file_favorite', { file_id: id, favorite: !on });
+      loadDbFiles();
+    }
+  });
+
   const filesRefresh = $('files-refresh');
-  if (filesRefresh) filesRefresh.addEventListener('click', renderFiles);
+  if (filesRefresh) filesRefresh.addEventListener('click', loadDbFiles);
 
   // Captura archivos de los resultados de herramienta en vivo
   function captureFromResult(result) {

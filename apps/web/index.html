@@ -190,7 +190,12 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>
-      <p class="view-sub">Documentos, imágenes y salidas generadas por el agente. Toca para abrir/descargar por URL pública.</p>
+      <p class="view-sub">Documentos, imágenes, adjuntos y salidas. Toca para abrir; marca ⭐ para conservarlos aunque borres la conversación.</p>
+      <div id="files-filter" class="files-filter">
+        <button class="files-tab active" data-filter="all">Todos</button>
+        <button class="files-tab" data-filter="conv">Esta conversación</button>
+        <button class="files-tab" data-filter="fav">⭐ Favoritos</button>
+      </div>
       <div id="files-grid" class="files-grid"></div>
     </section>
 
