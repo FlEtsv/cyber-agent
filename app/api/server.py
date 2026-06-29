@@ -324,31 +324,9 @@ async def api_files():
 # ── Vision helper ─────────────────────────────────────────────────────────────
 
 async def _describe_image(b64: str) -> str:
-    try:
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.get("http://localhost:11434/api/tags")
-        models = [m["name"] for m in r.json().get("models", [])]
-        vision = next(
-            (m for m in models if any(k in m.lower()
-             for k in ["llava", "vision", "moondream", "bakllava", "qwen2-vl", "qwen2.5-vl"])),
-            None,
-        )
-        if not vision:
-            return "[imagen adjunta — instala un modelo de visión como llava para analizarla]"
-        async with httpx.AsyncClient(timeout=45) as c:
-            r = await c.post("http://localhost:11434/api/generate", json={
-                "model": vision,
-                "prompt": (
-                    "Describe detalladamente lo que ves en esta imagen. "
-                    "Incluye: texto visible, elementos de interfaz, objetos, colores, "
-                    "contexto y cualquier información relevante. Responde en español."
-                ),
-                "images": [b64],
-                "stream": False,
-            })
-        return r.json().get("response", "[error al describir imagen]")
-    except Exception as e:
-        return f"[imagen adjunta — error: {e}]"
+    # Fuente única de visión (local llava/qwen-vl → Pixtral nube). Ver app/vision.py.
+    from app.vision import describe_image
+    return await describe_image(b64)
 
 
 # ── Watch mode (WATCH-001) ────────────────────────────────────────────────────

@@ -196,7 +196,24 @@ class RelayConnector:
         devuelve el stream de eventos etiquetados con session_id."""
         session_id = msg.get("session_id", "")
         content = (msg.get("content") or "").strip()
-        if not session_id or not content:
+        images = msg.get("images") or []
+        if not session_id or (not content and not images):
+            return
+
+        # WEBPROD-013/006: las imágenes adjuntas desde la web SÍ se procesan ahora.
+        # Se interpretan (visión local o Pixtral) y se inyectan en el prompt.
+        if images:
+            try:
+                await ws.send(json.dumps({"type": "status", "session_id": session_id,
+                                          "data": f"Analizando {len(images)} imagen(es)…"}))
+            except Exception:
+                pass
+            try:
+                from app.vision import describe_images
+                content = (content + await describe_images(images)).strip()
+            except Exception as e:
+                content = (content + f"\n\n[imagen adjunta — error de visión: {e}]").strip()
+        if not content:
             return
 
         # Contexto: si el cliente envía su historial (sobrevive reconexiones y
