@@ -274,6 +274,12 @@ class CyberAgent {
         break;
       }
 
+      case 'files':
+        // Archivos generados por el agente (imágenes, PDFs, salidas): refresca la
+        // pestaña Archivos en vivo o marca un badge si no la estas viendo.
+        if (typeof this.onServerFiles === 'function') this.onServerFiles(data);
+        break;
+
       case 'models':
         this.availableModels = data?.models || [];
         this.activeModel = data?.active || data?.active_model || '';

@@ -24,10 +24,31 @@
   function mergeFiles(list) {
     if (!Array.isArray(list)) return;
     const byKey = new Map(state.files.map(f => [f.url || f.name, f]));
-    list.forEach(f => { if (f && (f.url || f.name)) byKey.set(f.url || f.name, { ...byKey.get(f.url || f.name), ...f }); });
+    list.forEach(f => { if (f && (f.url || f.name)) byKey.set(f.url || f.name, { ...byKey.get(f.url || f.name), mtime: Date.now() / 1000, ...f }); });
     state.files = Array.from(byKey.values()).sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
     saveFiles();
   }
+
+  // Badge numérico en un botón de la navegación (p.ej. archivos nuevos).
+  function setNavBadge(viewId, count) {
+    const btn = document.querySelector(`.nav-item[data-view="${viewId}"]`);
+    if (!btn) return;
+    let b = btn.querySelector('.nav-badge');
+    if (count > 0) {
+      if (!b) { b = document.createElement('span'); b.className = 'nav-badge'; (btn.querySelector('.nav-ico') || btn).appendChild(b); }
+      b.textContent = count > 9 ? '9+' : String(count);
+    } else if (b) { b.remove(); }
+  }
+
+  // Hook que llama app.js al recibir el evento entrante type:"files" (WEBPROD-029):
+  // archivos generados por el agente → refresco en vivo o badge si no estás mirando.
+  let _newFiles = 0;
+  app.onServerFiles = function (list) {
+    if (!Array.isArray(list) || !list.length) return;
+    mergeFiles(list);
+    if (state.view === 'view-files') { _newFiles = 0; renderFiles(); }
+    else { _newFiles += list.length; setNavBadge('view-files', _newFiles); }
+  };
 
   // ── Navegación entre vistas ───────────────────────────────────────────────
   function showView(viewId) {
@@ -36,7 +57,7 @@
     document.querySelectorAll('.nav-item[data-view]').forEach(n =>
       n.classList.toggle('active', n.dataset.view === viewId));
     if (viewId === 'view-tools') renderTools();
-    if (viewId === 'view-files') loadDbFiles();
+    if (viewId === 'view-files') { _newFiles = 0; setNavBadge('view-files', 0); loadDbFiles(); }
   }
   document.querySelectorAll('.nav-item[data-view]').forEach(btn =>
     btn.addEventListener('click', () => showView(btn.dataset.view)));
