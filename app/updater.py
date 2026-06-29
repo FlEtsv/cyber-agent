@@ -60,8 +60,8 @@ class UpdateChecker(QThread):
     def run(self):
         local = local_version()
         try:
-            with httpx.Client(timeout=8) as c:
-                if is_frozen():
+            if is_frozen():
+                with httpx.Client(timeout=8) as c:
                     resp = c.get(_API_RELEASES, headers={"Accept": "application/vnd.github.v3+json"})
                     if resp.status_code != 200:
                         self.check_failed.emit(f"GitHub API {resp.status_code}")
@@ -73,22 +73,32 @@ class UpdateChecker(QThread):
                         self.update_available.emit(local, f"v{remote_ver} — {body}")
                     else:
                         self.up_to_date.emit(local)
-                else:
-                    resp = c.get(_API_COMMITS, headers={"Accept": "application/vnd.github.v3+json"})
-                    if resp.status_code != 200:
-                        self.check_failed.emit(f"GitHub API {resp.status_code}")
-                        return
-                    data       = resp.json()
-                    remote_sha = data["sha"][:7]
-                    code, sha  = _git("rev-parse", "HEAD")
-                    local_sha  = sha[:7] if code == 0 else "unknown"
-                    if remote_sha != local_sha:
-                        msg = data["commit"]["message"].split("\n")[0][:60]
-                        self.update_available.emit(local_sha, f"{remote_sha} — {msg}")
-                    else:
-                        self.up_to_date.emit(local_sha)
+            else:
+                self._check_source()
         except Exception as e:
             self.check_failed.emit(str(e))
+
+    def _check_source(self):
+        """Modo fuente: comparar TOPOLOGÍA, no SHAs sueltos.
+
+        El repo local puede ir por DELANTE de origin (commits sin pushear),
+        en cuyo caso un SHA remoto distinto NO significa que haya algo nuevo
+        que descargar. Solo hay actualización si origin/BRANCH tiene commits
+        que nuestro HEAD no contiene (estamos "behind"). Ante cualquier fallo
+        (offline, ref ausente) caemos a "al día" para no molestar en falso.
+        """
+        code_l, sha = _git("rev-parse", "HEAD")
+        local_sha = sha[:7] if code_l == 0 else "unknown"
+        # Refresca la ref remota sin tocar el working tree.
+        _git("fetch", "origin", BRANCH, timeout=40)
+        code_b, behind = _git("rev-list", "--count", f"HEAD..origin/{BRANCH}")
+        n = behind.strip()
+        if code_b == 0 and n.isdigit() and int(n) > 0:
+            code_m, msg = _git("log", "-1", "--format=%h %s", f"origin/{BRANCH}")
+            info = msg.strip()[:70] if code_m == 0 else f"origin/{BRANCH}"
+            self.update_available.emit(local_sha, f"{info} ({n} commit(s))")
+        else:
+            self.up_to_date.emit(local_sha)
 
 
 # ── Apply worker: modo fuente (git pull) ──────────────────────────────────────
@@ -233,10 +243,45 @@ Start-Process -FilePath $exe
     )
 
 
+def relaunch_detached(cmd: list[str], cwd: str | None = None) -> None:
+    """Relanza la app de forma robusta tras cerrar la actual.
+
+    Lanza un PowerShell desacoplado que ESPERA a que el proceso actual muera
+    (libera el mutex de instancia única) y solo entonces arranca la nueva
+    instancia. Esto evita la carrera en la que la nueva instancia ve el mutex
+    aún tomado, trae al frente la ventana moribunda y se cierra ella misma
+    → la app "se cierra pero no se reabre".
+    """
+    pid = os.getpid()
+    exe = cmd[0]
+    args = cmd[1:]
+    wd = cwd or os.path.dirname(os.path.abspath(sys.argv[0])) or os.getcwd()
+
+    def _q(s: str) -> str:
+        return "'" + str(s).replace("'", "''") + "'"
+
+    arglist = ", ".join(_q(a) for a in args)
+    start_args = f" -ArgumentList @({arglist})" if args else ""
+
+    ps = f"""
+try {{ Wait-Process -Id {pid} -Timeout 20 -ErrorAction SilentlyContinue }} catch {{}}
+Start-Sleep -Milliseconds 600
+Start-Process -FilePath {_q(exe)}{start_args} -WorkingDirectory {_q(wd)}
+"""
+    script = os.path.join(tempfile.gettempdir(), "cyberagent_relaunch.ps1")
+    with open(script, "w", encoding="utf-8") as f:
+        f.write(ps)
+
+    subprocess.Popen(
+        ["powershell", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script],
+        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        close_fds=True,
+    )
+
+
 def restart():
     """Reinicia la app (solo modo fuente) — cierra Qt limpiamente antes de relanzar."""
-    import subprocess
-    subprocess.Popen([sys.executable] + sys.argv)
+    relaunch_detached([sys.executable] + sys.argv)
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance()
     if app:

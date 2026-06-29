@@ -101,15 +101,14 @@ def main():
     tray.setContextMenu(menu)
 
     def _restart_app():
-        """Relanza una instancia nueva y cierra la actual (control de instancia)."""
-        import subprocess
+        """Relanza una instancia nueva y cierra la actual (control de instancia).
+
+        Usa un relanzador desacoplado que ESPERA a que este proceso muera (y
+        suelte el mutex) antes de arrancar la nueva instancia, evitando que la
+        nueva se cierre sola al ver el mutex todavía tomado.
+        """
         try:
             tray_notify("CyberAgent", "Reiniciando…", QSystemTrayIcon.Information, 1500)
-        except Exception:
-            pass
-        # Libera el mutex de instancia única para que la nueva instancia arranque
-        try:
-            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
         except Exception:
             pass
         if getattr(sys, "frozen", False):
@@ -121,12 +120,16 @@ def main():
                 py = pyw
             cmd = [py, os.path.abspath(sys.argv[0])] + sys.argv[1:]
         try:
-            flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-            subprocess.Popen(cmd, cwd=os.path.dirname(os.path.abspath(sys.argv[0])) or None,
-                             creationflags=flags, close_fds=True)
+            from app.updater import relaunch_detached
+            relaunch_detached(cmd, cwd=os.path.dirname(os.path.abspath(sys.argv[0])) or None)
         except Exception as e:
             print(f"[restart] {e}")
-        QTimer.singleShot(400, app.quit)
+        # Libera el mutex y cierra; el relanzador espera a que muramos.
+        try:
+            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+        except Exception:
+            pass
+        QTimer.singleShot(200, app.quit)
 
     def _toggle_window():
         if window.isVisible():
