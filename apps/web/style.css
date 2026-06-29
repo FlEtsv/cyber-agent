@@ -1080,6 +1080,38 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
   .activity-list { display: block; max-height: 22dvh; }
 }
 
+/* ═══ Feedback + escalada reactiva por respuesta ═══ */
+.msg-feedback {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-top: 10px; padding-top: 8px;
+  border-top: 1px solid var(--border, #1e242c);
+}
+.fb-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; line-height: 1;
+  padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid transparent; background: transparent;
+  transition: background .15s, border-color .15s, transform .05s;
+}
+.fb-btn:active { transform: scale(0.97); }
+.fb-useful {
+  color: #46d18a; border-color: rgba(70,209,138,.4);
+  background: rgba(70,209,138,.10);
+}
+.fb-useful:hover { background: rgba(70,209,138,.18); border-color: rgba(70,209,138,.7); }
+.fb-useful .fb-ic { font-size: 13px; }
+.fb-escalate {
+  color: var(--text-dim, #9aa6b2); border-color: var(--border, #2a313b);
+}
+.fb-escalate:hover { color: var(--text, #e6edf3); border-color: var(--accent-line, #3a4a63); background: var(--accent-soft, rgba(80,120,200,.08)); }
+.fb-thanks { font-size: 12.5px; font-weight: 600; color: #46d18a; }
+.escalation-note {
+  align-self: center; margin: 6px auto; padding: 6px 14px;
+  font-size: 12px; color: var(--text-dim, #9aa6b2);
+  background: var(--accent-soft, rgba(80,120,200,.10));
+  border: 1px solid var(--accent-line, #2a3850); border-radius: 999px;
+}
+
 /* ═══ Anti-zoom móvil (iOS hace zoom al enfocar inputs <16px y por doble-tap) ═══ */
 html { touch-action: manipulation; }
 @media (max-width: 640px) {

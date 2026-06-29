@@ -206,10 +206,22 @@ class CyberAgent {
       '';
   }
 
+  // Nombre amigable de cara al usuario. Nuestro modelo SIEMPRE es "Modelo local".
+  _modelLabel(id = '') {
+    const m = String(id || '').toLowerCase();
+    if (!m) return 'Modelo local';
+    if (/codestral/.test(m)) return 'Mistral Codestral';
+    if (/mistral-large|mistral_large/.test(m)) return 'Mistral Large';
+    if (/mistral-medium|mistral_medium/.test(m)) return 'Mistral Medium';
+    if (/pixtral/.test(m)) return 'Mistral (visión)';
+    if (/cyberagent|mistral-small|abliterated|huihui|qwen|cyber/.test(m)) return 'Modelo local';
+    return id;  // cualquier otro: tal cual
+  }
+
   _setHeaderModel(models = [], activeModel = '') {
     const modelEl = document.querySelector('.header-model');
     if (!modelEl) return;
-    modelEl.textContent = this._preferredModelLabel(models, activeModel);
+    modelEl.textContent = this._modelLabel(this._preferredModelLabel(models, activeModel));
   }
 
   // â”€â”€ Incoming events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -449,6 +461,13 @@ class CyberAgent {
     this._beginStreaming();
     this._addUserBubble(text, this.attachedImgs.map(i => i.dataUrl));
 
+    // Para el footer de feedback/escalada: recordamos el ultimo prompt, si es de
+    // programacion y con que modelo se respondio (vacio = modelo local).
+    this._lastUserText = text;
+    this._lastIsProgramming = this._looksLikeProgramming(text);
+    const sel = (this.selectedModel && this.selectedModel !== 'auto') ? this.selectedModel : '';
+    this._currentResponseModel = sel;
+
     this._send({
       type:          'message',
       content:       text,
@@ -627,6 +646,94 @@ class CyberAgent {
     this.currentBubble.contentEl.innerHTML = renderMd(this.currentBubble._raw);
   }
 
+  // ── Feedback + escalada reactiva ────────────────────────────────────────────
+  // El usuario decide: si la respuesta del modelo local no le sirve, escala a un
+  // modelo superior. Programacion → Codestral → Large; resto → Medium → Large.
+  _looksLikeProgramming(text = '') {
+    const t = String(text || '').toLowerCase();
+    if (/```/.test(t)) return true;
+    return /\b(c[oó]digo|programa|funci[oó]n|función|bug|error|excepci[oó]n|traceback|stack ?trace|compil|script|refactor|debug|deploy|docker|kubernetes|git\b|regex|sql|query|endpoint|api\b|json|html|css|typescript|javascript|python|java\b|c\+\+|c#|rust|golang|\bgo\b|kotlin|swift|php|ruby|bash|powershell|terminal|clase|m[eé]todo|variable|array|null|async|await|import|npm|pip|build|test unit|pytest|linter)\b/.test(t);
+  }
+
+  // Siguiente peldano de la escalera segun el modelo que produjo la respuesta.
+  _escalationTarget(currentModel = '', isProgramming = false) {
+    const m = String(currentModel || '').toLowerCase();
+    if (/mistral-large/.test(m)) return null;            // cima: no hay superior
+    if (/codestral/.test(m) || /mistral-medium/.test(m)) return 'mistral-large-latest';
+    // local (o cualquier otro de partida)
+    return isProgramming ? 'codestral-latest' : 'mistral-medium-latest';
+  }
+
+  _appendFeedbackFooter(bubble) {
+    if (!bubble || !bubble.contentEl) return;
+    const body = bubble.contentEl.parentElement;
+    if (!body || body.querySelector('.msg-feedback')) return;
+
+    const model = this._currentResponseModel || '';
+    const target = this._escalationTarget(model, this._lastIsProgramming);
+
+    const footer = document.createElement('div');
+    footer.className = 'msg-feedback';
+
+    const useful = document.createElement('button');
+    useful.className = 'fb-btn fb-useful';
+    useful.type = 'button';
+    useful.innerHTML = '<span class="fb-ic">✓</span> ¿Es útil?';
+    useful.title = 'Marca esta respuesta como útil';
+    useful.addEventListener('click', () => {
+      footer.innerHTML = '<span class="fb-thanks">✓ Gracias por el feedback</span>';
+      this._recordReportEvent('feedback', { useful: true, model: model || 'local' });
+    });
+    footer.appendChild(useful);
+
+    if (target) {
+      const esc = document.createElement('button');
+      esc.className = 'fb-btn fb-escalate';
+      esc.type = 'button';
+      esc.innerHTML = '↑ Escalar a ' + escHtml(this._modelLabel(target));
+      esc.title = 'La respuesta no te convence: reintentar con un modelo superior';
+      esc.addEventListener('click', () => this._escalate(target, footer));
+      footer.appendChild(esc);
+    }
+
+    body.appendChild(footer);
+  }
+
+  _escalate(model, footer) {
+    if (this.streaming) return;
+    if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
+      this._setConnectionState('offline', 'PC offline',
+        'No se puede escalar: el PC no está conectado.', true);
+      return;
+    }
+    if (!this._lastUserText) return;
+    if (footer) footer.innerHTML =
+      '<span class="fb-thanks">↑ Escalando a ' + escHtml(this._modelLabel(model)) + '…</span>';
+
+    this._recordReportEvent('escalate', { from: this._currentResponseModel || 'local', to: model });
+    this._beginStreaming();
+
+    // Nota visible de que estamos consultando un modelo superior (nube).
+    const note = document.createElement('div');
+    note.className = 'escalation-note';
+    note.textContent = 'Escalando a ' + this._modelLabel(model) + ' (modelo en la nube)…';
+    this._removeWelcome();
+    this.messages.appendChild(note);
+
+    this._currentResponseModel = model;
+    this._send({
+      type:          'message',
+      content:       this._lastUserText,
+      history:       this._historyForRelay(),
+      session_trust: this.sessionTrust,
+      permissions:   this.permissions,
+      model,
+      folder_id:     this._currentFolderId() || undefined,
+      device:        `${this.isMobile ? 'movil' : 'PC'} ${this.platform}`,
+      escalated:     true,
+    });
+  }
+
   _finalizeAIBubble() {
     if (!this.currentBubble) return;
     this._renderCurrentBubble();
@@ -646,6 +753,8 @@ class CyberAgent {
     });
     this._persistHistoryMessage({ role: 'assistant', text: this.currentBubble._raw, ts: Date.now() });
     this._touchConversation(this.currentBubble._raw, 'assistant');
+    // Footer de feedback/escalada solo en respuestas reales con texto.
+    if ((this.currentBubble._raw || '').trim()) this._appendFeedbackFooter(this.currentBubble);
     this.currentBubble = null;
   }
 
