@@ -220,15 +220,19 @@ class CyberAgent {
       '';
   }
 
-  // Nombre amigable de cara al usuario. Nuestro modelo SIEMPRE es "Modelo local".
+  // Nombre amigable de cara al usuario, diferenciando LOCAL vs NUBE sin dudas.
   _modelLabel(id = '') {
     const m = String(id || '').toLowerCase();
     if (!m) return 'Modelo local';
-    if (/codestral/.test(m)) return 'Mistral Codestral';
-    if (/mistral-large|mistral_large/.test(m)) return 'Mistral Large';
-    if (/mistral-medium|mistral_medium/.test(m)) return 'Mistral Medium';
-    if (/pixtral/.test(m)) return 'Mistral (visión)';
-    if (/cyberagent|mistral-small|abliterated|huihui|qwen|cyber/.test(m)) return 'Modelo local';
+    // Codestral: el local de Ollama lleva ":" (p.ej. codestral:22b); el de nube es codestral-latest.
+    if (m.includes('codestral')) return m.includes(':') ? 'Codestral 22B (local)' : 'Codestral (nube)';
+    if (/mistral-large|mistral_large/.test(m)) return 'Mistral Large (nube)';
+    if (/mistral-medium|mistral_medium/.test(m)) return 'Mistral Medium (nube)';
+    if (/mistral-small/.test(m)) return 'Mistral Small (nube)';
+    if (/pixtral/.test(m)) return 'Mistral visión (nube)';
+    if (/gpt-oss/.test(m)) return 'GPT-OSS 120B (RunPod)';
+    if (/cyberagent|mistral-small|abliterated|huihui|qwen|cyber/.test(m)) return 'Modelo local — Mistral 24B';
+    if (m.includes(':')) return id.replace(/:latest$/, '') + ' (local)';
     return id;  // cualquier otro: tal cual
   }
 
@@ -972,10 +976,19 @@ class CyberAgent {
   }
 
   _modelOptions() {
-    const opts = [{ value: '', label: '(heredar / auto)' }];
-    (this.availableModels || []).forEach(m => opts.push({ value: m, label: m.replace(/:latest$/, '') }));
-    ['codestral-latest', 'mistral-medium-latest', 'mistral-large-latest'].forEach(m => {
-      if (!opts.find(o => o.value === m)) opts.push({ value: m, label: m });
+    const opts = [
+      { value: '',                      label: '(heredar / auto)' },
+      { value: 'cyberagent-24b',        label: 'Modelo local — Mistral 24B' },
+      { value: 'codestral:22b',         label: 'Codestral 22B — local' },
+      { value: 'codestral-latest',      label: 'Codestral (nube)' },
+      { value: 'mistral-medium-latest', label: 'Mistral Medium (nube)' },
+      { value: 'mistral-large-latest',  label: 'Mistral Large (nube)' },
+    ];
+    (this.availableModels || []).forEach(m => {
+      if (m && m !== 'auto' && !opts.find(o => o.value === m)
+          && !/^(mistral|magistral|pixtral|codestral)-/i.test(m)) {
+        opts.push({ value: m, label: this._modelLabel(m) });
+      }
     });
     return opts;
   }
@@ -1972,46 +1985,50 @@ class CyberAgent {
   _syncModelSelect() {
     const select = this.$('model-select');
     if (!select) return;
-    const LABELS = {
-      '': '🔀 Auto (decide solo)',
-      'auto': '🔀 Auto (decide solo)',
-      'fused': '🤝 Fusionado (Mistral + local)',
-      'codestral-latest': '💻 Codestral (código)',
-      'mistral-large-latest': '🧠 Mistral Large',
-      'mistral-medium-latest': '🧠 Mistral Medium',
-    };
-    const prettyLocal = (m) => '🖥️ ' + m.replace(/:latest$/, '');
-    // Opciones SIEMPRE disponibles: el modo fusionado y los modelos de nube NO
-    // aparecen en availableModels (que solo lista los Ollama locales del host),
-    // así que los añadimos a mano o el selector se queda casi vacío.
-    const VIRTUAL = [
-      { value: 'fused',                 label: '🤝 Fusionado (Mistral Small + local)' },
-      { value: 'codestral-latest',      label: '💻 Codestral (código, barato)' },
-      { value: 'mistral-small-latest',  label: '⚡ Mistral Small (barato)' },
-      { value: 'mistral-medium-latest', label: '🧠 Mistral Medium (caro)' },
-      { value: 'mistral-large-latest',  label: '🧠 Mistral Large (muy caro)' },
+
+    // Catálogo curado y AGRUPADO para que no haya dudas del modelo (origen + coste).
+    // Los modelos de nube y los alias (auto/fused) no vienen en availableModels
+    // (que solo lista los Ollama locales del host), así que se fijan aquí.
+    const LOCAL_CODESTRAL = 'codestral:22b';
+    const groups = [
+      { label: 'Automático', items: [
+        { value: '',      label: '🔀 Auto (local primero)' },
+        { value: 'fused', label: '🤝 Fusionado (local + Mistral)' },
+      ]},
+      { label: '🟢 Local · gratis (tu GPU)', items: [
+        { value: 'cyberagent-24b',  label: '🟢 Modelo local — Mistral 24B' },
+        { value: LOCAL_CODESTRAL,   label: '🟢 Codestral 22B — local (código)' },
+      ]},
+      { label: '☁️ Nube · de pago', items: [
+        { value: 'codestral-latest',      label: '☁️ Codestral (nube · código)' },
+        { value: 'mistral-small-latest',  label: '☁️ Mistral Small (barato)' },
+        { value: 'mistral-medium-latest', label: '☁️ Mistral Medium' },
+        { value: 'mistral-large-latest',  label: '☁️ Mistral Large (caro)' },
+      ]},
     ];
-    const virtualValues = new Set(VIRTUAL.map(v => v.value));
-    const known = [
-      { value: '', label: LABELS[''] },
-      ...VIRTUAL,
-      ...this.availableModels
-        .filter(model => model !== 'auto' && !virtualValues.has(model))   // '' ya representa Auto
-        .map(model => ({
-          value: model,
-          label: LABELS[model] || (/mistral|magistral|pixtral/i.test(model) ? '🧠 ' + model : prettyLocal(model)),
-        })),
-    ];
+    // Añade cualquier modelo local REAL del host que no esté ya en el catálogo.
+    const known = new Set(groups.flatMap(g => g.items.map(i => i.value)));
+    const extraLocal = (this.availableModels || [])
+      .filter(m => m && m !== 'auto' && !known.has(m)
+                   && !/^(mistral|magistral|pixtral|codestral)-/i.test(m))
+      .map(m => ({ value: m, label: '🟢 ' + this._modelLabel(m) }));
+    if (extraLocal.length) groups[1].items.push(...extraLocal);
+
     const seen = new Set();
     select.innerHTML = '';
-    known.forEach(opt => {
-      if (seen.has(opt.value)) return;
-      seen.add(opt.value);
-      const el = document.createElement('option');
-      el.value = opt.value;
-      el.textContent = opt.label;
-      select.appendChild(el);
-    });
+    for (const g of groups) {
+      const og = document.createElement('optgroup');
+      og.label = g.label;
+      for (const opt of g.items) {
+        if (seen.has(opt.value)) continue;
+        seen.add(opt.value);
+        const el = document.createElement('option');
+        el.value = opt.value;
+        el.textContent = opt.label;
+        og.appendChild(el);
+      }
+      if (og.children.length) select.appendChild(og);
+    }
     const normalizedModel = this.selectedModel === 'auto' ? '' : this.selectedModel;
     if (seen.has(normalizedModel)) {
       select.value = normalizedModel;

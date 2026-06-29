@@ -60,10 +60,15 @@ def is_mistral_model(model: str | None) -> bool:
     if not model:
         return False
     m = model.strip().lower()
+    # Un ":" indica tag de Ollama (modelo LOCAL, p.ej. codestral:22b) → nunca es nube.
+    if ":" in m:
+        return False
     if m in MISTRAL_MODELS or m == FUSED_MODEL:
         return True
+    # OJO: solo "codestral-..." (nube). El local de Ollama es "codestral:22b" y ya
+    # se descartó por el ":" de arriba.
     return (m.startswith("mistral-") or m.startswith("magistral-")
-            or m.startswith("pixtral-") or m.startswith("codestral"))
+            or m.startswith("pixtral-") or m.startswith("codestral-"))
 
 
 def resolve_model(model: str | None) -> str:
