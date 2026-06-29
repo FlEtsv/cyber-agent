@@ -335,6 +335,10 @@ class CyberAgent {
         this._endWatchMode(data?.frames ?? 0);
         break;
 
+      case 'cost':
+        this._pendingCost = data;        // WEBPROD-009: coste de esta respuesta
+        break;
+
       case 'done':
         this._hideQueueBadge();
         this._finalizeAIBubble();
@@ -708,7 +712,46 @@ class CyberAgent {
       footer.appendChild(esc);
     }
 
+    // WEBPROD-009: botón de gasto ($) de esta respuesta.
+    if (this._pendingCost) {
+      const cost = this._pendingCost;
+      this._pendingCost = null;
+      const dollar = document.createElement('button');
+      dollar.className = 'fb-btn fb-cost';
+      dollar.type = 'button';
+      dollar.innerHTML = '$';
+      dollar.title = 'Ver gasto de esta respuesta y del mes';
+      dollar.addEventListener('click', () => this._showCostModal(cost));
+      footer.appendChild(dollar);
+    }
+
     body.appendChild(footer);
+  }
+
+  _showCostModal(cost) {
+    const t = (cost && cost.this) || {};
+    const m = (cost && cost.month) || {};
+    const usd = (v) => '$' + (Number(v) || 0).toFixed(4);
+    const n = (v) => (Number(v) || 0).toLocaleString('es-ES');
+    const thisBlock = t.is_local
+      ? `<div class="cost-row"><span>Modelo</span><b>Modelo local (gratis)</b></div>
+         <div class="cost-row"><span>Tokens</span><b>${n(t.tokens)}</b></div>
+         <div class="cost-row"><span>Coste</span><b class="cost-free">$0.0000</b></div>
+         <div class="cost-row"><span>Ahorrado vs nube</span><b class="cost-save">${usd(t.saved_usd)}</b></div>`
+      : `<div class="cost-row"><span>Modelo</span><b>${escHtml(this._modelLabel(t.model))}</b></div>
+         <div class="cost-row"><span>Tokens</span><b>${n(t.tokens)} (${n(t.input_tokens)}+${n(t.output_tokens)})</b></div>
+         <div class="cost-row"><span>Coste</span><b class="cost-spend">${usd(t.cost_usd)}</b></div>`;
+    const html = `
+      <div class="cost-modal">
+        <div class="cost-sec-title">Esta respuesta</div>
+        ${thisBlock}
+        <div class="cost-sec-title">Acumulado del mes (todos los modelos)</div>
+        <div class="cost-row"><span>Gasto real (nube)</span><b class="cost-spend">${usd(m.cost_usd)}</b></div>
+        <div class="cost-row"><span>Tokens nube</span><b>${n(m.cloud_tokens)} · ${n(m.cloud_calls)} llamadas</b></div>
+        <div class="cost-row"><span>Tokens locales</span><b>${n(m.local_tokens)} · ${n(m.local_calls)} gen.</b></div>
+        <div class="cost-row"><span>Ahorrado en local</span><b class="cost-save">${usd(m.local_saved_usd)}</b></div>
+      </div>`;
+    this._menu('💲 Gasto', [{ label: 'Cerrar', value: 'ok' }], html);
   }
 
   _escalate(model, footer) {
@@ -890,11 +933,15 @@ class CyberAgent {
     });
   }
 
-  _menu(title, items) {
+  _menu(title, items, bodyHtml) {
     return new Promise((resolve) => {
       const back = document.createElement('div'); back.className = 'modal-backdrop';
       const box = document.createElement('div'); box.className = 'modal-box menu';
       if (title) box.innerHTML = `<div class="modal-title">${escHtml(title)}</div>`;
+      if (bodyHtml) {
+        const bd = document.createElement('div'); bd.className = 'menu-body';
+        bd.innerHTML = bodyHtml; box.appendChild(bd);
+      }
       const list = document.createElement('div'); list.className = 'menu-list';
       const close = (v) => { back.classList.remove('open'); setTimeout(() => back.remove(), 180); resolve(v); };
       items.forEach(it => {

@@ -122,15 +122,15 @@ def session_summary() -> dict:
 
 
 def get_summary(scope: str = "all") -> dict:
-    """Resumen acumulado del CSV. scope: 'all' o 'today'."""
+    """Resumen acumulado del CSV. scope: 'all', 'today' o 'month'."""
     totals = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "calls": 0}
     if not LOG_FILE.exists():
         return totals
-    today = date.today().isoformat()
+    prefix = date.today().isoformat() if scope == "today" else date.today().strftime("%Y-%m")
     try:
         with open(LOG_FILE, "r", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                if scope == "today" and not str(row.get("timestamp", "")).startswith(today):
+                if scope in ("today", "month") and not str(row.get("timestamp", "")).startswith(prefix):
                     continue
                 totals["input_tokens"] += int(row.get("input_tokens") or 0)
                 totals["output_tokens"] += int(row.get("output_tokens") or 0)

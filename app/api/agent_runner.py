@@ -82,7 +82,54 @@ class AgentRunner:
                     yield {"type": "done", "data": ""}
                     break
 
+    def _build_cost(self) -> dict:
+        """Coste de ESTA respuesta (diff de sesión) + acumulado del mes (todos los
+        modelos): Mistral (gasto real) + local (ahorro, gasto $0)."""
+        from app import mistral_usage as _mu, local_usage as _lu
+        st = self._cost_start or {}
+        ms = _mu.session_summary(); ls = _lu.session_summary()
+        m_in = ms.get("input", 0) - st.get("m_in", 0)
+        m_out = ms.get("output", 0) - st.get("m_out", 0)
+        m_cost = ms.get("cost", 0.0) - st.get("m_cost", 0.0)
+        l_in = ls.get("input", 0) - st.get("l_in", 0)
+        l_out = ls.get("output", 0) - st.get("l_out", 0)
+        l_saved = ls.get("saved", 0.0) - st.get("l_saved", 0.0)
+        used_cloud = (m_in + m_out) > 0
+        this = {
+            "model": self.model,
+            "is_local": not used_cloud,
+            "input_tokens": (m_in if used_cloud else l_in),
+            "output_tokens": (m_out if used_cloud else l_out),
+            "cost_usd": round(m_cost, 6),          # gasto real (0 si local)
+            "saved_usd": round(l_saved, 6),        # ahorrado si fue local
+        }
+        this["tokens"] = this["input_tokens"] + this["output_tokens"]
+        mu_month = _mu.get_summary("month"); lu_month = _lu.get_summary("month")
+        month = {
+            "cost_usd": round(mu_month["cost_usd"], 4),               # gasto real del mes
+            "cloud_tokens": mu_month["input_tokens"] + mu_month["output_tokens"],
+            "cloud_calls": mu_month["calls"],
+            "local_tokens": lu_month["input_tokens"] + lu_month["output_tokens"],
+            "local_saved_usd": round(lu_month["saved_usd"], 4),
+            "local_calls": lu_month["calls"],
+        }
+        return {"this": this, "month": month}
+
     def _run(self):
+        # WEBPROD-009: snapshot de uso al empezar, para calcular el coste de ESTA
+        # respuesta (diff contra los totales de sesión al terminar).
+        try:
+            from app import mistral_usage as _mu, local_usage as _lu
+            self._cost_start = {
+                "m_in": _mu.session_summary().get("input", 0),
+                "m_out": _mu.session_summary().get("output", 0),
+                "m_cost": _mu.session_summary().get("cost", 0.0),
+                "l_in": _lu.session_summary().get("input", 0),
+                "l_out": _lu.session_summary().get("output", 0),
+                "l_saved": _lu.session_summary().get("saved", 0.0),
+            }
+        except Exception:
+            self._cost_start = None
         try:
             # Auto-routing
             last_user = next((m["content"] for m in reversed(self.messages)
@@ -442,6 +489,12 @@ class AgentRunner:
                         f"💰 Ahorrado en local: ${ls['saved']:.4f} esta tarea · "
                         f"${tot['saved_usd']:.2f} en total ({(tot['input_tokens']+tot['output_tokens']):,} tokens gratis)"
                     )
+            except Exception:
+                pass
+
+            # WEBPROD-009: coste de ESTA respuesta + acumulado del mes (todos los modelos).
+            try:
+                self._q.put({"type": "cost", "data": self._build_cost()})
             except Exception:
                 pass
 
