@@ -65,6 +65,7 @@ class RelayConnector:
         self.host_secret = host_secret
         self._runners: dict[str, object] = {}   # session_id → AgentRunner
         self._convs:   dict[str, list]   = {}   # session_id → conversation history
+        self._pending: dict[str, list]   = {}   # session_id → mensajes en cola (procesar al terminar)
         self._ws       = None
         self._running  = False
         self._use_cloudflare_headers = os.environ.get("USE_CLOUDFLARE_HEADERS", "True").lower() == "true"
@@ -153,7 +154,18 @@ class RelayConnector:
                     # La web/relay envía type:"message". Lo corremos en una tarea
                     # para NO bloquear el bucle de recepción (pings y siguientes
                     # mensajes) mientras el agente trabaja.
-                    asyncio.create_task(self._handle_message(ws, msg))
+                    sid = msg.get("session_id", "")
+                    if sid in self._runners:
+                        # Ya hay una ejecución en curso: encola la instrucción para
+                        # procesarla al terminar (aceptar más instrucciones aunque
+                        # esté procesando, como un asistente de verdad).
+                        self._pending.setdefault(sid, []).append(msg)
+                        pos = len(self._pending[sid])
+                        await ws.send(json.dumps({
+                            "type": "status", "session_id": sid,
+                            "data": f"📥 Instrucción en cola ({pos}) — la haré al terminar lo actual."}))
+                    else:
+                        asyncio.create_task(self._handle_message(ws, msg))
                 elif msg_type == "stop":
                     r = self._runners.get(msg.get("session_id", ""))
                     if r:
@@ -381,6 +393,17 @@ class RelayConnector:
         if full:
             conv.append({"role": "assistant", "content": full[0]})
         self._runners.pop(session_id, None)
+
+        # ¿Hay instrucciones encoladas para esta sesión? Procesa la siguiente.
+        pend = self._pending.get(session_id)
+        if pend:
+            nxt = pend.pop(0)
+            if not pend:
+                self._pending.pop(session_id, None)
+            # El history del cliente se capturó antes de esta respuesta → obsoleto.
+            # Lo quitamos para que use la conversación acumulada (ya con la réplica).
+            nxt.pop("history", None)
+            asyncio.create_task(self._handle_message(ws, nxt))
 
     async def _handle_new_session(self, ws, msg: dict):
         session_id = msg.get("session_id", "")
