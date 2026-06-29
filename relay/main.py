@@ -56,6 +56,24 @@ if not (WEB_DIR / "index.html").exists():
 
 app = FastAPI(docs_url=None, redoc_url=None)
 
+# WEBPROD-008: comprime respuestas (HTML/JS/CSS) para reducir el egress de Cloud
+# Run (coste) y acelerar el móvil. app.js ~80KB → ~20KB.
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=600)
+
+
+@app.middleware("http")
+async def _cache_headers(request: Request, call_next):
+    """WEBPROD-008: cachea estáticos (menos peticiones a Cloud Run); el service
+    worker y el manifest se revalidan siempre para que los updates lleguen."""
+    resp = await call_next(request)
+    path = request.url.path
+    if path.startswith("/static/"):
+        resp.headers.setdefault("Cache-Control", "public, max-age=86400")
+    elif path in ("/sw.js", "/manifest.json"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
 
 # ── Rate limiting (in-memory, per IP) ─────────────────────────────────────────
 _RATE_WINDOW = 300   # seconds

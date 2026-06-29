@@ -1009,6 +1009,14 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
   #input-area { padding: 10px 12px 14px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   #approval-overlay { padding: 12px; }
 
+  /* Compositor móvil: textarea a todo el ancho arriba, acciones debajo, para que
+     los 5 botones (cámara/archivo/imagen/pantalla/voz) no aplasten el campo. */
+  .input-row { flex-wrap: wrap; align-items: center; }
+  #input { order: 1; flex-basis: 100%; max-height: 132px; }
+  .input-actions { order: 2; gap: 2px; }
+  .icon-btn { width: 40px; height: 40px; }   /* objetivo táctil cómodo */
+  #send-btn { order: 3; margin-left: auto; width: 40px; height: 40px; }
+
   .tool-row { align-items: flex-start; flex-wrap: wrap; }
   .tool-row-name { width: auto; max-width: 100%; }
   .tool-row-args { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; }
