@@ -7,17 +7,19 @@
  *
  * SEGURIDAD:
  *  - Protegido por un SECRETO compartido (Script Properties: SHARED_SECRET).
- *  - Solo lo llama tu PC. Cada acción que pide el agente pasa por la tarjeta de
- *    aprobación del agente (es una tool peligrosa) → tú das el consentimiento.
- *  - Despliega "ejecutar como: yo" y acceso "solo yo".
+ *    ESTE secreto es lo que protege la webapp: doPost rechaza todo sin él.
+ *  - Cada acción que pide el agente pasa por la tarjeta de aprobación del agente
+ *    (es una tool peligrosa) → tú das el consentimiento.
  *
  * DESPLIEGUE:
  *  1. script.google.com → Nuevo proyecto → pega este archivo.
  *  2. Configuración del proyecto → Propiedades de script → añade
  *     SHARED_SECRET = (un secreto largo aleatorio).
  *  3. Implementar → Nueva implementación → Aplicación web:
- *       - Ejecutar como: Yo
- *       - Quién tiene acceso: Solo yo
+ *       - Ejecutar como: Yo (mismo)
+ *       - Quién tiene acceso: CUALQUIERA   ← necesario para POST programático;
+ *         la seguridad la da el SHARED_SECRET (no "Solo yo", que exigiría login
+ *         OAuth por cada petición y bloquearía al PC).
  *  4. Autoriza los permisos que pida (Sheets/Docs/Slides/Gmail/Drive/Calendar).
  *  5. Copia la URL /exec y pásala al PC:
  *       APPS_SCRIPT_URL=<url>   APPS_SCRIPT_SECRET=<el secreto>

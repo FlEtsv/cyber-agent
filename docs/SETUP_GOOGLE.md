@@ -48,8 +48,11 @@ es peligrosa) → tú das el consentimiento en el momento.
 3. **Configuración del proyecto → Propiedades de script** → añade
    `SHARED_SECRET` = un secreto largo aleatorio.
 4. **Implementar → Nueva implementación → Aplicación web**:
-   - *Ejecutar como*: **Yo**
-   - *Quién tiene acceso*: **Solo yo**
+   - *Ejecutar como*: **Yo (mismo)** — las acciones corren en tu cuenta.
+   - *Quién tiene acceso*: **Cualquiera** — necesario para que el PC pueda hacer
+     POST. ⚠️ NO uses "Solo yo": exigiría login OAuth por petición y bloquearía
+     al agente. La seguridad la da el `SHARED_SECRET` (sin él, `doPost` rechaza
+     todo). Usa un secreto largo y aleatorio.
    - Autoriza los permisos (Sheets/Docs/Slides/Gmail/Drive/Calendar).
 5. Copia la **URL `/exec`** de la implementación.
 6. En el `.env` del PC añade y reinicia:
