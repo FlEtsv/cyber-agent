@@ -131,6 +131,7 @@ class CyberAgent {
 
     this._loadPreferences();
     this._loadConversations();
+    this._loadFoldersCache();   // offline parcial: carpetas visibles antes de conectar
     this._ensureConnectionBanner();
     this._ensureQueueBadge();
     this._initSettingsPanel();
@@ -225,7 +226,9 @@ class CyberAgent {
         this.activeModel = data?.active_model || '';
         this._syncModelSelect();
         if (!this.pcOnline) {
-          this._setConnectionState('offline', 'PC offline', 'El PC principal no esta conectado al relay.', true);
+          this._setConnectionState('offline', 'PC offline',
+            'PC apagado: estas viendo tu copia local (chats, carpetas y archivos). ' +
+            'El envio se reactivara cuando el PC se conecte.', true);
         } else {
           this._setConnectionState('', 'conectado');
         }
@@ -682,9 +685,34 @@ class CyberAgent {
     });
   }
 
+  _foldersKey() { return `ca_folders_${location.host}`; }
+
+  // Offline parcial: hidrata carpetas desde la copia local (PC apagado o aun
+  // sin conectar) para que el workspace se vea de inmediato.
+  _loadFoldersCache() {
+    try {
+      const raw = localStorage.getItem(this._foldersKey());
+      const cached = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(cached)) this.folders = cached;
+    } catch { /* cache corrupta: se ignora */ }
+  }
+
+  _saveFoldersCache() {
+    try { localStorage.setItem(this._foldersKey(), JSON.stringify(this.folders || [])); } catch {}
+  }
+
   async _loadFolders() {
     const r = await this._workspace('get');
-    if (Array.isArray(r.folders)) { this.folders = r.folders; this._renderConversationList(); }
+    if (Array.isArray(r.folders)) {
+      // Online: el backend (SQLite del PC) es la fuente de verdad; refresca cache.
+      this.folders = r.folders;
+      this._saveFoldersCache();
+      this._renderConversationList();
+    } else {
+      // Offline/timeout: nos quedamos con la copia local ya hidratada.
+      this._loadFoldersCache();
+      this._renderConversationList();
+    }
   }
 
   _folderById(id) { return (this.folders || []).find(f => String(f.id) === String(id)); }
