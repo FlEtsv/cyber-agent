@@ -274,10 +274,13 @@ class RelayConnector:
         if isinstance(client_hist, list) and client_hist:
             conv = [m for m in client_hist
                     if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")][-40:]
-            conv.append({"role": "user", "content": content})
             self._convs[session_id] = conv
         else:
             conv = self._convs.setdefault(session_id, [])
+        # No dupliques el turno: si el historial del cliente ya termina con este
+        # mismo mensaje de usuario (pasa al escalar/reintentar), no lo añadas otra vez.
+        last = conv[-1] if conv else None
+        if not (last and last.get("role") == "user" and last.get("content") == content):
             conv.append({"role": "user", "content": content})
         conv_trimmed = conv[-40:]
         requested_model = _requested_model_from_message(msg)

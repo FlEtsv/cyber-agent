@@ -147,7 +147,20 @@ class CyberAgent {
   // â”€â”€ WebSocket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   _connect() {
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    // Un solo socket: si ya hay uno abriéndose/abierto, no crees otro (cada socket
+    // extra procesa CADA evento del servidor de nuevo → respuestas duplicadas).
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    // Limpia un socket previo colgado (desconecta sus handlers para que no dispare).
+    if (this.ws) {
+      try {
+        this.ws.onopen = this.ws.onclose = this.ws.onerror = this.ws.onmessage = null;
+        this.ws.close();
+      } catch {}
+      this.ws = null;
+    }
     this._setConnectionState('offline', 'conectando...', 'Conectando con CyberAgent...', true);
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';

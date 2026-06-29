@@ -580,7 +580,10 @@ async def websocket_chat(ws: WebSocket):
                 if not content:
                     continue
 
-                conv.append({"role": "user", "content": content})
+                # No dupliques el turno si el último mensaje ya era idéntico.
+                _last = conv[-1] if conv else None
+                if not (_last and _last.get("role") == "user" and _last.get("content") == content):
+                    conv.append({"role": "user", "content": content})
 
                 # Cap conversation history to avoid exceeding num_ctx silently
                 conv_trimmed = conv[-40:]
