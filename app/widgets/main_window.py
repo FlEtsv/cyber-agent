@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QTextEdit, QSizePolicy, QStackedWidget,
-    QFrame, QComboBox, QScrollArea,
+    QFrame, QComboBox, QScrollArea, QMenu, QInputDialog, QDialog, QLineEdit,
+    QFormLayout, QDialogButtonBox, QColorDialog,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtGui import QKeyEvent, QColor
 
 from .chat_panel import ChatPanel
 from .terminal_panel import TerminalPanel
@@ -277,16 +278,26 @@ class MainWindow(QMainWindow):
         self.trust_btn.clicked.connect(self._toggle_trust)
         lay.addWidget(self.trust_btn)
 
-        # New conversation
-        new_btn = QPushButton("＋  Nueva conversación")
+        # New conversation + nueva carpeta (A2 workspace)
+        new_row = QHBoxLayout()
+        new_btn = QPushButton("＋  Chat")
         new_btn.setObjectName("btn_new_conv")
-        new_btn.clicked.connect(self._new_conversation)
-        lay.addWidget(new_btn)
+        new_btn.clicked.connect(lambda: self._new_conversation(ask_folder=True))
+        folder_btn = QPushButton("📁  Carpeta")
+        folder_btn.setObjectName("btn_new_conv")
+        folder_btn.clicked.connect(self._create_folder_dialog)
+        new_row.addWidget(new_btn, 1)
+        new_row.addWidget(folder_btn, 1)
+        lay.addLayout(new_row)
 
-        # Conversation list
+        # Conversation list (agrupada por carpetas)
         self.conv_list = QListWidget()
         self.conv_list.setObjectName("conv_list")
         self.conv_list.currentRowChanged.connect(self._on_conv_selected)
+        self.conv_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.conv_list.customContextMenuRequested.connect(self._conv_context_menu)
+        self.conv_list.itemClicked.connect(self._on_conv_item_clicked)
+        self._collapsed = set()
         lay.addWidget(self.conv_list, 1)
 
         # ── Permissions section ────────────────────────────────────────
@@ -628,34 +639,192 @@ class MainWindow(QMainWindow):
     # CONVERSATIONS
     # ════════════════════════════════════════════════════════════════════
 
+    _ROLE_FOLDER = Qt.UserRole + 1   # ("folder", id) en cabeceras
+
     def _load_conversations(self):
         self.conv_list.blockSignals(True)
         self.conv_list.clear()
         self._convs = db.get_conversations()
+        self._folders = db.get_folders()
+        groups = {}
         for c in self._convs:
-            item = QListWidgetItem(f"  {c['title']}")
-            item.setData(Qt.UserRole, c["id"])
-            self.conv_list.addItem(item)
+            groups.setdefault(c.get("folder_id"), []).append(c)
+
+        def add_header(f, depth):
+            collapsed = f["id"] in self._collapsed
+            caret = "▸" if collapsed else "▾"
+            it = QListWidgetItem(("    " * depth) + f"{caret} 📁 {f['name']}")
+            it.setData(Qt.UserRole, None)
+            it.setData(self._ROLE_FOLDER, f["id"])
+            it.setFlags(Qt.ItemIsEnabled)
+            fnt = it.font(); fnt.setBold(True); it.setFont(fnt)
+            if f.get("color"):
+                it.setForeground(QColor(f["color"]))
+            self.conv_list.addItem(it)
+            return not collapsed
+
+        def add_conv(c, depth=0):
+            dot = "● " if c.get("color") else ""
+            it = QListWidgetItem(("    " * depth) + f"   {dot}{c['title']}")
+            it.setData(Qt.UserRole, c["id"])
+            if c.get("color"):
+                it.setForeground(QColor(c["color"]))
+            self.conv_list.addItem(it)
+
+        def render_folder(f, depth=0):
+            opened = add_header(f, depth)
+            if opened:
+                for c in groups.get(f["id"], []):
+                    add_conv(c, depth + 1)
+            for sub in self._folders:
+                if sub.get("parent_id") == f["id"]:
+                    render_folder(sub, depth + 1)
+
+        for f in self._folders:
+            if not f.get("parent_id"):
+                render_folder(f)
+        loose = groups.get(None, [])
+        if loose and self._folders:
+            h = QListWidgetItem("Sin carpeta")
+            h.setData(Qt.UserRole, None); h.setFlags(Qt.ItemIsEnabled)
+            h.setForeground(QColor("#616d7d"))
+            self.conv_list.addItem(h)
+        for c in loose:
+            add_conv(c)
         self.conv_list.blockSignals(False)
 
     def _on_conv_selected(self, row: int):
-        if row < 0 or row >= len(self._convs):
+        item = self.conv_list.item(row)
+        if not item:
             return
-        self.active_conv = self._convs[row]["id"]
-        msgs = db.get_messages(self.active_conv)
-        self.chat.load_messages(msgs, conv_id=self.active_conv)
+        cid = item.data(Qt.UserRole)
+        if cid is None:
+            return                       # cabecera de carpeta
+        self.active_conv = cid
+        msgs = db.get_messages(cid)
+        self.chat.load_messages(msgs, conv_id=cid)
 
-    def _new_conversation(self):
-        conv_id = db.create_conversation()
-        self._load_conversations()
+    def _on_conv_item_clicked(self, item):
+        fid = item.data(self._ROLE_FOLDER)
+        if fid is not None:
+            self._collapsed.discard(fid) if fid in self._collapsed else self._collapsed.add(fid)
+            self._load_conversations()
+
+    def _select_conv_item(self, conv_id):
         for i in range(self.conv_list.count()):
             if self.conv_list.item(i).data(Qt.UserRole) == conv_id:
                 self.conv_list.setCurrentRow(i)
                 break
+
+    def _new_conversation(self, ask_folder=True):
+        folder_id = None
+        if ask_folder:
+            folder_id = self._pick_folder_dialog()
+            if folder_id == "__cancel__":
+                return
+        conv_id = db.create_conversation(folder_id=folder_id)
+        self._load_conversations()
+        self._select_conv_item(conv_id)
         self.chat.clear()
         self.active_conv = conv_id
         self._switch_tab(0)
         self.input_box.setFocus()
+
+    # ── A2: carpetas / workspace (escritorio) ───────────────────────────────
+    def _pick_folder_dialog(self, title="¿Para quién es este chat?"):
+        folders = db.get_folders()
+        labels = ["(Sin carpeta)"] + [f["name"] for f in folders] + ["＋ Nueva categoría…"]
+        choice, ok = QInputDialog.getItem(self, "Carpeta", title, labels, 0, False)
+        if not ok:
+            return "__cancel__"
+        if choice == labels[0]:
+            return None
+        if choice == labels[-1]:
+            return self._create_folder_dialog()
+        for f in folders:
+            if f["name"] == choice:
+                return f["id"]
+        return None
+
+    def _folder_dialog(self, folder=None):
+        """Diálogo crear/editar carpeta. Devuelve dict o None."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Editar categoría" if folder else "Nueva categoría")
+        form = QFormLayout(dlg)
+        name = QLineEdit(folder["name"] if folder else "")
+        context = QTextEdit((folder or {}).get("context", "") or "")
+        context.setMaximumHeight(80)
+        color = QLineEdit((folder or {}).get("color", "") or "#54c7d8")
+        model = QComboBox(); model.setEditable(True)
+        model.addItem("")
+        for m_ in ("cyberagent-24b", "codestral-latest", "mistral-medium-latest", "mistral-large-latest"):
+            model.addItem(m_)
+        if folder and folder.get("default_model"):
+            model.setEditText(folder["default_model"])
+        form.addRow("Nombre", name)
+        form.addRow("Contexto", context)
+        form.addRow("Color (hex)", color)
+        form.addRow("Modelo por defecto", model)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        form.addRow(bb)
+        if dlg.exec() != QDialog.Accepted or not name.text().strip():
+            return None
+        return {"name": name.text().strip(), "context": context.toPlainText().strip(),
+                "color": color.text().strip() or None, "default_model": model.currentText().strip() or None}
+
+    def _create_folder_dialog(self):
+        data = self._folder_dialog()
+        if not data:
+            return None
+        fid = db.create_folder(data["name"], color=data["color"],
+                               context=data["context"], default_model=data["default_model"])
+        self._load_conversations()
+        return fid
+
+    def _conv_context_menu(self, pos):
+        item = self.conv_list.itemAt(pos)
+        if not item:
+            return
+        menu = QMenu(self)
+        fid = item.data(self._ROLE_FOLDER)
+        cid = item.data(Qt.UserRole)
+        if fid is not None:                         # cabecera de carpeta
+            act_edit = menu.addAction("✏️  Editar carpeta")
+            act_del = menu.addAction("🗑  Borrar carpeta")
+            chosen = menu.exec(self.conv_list.mapToGlobal(pos))
+            f = db.get_folder(fid)
+            if chosen == act_edit and f:
+                data = self._folder_dialog(f)
+                if data:
+                    db.update_folder(fid, **data)
+                    self._load_conversations()
+            elif chosen == act_del:
+                db.delete_folder(fid)
+                self._load_conversations()
+        elif cid is not None:                       # conversación
+            move = menu.addMenu("📁  Mover a")
+            folders = db.get_folders()
+            act_none = move.addAction("(Sin carpeta)")
+            fmap = {}
+            for f in folders:
+                a = move.addAction(f["name"]); fmap[a] = f["id"]
+            act_color = menu.addAction("🎨  Color…")
+            act_del = menu.addAction("🗑  Borrar")
+            chosen = menu.exec(self.conv_list.mapToGlobal(pos))
+            if chosen == act_none:
+                db.move_conversation(cid, None); self._load_conversations()
+            elif chosen in fmap:
+                db.move_conversation(cid, fmap[chosen]); self._load_conversations()
+            elif chosen == act_color:
+                col = QColorDialog.getColor(parent=self)
+                if col.isValid():
+                    db.set_conversation_color(cid, col.name()); self._load_conversations()
+            elif chosen == act_del:
+                db.delete_conversation(cid)
+                if self.active_conv == cid:
+                    self.active_conv = None; self.chat.clear()
+                self._load_conversations()
 
     # ════════════════════════════════════════════════════════════════════
     # SEND / STOP
@@ -674,7 +843,7 @@ class MainWindow(QMainWindow):
         if not text or self._streaming:
             return
         if not self.active_conv:
-            self._new_conversation()
+            self._new_conversation(ask_folder=False)
         separator(f"SEND → {text[:60]}")
         log("INFO", "main_window._send", "Usuario envía mensaje",
             {"msg": text[:200], "model": self.selected_model,
