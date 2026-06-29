@@ -212,6 +212,81 @@ async def api_tools():
         return {"ok": False, "error": str(e), "tools": []}
 
 
+# ── A1.5: Carpetas / workspace (auth-gated) ───────────────────────────────────
+def _gate(request: Request):
+    return None if _auth_ok(request) else JSONResponse(
+        {"ok": False, "error": "no autorizado"}, status_code=401)
+
+
+@app.get("/api/folders")
+async def api_folders(request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    from app import database as db
+    return {"ok": True, "folders": db.get_folders(), "conversations": db.get_conversations()}
+
+
+@app.post("/api/folders")
+async def api_folders_create(request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    b = await request.json()
+    name = (b.get("name") or "").strip()
+    if not name:
+        return JSONResponse({"ok": False, "error": "nombre requerido"}, status_code=400)
+    from app import database as db
+    fid = db.create_folder(name, b.get("parent_id"), b.get("color"),
+                           b.get("context", ""), b.get("default_model"))
+    return {"ok": True, "id": fid}
+
+
+@app.patch("/api/folders/{folder_id}")
+async def api_folders_update(folder_id: int, request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    b = await request.json()
+    from app import database as db
+    db.update_folder(folder_id, **{k: b[k] for k in
+                     ("name", "parent_id", "color", "context", "default_model", "position")
+                     if k in b})
+    return {"ok": True}
+
+
+@app.delete("/api/folders/{folder_id}")
+async def api_folders_delete(folder_id: int, request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    from app import database as db
+    db.delete_folder(folder_id)
+    return {"ok": True}
+
+
+@app.post("/api/conversations/{conv_id}/move")
+async def api_conv_move(conv_id: int, request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    b = await request.json()
+    from app import database as db
+    db.move_conversation(conv_id, b.get("folder_id"))
+    return {"ok": True}
+
+
+@app.post("/api/conversations/{conv_id}/color")
+async def api_conv_color(conv_id: int, request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    b = await request.json()
+    from app import database as db
+    db.set_conversation_color(conv_id, b.get("color"))
+    return {"ok": True}
+
+
 @app.get("/api/files")
 async def api_files():
     """Archivos generados por el agente (documentos/imágenes) con su URL pública."""
