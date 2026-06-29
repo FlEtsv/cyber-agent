@@ -102,6 +102,58 @@ def _extract_body(payload) -> str:
     return base64.urlsafe_b64decode(data).decode("utf-8", "replace") if data else ""
 
 
+# ── Estado / conexión (WEBPROD-015: conectar sin CLI) ────────────────────────
+def google_status() -> dict:
+    """Estado de la conexión SIN abrir el navegador: ¿hay credenciales? ¿token válido?"""
+    has_creds = os.path.exists(_CREDS)
+    has_token = os.path.exists(_TOKEN)
+    connected = False
+    if has_token:
+        try:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            creds = Credentials.from_authorized_user_file(_TOKEN, SCOPES)
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                with open(_TOKEN, "w", encoding="utf-8") as f:
+                    f.write(creds.to_json())
+            connected = bool(creds and creds.valid)
+        except Exception:
+            connected = False
+    return {"ok": True, "has_credentials": has_creds, "has_token": has_token,
+            "connected": connected, "hint": None if has_creds else _SETUP_MSG}
+
+
+def google_connect() -> dict:
+    """Lanza el OAuth (abre el navegador EN EL PC) y guarda el token. Idempotente.
+    El usuario elige en el navegador qué cuenta de Google autorizar."""
+    creds, err = _get_creds()
+    if err:
+        return err
+    return {"ok": True, "connected": bool(creds and creds.valid)}
+
+
+def google_disconnect() -> dict:
+    """Cierra la sesión: borra el token local (no las credenciales OAuth).
+    Intenta revocar el token en Google antes de borrarlo."""
+    try:
+        if os.path.exists(_TOKEN):
+            try:
+                import httpx
+                from google.oauth2.credentials import Credentials
+                creds = Credentials.from_authorized_user_file(_TOKEN, SCOPES)
+                tok = getattr(creds, "token", None) or getattr(creds, "refresh_token", None)
+                if tok:
+                    httpx.post("https://oauth2.googleapis.com/revoke",
+                               params={"token": tok}, timeout=8)
+            except Exception:
+                pass
+            os.remove(_TOKEN)
+        return {"ok": True, "connected": False}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 # ── Gmail ────────────────────────────────────────────────────────────────────
 def gmail_search(query: str = "", max_results: int = 10) -> dict:
     """Busca correos (sintaxis Gmail: 'from:x is:unread newer_than:7d ...')."""

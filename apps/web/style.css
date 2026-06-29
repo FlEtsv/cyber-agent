@@ -1159,6 +1159,16 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
   border: 1px solid var(--accent-line, #2a3850); border-radius: 999px;
 }
 
+/* ═══ Sección Google en Ajustes ═══ */
+.google-actions { display: flex; gap: 8px; margin: 6px 0; }
+.google-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip-btn {
+  font-size: 12.5px; padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--surface-2, #161b22); color: var(--text, #e6edf3);
+  border: 1px solid var(--border, #2a313b); transition: border-color .15s, background .15s;
+}
+.chip-btn:hover { border-color: var(--accent-line); background: var(--accent-soft, rgba(80,120,200,.10)); }
+
 /* ═══ Adjuntos no-imagen (chips de archivo) ═══ */
 .attachment-file {
   display: inline-flex; align-items: center; gap: 6px;

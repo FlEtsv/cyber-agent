@@ -228,6 +228,16 @@ class RelayConnector:
             elif action == "conv_files_cleanup":
                 db.cleanup_conversation_files(msg.get("conversation_id"))
                 data = {"ok": True}
+            elif action == "google_status":
+                from app import google_suite as _g
+                data = _g.google_status()
+            elif action == "google_connect":
+                from app import google_suite as _g
+                loop = asyncio.get_running_loop()
+                data = await loop.run_in_executor(None, _g.google_connect)
+            elif action == "google_disconnect":
+                from app import google_suite as _g
+                data = _g.google_disconnect()
             elif action == "folder_create":
                 data = {"id": db.create_folder(
                     msg.get("name", ""), msg.get("parent_id"), msg.get("color"),

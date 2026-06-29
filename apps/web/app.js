@@ -1880,7 +1880,59 @@ class CyberAgent {
         this._savePreferences();
       }
     });
+    this._initGoogle();
     this._syncSettingsPanel();
+  }
+
+  // WEBPROD-015: conectar/desconectar Google y acciones rápidas desde Ajustes.
+  _initGoogle() {
+    const statusEl = this.$('google-status');
+    if (!statusEl) return;
+    this.$('google-connect')?.addEventListener('click', async () => {
+      statusEl.textContent = 'Abriendo autorización en el PC… elige tu cuenta.';
+      const r = await this._workspace('google_connect');
+      this._googleRender(r.error ? { ok: false, error: r.error } : r);
+      this._googleRefresh();
+    });
+    this.$('google-disconnect')?.addEventListener('click', async () => {
+      await this._workspace('google_disconnect');
+      this._googleRefresh();
+    });
+    this.$('google-quick')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-g]'); if (!b) return;
+      const prompts = {
+        inbox: 'Resume mis correos sin leer más recientes (usa Gmail).',
+        events: 'Dime mis próximos eventos del calendario de los próximos 7 días.',
+        drive: 'Lista mis archivos recientes de Google Drive.',
+      };
+      this.inputEl.value = prompts[b.dataset.g] || '';
+      this._toggleSettingsPanel(false);
+      this.send();
+    });
+    this._googleRefresh();
+  }
+
+  async _googleRefresh() {
+    const r = await this._workspace('google_status');
+    this._googleRender(r || {});
+  }
+
+  _googleRender(s) {
+    const statusEl = this.$('google-status');
+    const quick = this.$('google-quick');
+    if (!statusEl) return;
+    if (s.connected) {
+      statusEl.textContent = '✅ Conectado. Eliges la cuenta al autorizar; "Desconectar" cierra la sesión.';
+    } else if (s.has_credentials === false) {
+      statusEl.textContent = '⚠️ Falta data/google_credentials.json (OAuth de escritorio) en el PC.';
+    } else if (s.error) {
+      statusEl.textContent = 'Error: ' + s.error;
+    } else {
+      statusEl.textContent = 'No conectado. Pulsa "Conectar" y elige tu cuenta de Google.';
+    }
+    if (quick) quick.hidden = !s.connected;
+    const dis = this.$('google-disconnect');
+    if (dis) dis.disabled = !s.connected && s.has_token !== true;
   }
 
   _toggleSettingsPanel(force) {

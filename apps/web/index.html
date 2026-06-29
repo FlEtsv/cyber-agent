@@ -95,6 +95,22 @@
     </section>
 
     <section class="settings-section">
+      <h3>Google (Gmail · Drive · Calendar)</h3>
+      <p id="google-status" class="settings-hint">Comprobando…</p>
+      <div class="google-actions">
+        <button id="google-connect" class="mini-btn" type="button">Conectar</button>
+        <button id="google-disconnect" class="mini-btn" type="button">Desconectar</button>
+      </div>
+      <div id="google-quick" class="google-quick" hidden>
+        <button class="chip-btn" data-g="inbox" type="button">📥 No leídos</button>
+        <button class="chip-btn" data-g="events" type="button">📅 Próximos eventos</button>
+        <button class="chip-btn" data-g="drive" type="button">🗂️ Drive reciente</button>
+      </div>
+      <p class="settings-hint">Eliges tu cuenta de Google al conectar (se autoriza en el PC).
+        "Desconectar" cierra la sesión y borra el token de este equipo.</p>
+    </section>
+
+    <section class="settings-section">
       <h3>Permisos por herramienta</h3>
       <div id="permissions-list" class="permissions-list"></div>
     </section>
