@@ -118,6 +118,12 @@ def init_db():
             c.execute("ALTER TABLE conversations ADD COLUMN folder_id INTEGER")
         if "color" not in cols:
             c.execute("ALTER TABLE conversations ADD COLUMN color TEXT")
+        # WEBPROD-012: favoritos en files (persisten aunque se borre la conversación).
+        fcols = {r["name"] for r in c.execute("PRAGMA table_info(files)")}
+        if "favorite" not in fcols:
+            c.execute("ALTER TABLE files ADD COLUMN favorite INTEGER DEFAULT 0")
+        if "kind" not in fcols:
+            c.execute("ALTER TABLE files ADD COLUMN kind TEXT")
 
 def create_conversation(title="Nueva conversación", folder_id=None):
     with get_conn() as c:
@@ -156,6 +162,12 @@ def delete_conversation(conv_id):
             c.execute("DELETE FROM decision_log WHERE conversation_id=?", (conv_id,))
             c.execute("DELETE FROM conversation_memory WHERE conversation_id=?", (conv_id,))
             c.execute("DELETE FROM messages WHERE conversation_id=?", (conv_id,))
+            # WEBPROD-012: los favoritos se conservan (se desligan); el resto de
+            # adjuntos de la conversación se eliminan con ella.
+            c.execute("UPDATE files SET conversation_id=NULL "
+                      "WHERE conversation_id=? AND favorite=1", (conv_id,))
+            c.execute("DELETE FROM files "
+                      "WHERE conversation_id=? AND (favorite IS NULL OR favorite=0)", (conv_id,))
             c.execute("DELETE FROM conversations WHERE id=?", (conv_id,))
             c.execute("COMMIT")
         except Exception:
@@ -247,25 +259,59 @@ def set_conversation_color(conv_id, color):
         c.execute("UPDATE conversations SET color=? WHERE id=?", (color, conv_id))
 
 
-def register_file(path, name=None, url=None, folder_id=None, conversation_id=None):
-    """A4: registra un archivo generado, asociado a una carpeta/conversación."""
+def register_file(path, name=None, url=None, folder_id=None, conversation_id=None, kind=None):
+    """A4/WEBPROD-011: registra un archivo (generado o adjunto), asociado a una
+    carpeta/conversación. Devuelve el id de la fila o None."""
     try:
         with get_conn() as c:
-            c.execute(
-                "INSERT INTO files (path, name, url, folder_id, conversation_id) VALUES (?,?,?,?,?)",
-                (str(path), name or os.path.basename(str(path)), url, folder_id, conversation_id))
+            cur = c.execute(
+                "INSERT INTO files (path, name, url, folder_id, conversation_id, kind) "
+                "VALUES (?,?,?,?,?,?)",
+                (str(path), name or os.path.basename(str(path)), url,
+                 folder_id, conversation_id, kind))
+            return cur.lastrowid
     except Exception:
-        pass
+        return None
 
 
-def get_files(folder_id="__all__"):
+def get_files(folder_id="__all__", conversation_id="__all__", favorites_only=False):
+    """Lista archivos. Filtra por carpeta y/o conversación; o solo favoritos."""
+    where, params = [], []
+    if favorites_only:
+        where.append("favorite=1")
+    if folder_id != "__all__":
+        where.append("folder_id IS ?"); params.append(folder_id)
+    if conversation_id != "__all__":
+        where.append("conversation_id IS ?"); params.append(conversation_id)
+    sql = "SELECT * FROM files"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY favorite DESC, created_at DESC LIMIT 300"
     with get_conn() as c:
-        if folder_id == "__all__":
-            rows = c.execute("SELECT * FROM files ORDER BY created_at DESC LIMIT 300")
-        else:
-            rows = c.execute(
-                "SELECT * FROM files WHERE folder_id IS ? ORDER BY created_at DESC", (folder_id,))
-        return [dict(r) for r in rows]
+        return [dict(r) for r in c.execute(sql, params)]
+
+
+def set_file_favorite(file_id, favorite=True):
+    """WEBPROD-012: marca/desmarca un archivo como favorito (persiste al borrar la conv)."""
+    with get_conn() as c:
+        c.execute("UPDATE files SET favorite=? WHERE id=?", (1 if favorite else 0, file_id))
+
+
+def delete_file(file_id):
+    """Elimina el registro de un archivo (no borra el fichero físico)."""
+    with get_conn() as c:
+        c.execute("DELETE FROM files WHERE id=?", (file_id,))
+
+
+def cleanup_conversation_files(conversation_id):
+    """WEBPROD-012: al borrar una conversación (incluidas las de la web en
+    localStorage), conserva sus archivos favoritos (los desliga) y elimina el resto."""
+    with get_conn() as c:
+        c.execute("UPDATE files SET conversation_id=NULL "
+                  "WHERE conversation_id IS ? AND favorite=1", (conversation_id,))
+        c.execute("DELETE FROM files "
+                  "WHERE conversation_id IS ? AND (favorite IS NULL OR favorite=0)",
+                  (conversation_id,))
 
 
 def get_conversation_folder(conv_id):

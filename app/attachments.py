@@ -43,8 +43,8 @@ def _register(path: str, name: str, conversation_id, folder_id) -> str:
     url = f"/served/uploads/{os.path.basename(path)}"
     try:
         from app import database as _db
-        _db.register_file(path, name=name, url=url,
-                          folder_id=folder_id, conversation_id=conversation_id)
+        _db.register_file(path, name=name, url=url, folder_id=folder_id,
+                          conversation_id=conversation_id, kind="attachment")
     except Exception:
         pass
     return url

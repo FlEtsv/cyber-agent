@@ -476,6 +476,7 @@ class CyberAgent {
       history:       priorHistory,
       images:        this.attachedImgs.map(i => i.b64),
       files:         this.attachedFiles.length ? this.attachedFiles : undefined,
+      conversation_id: this.currentConversationId || undefined,
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
       model:         this.selectedModel || undefined,
@@ -964,6 +965,9 @@ class CyberAgent {
       const ok = await this._menu('¿Borrar esta conversación?', [
         { label: 'Sí, borrar', value: 'yes', danger: true }, { label: 'Cancelar', value: 'no' }]);
       if (ok !== 'yes') return;
+      // WEBPROD-012: conserva los adjuntos favoritos; borra el resto en el backend.
+      this._workspace('conv_files_cleanup', { conversation_id: convId });
+      try { localStorage.removeItem(this._historyKey(convId)); } catch {}
       this.conversations = this.conversations.filter(c => c.id !== convId);
       if (this.currentConversationId === convId) {
         this.currentConversationId = (this.conversations[0] || {}).id || null;
@@ -1209,8 +1213,8 @@ class CyberAgent {
     }
   }
 
-  _historyKey() {
-    return `ca_history_${location.host}_${this.currentConversationId || 'default'}`;
+  _historyKey(convId) {
+    return `ca_history_${location.host}_${convId || this.currentConversationId || 'default'}`;
   }
 
   _loadLocalHistory() {

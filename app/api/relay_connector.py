@@ -160,7 +160,18 @@ class RelayConnector:
             if action == "get":
                 data = {"folders": db.get_folders(), "conversations": db.get_conversations()}
             elif action == "files_get":
-                data = {"files": db.get_files()}
+                data = {"files": db.get_files(
+                    conversation_id=msg.get("conversation_id", "__all__"),
+                    favorites_only=bool(msg.get("favorites_only", False)))}
+            elif action == "file_favorite":
+                db.set_file_favorite(msg["file_id"], bool(msg.get("favorite", True)))
+                data = {"ok": True}
+            elif action == "file_delete":
+                db.delete_file(msg["file_id"])
+                data = {"ok": True}
+            elif action == "conv_files_cleanup":
+                db.cleanup_conversation_files(msg.get("conversation_id"))
+                data = {"ok": True}
             elif action == "folder_create":
                 data = {"id": db.create_folder(
                     msg.get("name", ""), msg.get("parent_id"), msg.get("color"),
@@ -221,7 +232,9 @@ class RelayConnector:
             try:
                 from app.attachments import process_attachments
                 content = (content + process_attachments(
-                    files, conversation_id=session_id, folder_id=msg.get("folder_id"))).strip()
+                    files,
+                    conversation_id=msg.get("conversation_id"),
+                    folder_id=msg.get("folder_id"))).strip()
             except Exception as e:
                 content = (content + f"\n\n[archivo adjunto — error: {e}]").strip()
 
