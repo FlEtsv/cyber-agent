@@ -952,11 +952,42 @@ def threat_intel(indicator: str, kind: str = "auto") -> dict:
 
 def yara_scan(path: str, rules: str) -> dict:
     """Escanea un archivo/carpeta con reglas YARA (CPU). `rules` = reglas YARA (texto)
-    o ruta a un .yar. Detección de malware/IOCs. Requiere: pip install yara-python."""
+    o ruta a un .yar. Detección de malware/IOCs. Usa yara-python si está; si no, el
+    binario `yara` (CLI). Instala uno: pip install yara-python  o  scoop install yara."""
+    if not os.path.exists(path):
+        return {"ok": False, "error": "no existe: " + str(path)}
     try:
-        import yara
+        import yara  # noqa: F401
     except Exception:
-        return {"ok": False, "error": "yara-python no instalado: pip install yara-python"}
+        # Fallback al binario yara (CLI) si la librería Python no está disponible.
+        if _which("yara"):
+            import tempfile
+            rules_file = rules
+            tmp = None
+            if not os.path.isfile(rules):
+                fd, tmp = tempfile.mkstemp(suffix=".yar", text=True)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(rules)
+                rules_file = tmp
+            try:
+                rc, out, err = _run_cmd(["yara", "-r", rules_file, path], timeout=120)
+                if rc not in (0, 1):
+                    return {"ok": False, "error": (err or out)[:300]}
+                matches = []
+                for line in out.splitlines():
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        matches.append({"rule": parts[0], "file": parts[1]})
+                return {"ok": True, "engine": "yara-cli", "match_count": len(matches),
+                        "matches": matches[:100], "clean": len(matches) == 0}
+            finally:
+                if tmp:
+                    try:
+                        os.remove(tmp)
+                    except Exception:
+                        pass
+        return {"ok": False, "error": "YARA no disponible. Instala uno: "
+                "pip install yara-python  (necesita compilador)  o  scoop install yara (binario)"}
     try:
         compiled = yara.compile(filepath=rules) if os.path.isfile(rules) else yara.compile(source=rules)
     except Exception as e:
