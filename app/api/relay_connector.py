@@ -102,6 +102,7 @@ class RelayConnector:
                 async with websockets.connect(
                     f"{self.ws_url}/host?secret={quote(self.host_secret, safe='')}",
                     **{_WS_HEADERS_KW: {"X-Host-Secret": self.host_secret}},
+                    open_timeout=25,   # Cloud Run min-instances=0: tolera arranque en frío
                     ping_interval=20,
                     ping_timeout=60,
                 ) as ws:
