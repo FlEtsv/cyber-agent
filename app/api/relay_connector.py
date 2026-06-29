@@ -142,12 +142,68 @@ class RelayConnector:
                     await self._handle_resume_session(ws, msg)
                 elif msg_type == "ping":
                     await ws.send(json.dumps({"type": "pong"}))
+                elif msg_type == "generate_image":
+                    asyncio.create_task(self._handle_generate_image(ws, msg))
                 elif msg_type and msg_type.startswith("workspace:"):
                     await self._handle_workspace(ws, msg)
         except Exception as e:
             log.error(f"[relay] Error en conexión: {e}")
         finally:
             self._stop_all_runners()
+
+    async def _handle_generate_image(self, ws, msg: dict):
+        """WEBPROD-005: crea una imagen con FLUX (Mistral Studio) de forma directa,
+        sin depender de que el modelo decida llamarla. Devuelve burbuja + archivo."""
+        session_id = msg.get("session_id", "")
+        prompt = (msg.get("prompt") or "").strip()
+        if not session_id or not prompt:
+            return
+
+        async def _send(obj):
+            try:
+                await ws.send(json.dumps({**obj, "session_id": session_id}))
+            except Exception:
+                pass
+
+        await _send({"type": "status", "data": "🎨 Generando imagen…"})
+        try:
+            from app.mistral_studio import available, run
+            if not available():
+                await _send({"type": "token",
+                             "data": "No puedo crear imágenes: falta MISTRAL_API_KEY en el PC."})
+                await _send({"type": "done"})
+                return
+            loop = asyncio.get_running_loop()
+            res = await loop.run_in_executor(
+                None, lambda: run(prompt, connectors=["image_generation"]))
+        except Exception as e:
+            await _send({"type": "token", "data": f"Error generando la imagen: {e}"})
+            await _send({"type": "done"})
+            return
+
+        files = res.get("files") or [] if isinstance(res, dict) else []
+        if not files:
+            txt = (res or {}).get("text") or "No se generó ninguna imagen."
+            await _send({"type": "token", "data": txt})
+            await _send({"type": "done"})
+            return
+
+        # Registra cada imagen como archivo de la conversación y arma la respuesta.
+        try:
+            from app import database as db
+            for f in files:
+                db.register_file(f.get("path", ""), name=(f.get("path", "").split("/")[-1] or "imagen.png"),
+                                 url=f.get("url"), conversation_id=msg.get("conversation_id"),
+                                 folder_id=msg.get("folder_id"), kind="image")
+        except Exception:
+            pass
+        md = f"🎨 Imagen generada para: *{prompt}*\n\n" + "\n".join(
+            f"![imagen]({f.get('url')})" for f in files if f.get("url"))
+        await _send({"type": "token", "data": md})
+        await _send({"type": "files", "data": [
+            {"name": (f.get("path", "").split("/")[-1] or "imagen.png"),
+             "url": f.get("url"), "kind": "image"} for f in files]})
+        await _send({"type": "done"})
 
     async def _handle_workspace(self, ws, msg: dict):
         """CRUD de carpetas/conversaciones del workspace (web→relay→host→SQLite).

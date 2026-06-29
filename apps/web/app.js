@@ -1553,6 +1553,32 @@ class CyberAgent {
     });
   }
 
+  // WEBPROD-005: crear imagen con IA (FLUX) — flujo directo, no depende del modelo.
+  async generateImage() {
+    if (this.streaming) return;
+    const r = await this._modal({
+      title: '🎨 Crear imagen',
+      submitLabel: 'Generar',
+      fields: [{ name: 'prompt', label: 'Describe la imagen', type: 'textarea',
+                 placeholder: 'Ej: un gato astronauta sobre Marte, estilo acuarela' }],
+    });
+    const prompt = r && (r.prompt || '').trim();
+    if (!prompt) return;
+    if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
+      this._setConnectionState('offline', 'PC offline',
+        'No se puede crear la imagen: el PC no está conectado.', true);
+      return;
+    }
+    this._addUserBubble('🎨 Crear imagen: ' + prompt);
+    this._beginStreaming();
+    this._send({
+      type: 'generate_image',
+      prompt,
+      conversation_id: this.currentConversationId || undefined,
+      folder_id: this._currentFolderId() || undefined,
+    });
+  }
+
   // WEBPROD-014: abrir selector de archivos (cualquier tipo).
   openFilePicker() {
     const input = document.createElement('input');
@@ -2037,6 +2063,7 @@ class CyberAgent {
 
     this.$('camera-btn').addEventListener('click', () => this.openCamera());
     this.$('file-btn')?.addEventListener('click', () => this.openFilePicker());
+    this.$('image-btn')?.addEventListener('click', () => this.generateImage());
     this.$('screen-btn').addEventListener('click', () => this.captureScreen());
     this.$('voice-btn').addEventListener('click',  () => this.toggleVoice());
   }
