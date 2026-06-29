@@ -1,4 +1,4 @@
-const CACHE = 'cyberagent-v12';
+const CACHE = 'cyberagent-v13';
 const PRECACHE = [
   '/',
   '/static/style.css',
@@ -23,15 +23,27 @@ self.addEventListener('activate', e => {
   );
 });
 
+// ¿Es un recurso propio del shell (HTML/JS/CSS/manifest)? Para estos usamos
+// network-first para que los updates lleguen SIEMPRE; el resto, cache-first.
+function isShellAsset(url) {
+  return url.origin === self.location.origin && (
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    url.pathname === '/manifest.json' ||
+    url.pathname.startsWith('/static/')
+  );
+}
+
 self.addEventListener('fetch', e => {
-  // WebSocket and API calls always go to network
   const url = new URL(e.request.url);
+
+  // WebSocket y API: siempre a red, nunca caché.
   if (url.pathname.startsWith('/ws') || url.pathname.startsWith('/api') || url.pathname === '/terminal') {
     return;
   }
 
-  // Navegaciones (deep links con ?action=...): si la red falla, sirve el shell
-  // cacheado para que la app abra estando el PC apagado (offline parcial).
+  // Navegaciones (deep links con ?action=...): red primero; si falla, shell
+  // cacheado para que la app abra con el PC apagado (offline parcial).
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('/'))
@@ -39,6 +51,25 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // Shell/estáticos propios: NETWORK-FIRST con revalidación (cache:'no-cache'
+  // → 304 barato cuando no cambian). Así un deploy nuevo se ve al instante.
+  // Cae a caché solo si no hay red (offline parcial).
+  if (e.request.method === 'GET' && isShellAsset(url)) {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-cache' })
+        .then(res => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request).then(c => c || caches.match('/')))
+    );
+    return;
+  }
+
+  // Resto (CDNs de terceros, etc.): cache-first con relleno en segundo plano.
   e.respondWith(
     caches.match(e.request).then(cached => {
       const network = fetch(e.request).then(res => {
