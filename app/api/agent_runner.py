@@ -85,15 +85,22 @@ class AgentRunner:
             # Auto-routing
             last_user = next((m["content"] for m in reversed(self.messages)
                               if m["role"] == "user"), "")
-            if self.model == OLLAMA_MODEL:
+            from app.brain import is_mistral_model, is_fused, resolve_model
+            if self.model in (OLLAMA_MODEL, "auto"):
                 try:
                     from app.model_router import route
                     routed_model, reason = route(last_user)
                     if routed_model != self.model:
                         self.model = routed_model
-                        self._q.put({"type": "token", "data": f"[🔀 {reason}]\n\n"})
+                        self._q.put({"type": "reasoning", "data": f"🔀 {reason}"})
                 except Exception:
                     pass
+            self._mistral = is_mistral_model(self.model)
+            self._fused = is_fused(self.model)
+            if self._mistral:
+                self._q.put({"type": "reasoning",
+                             "data": f"🧠 Cerebro: Mistral ({resolve_model(self.model)})"
+                                     + (" + delegación local (fused)" if self._fused else "")})
 
             from app.ollama_client import _build_base_prompt
             system = _build_base_prompt() + (
@@ -115,6 +122,17 @@ class AgentRunner:
                 except Exception:
                     pass
 
+            # Ancla de objetivo: se fija en el system prompt y NUNCA se compacta,
+            # para que el modelo no pierda el objetivo en tareas largas.
+            if last_user:
+                system += (
+                    "\n\n## 🎯 OBJETIVO PERSISTENTE DE ESTA TAREA (NO LO PIERDAS)\n"
+                    + last_user.strip()[:2000]
+                    + "\n\nMantén SIEMPRE este objetivo en mente. Tras cada herramienta, "
+                    "comprueba si avanzas hacia él. No te declares terminado hasta cumplirlo "
+                    "o encontrar un bloqueo concreto que expliques."
+                )
+
             from app.memory import build_layered_history
             history = build_layered_history(system, list(self.messages), self.conversation_id)
             full    = ""
@@ -124,8 +142,8 @@ class AgentRunner:
             tool_execution_count = 0
 
             def _emit_status(text: str):
-                msg = f"\n\n[estado] {text}\n\n"
-                self._q.put({"type": "token", "data": msg})
+                # Razonamiento/proceso: evento propio (NO se mezcla con la respuesta final)
+                self._q.put({"type": "reasoning", "data": text})
 
             try:
                 from app.tool_router import route_tools
@@ -139,6 +157,7 @@ class AgentRunner:
 
             _emit_status("Inicio la tarea y la dividiré en pasos verificables.")
 
+            verification_done = False  # fuerza una pasada de verificación antes de cerrar
             for iteration in range(MAX_AGENT_ITERATIONS):
                 if self._stop_flag:
                     break
@@ -156,12 +175,10 @@ class AgentRunner:
                         self._q.put({"type": "token", "data": extra})
                         full += extra
                     break
-                if iteration > 0 and called_tool_names:
-                    try:
-                        from app.tool_router import route_tools
-                        _routed_tools = route_tools(last_user, history, called_tool_names)
-                    except Exception:
-                        pass
+                # Contexto LEAN: routeamos UNA sola vez al inicio y reutilizamos el
+                # set toda la ejecución. Antes re-routeábamos cada iteración, lo que
+                # inflaba el esquema de tools que ve el modelo en cada turno (más
+                # tokens, más coste, más distracción). _ALWAYS cubre lo esencial.
                 content, tool_calls = self._stream_once(history, _routed_tools)
                 full += content
                 if tool_calls and not content.strip():
@@ -189,6 +206,14 @@ class AgentRunner:
                     empty_tool_turns = 0
                     continue
                 if not tool_calls:
+                    # Verificación OBLIGATORIA: una pasada de comprobación con tools
+                    # antes de aceptar que la tarea está hecha.
+                    if tools_executed and not verification_done:
+                        verification_done = True
+                        from app.ollama_client import _VERIFY_PROMPT
+                        _emit_status("Antes de cerrar, verifico que lo hecho funciona de verdad.")
+                        history.append({"role": "user", "content": _VERIFY_PROMPT})
+                        continue
                     if tools_executed and not content.strip():
                         history.append({
                             "role":    "user",
@@ -224,6 +249,55 @@ class AgentRunner:
                         for tc in tc_with_ids.values()
                     ],
                 })
+
+                # PARALELO (seguro): si el turno trae ≥2 herramientas y TODAS son
+                # de solo-lectura/seguras (no peligrosas, sin aprobación), se ejecutan
+                # a la vez. En cuanto hay una peligrosa, cae al camino secuencial de
+                # abajo con su aprobación intacta. Acelera p.ej. escanear varios hosts.
+                _parallel_ok = len(tc_with_ids) >= 2 and all(
+                    (not is_dangerous(tc["name"])) and tc["name"] != "mistral_consult"
+                    and self.tool_permissions.get(tc["name"], "ask") != "block"
+                    for tc in tc_with_ids.values()
+                )
+                if _parallel_ok and not self._stop_flag:
+                    import concurrent.futures
+                    _parsed = {}
+                    for tc in tc_with_ids.values():
+                        try:
+                            _ra = tc.get("args") or ""
+                            _a = json.loads(_ra) if _ra.strip() else {}
+                        except Exception:
+                            _a = {}
+                        _parsed[tc["id"]] = (tc["name"], _a)
+                        self._q.put({"type": "tool_call",
+                                     "data": tool_event_payload(tc["id"], tc["name"], _a)})
+                    _emit_status(f"Ejecuto {len(_parsed)} herramientas en paralelo.")
+                    _results = {}
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(_parsed))) as _ex:
+                        _futs = {_ex.submit(execute_tool, n, a): t for t, (n, a) in _parsed.items()}
+                        for _f in concurrent.futures.as_completed(_futs):
+                            _t = _futs[_f]
+                            try:
+                                _results[_t] = _f.result()
+                            except Exception as _e:
+                                _results[_t] = {"ok": False, "error": str(_e)}
+                    for tc in tc_with_ids.values():  # historial en orden original
+                        _tid = tc["id"]
+                        _name = _parsed[_tid][0]
+                        _res = _results.get(_tid, {})
+                        if not _res.get("blocked") and not _res.get("cancelled"):
+                            tool_execution_count += 1
+                        history.append({"role": "tool", "tool_call_id": _tid,
+                                        "content": json.dumps(_res, ensure_ascii=False)})
+                        self._q.put({"type": "tool_result", "data": {"id": _tid, "result": _res}})
+                        if _res.get("watch_started"):
+                            self._q.put({"type": "watch_config", "data": _res})
+                        if _res.get("watch_stopped"):
+                            self._q.put({"type": "watch_stop", "data": {}})
+                        called_tool_names.add(_name)
+                        tools_executed = True
+                    _emit_status("Herramientas en paralelo completadas; decido el siguiente paso.")
+                    continue
 
                 for idx, tc in tc_with_ids.items():
                     if self._stop_flag:
@@ -314,7 +388,51 @@ class AgentRunner:
                 self._q.put({"type": "token", "data": fallback})
                 full = fallback
 
+            # Consumo Mistral de esta sesión (visible en Actividad).
+            try:
+                from app import mistral_usage
+                s = mistral_usage.session_summary()
+                if s.get("calls"):
+                    _emit_status(
+                        f"Consumo Mistral (sesión): ${s['cost']:.4f} · "
+                        f"{s['input']:,}+{s['output']:,} tokens · {s['calls']} llamadas"
+                    )
+            except Exception:
+                pass
+
+            # 💰 Dinero ahorrado usando el modelo LOCAL (vs la nube). Total acumulado.
+            try:
+                from app import local_usage
+                ls = local_usage.session_summary()
+                if ls.get("calls"):
+                    tot = local_usage.get_summary("all")
+                    self._q.put({"type": "savings", "data": {
+                        "session_saved": round(ls["saved"], 4),
+                        "total_saved": round(tot["saved_usd"], 4),
+                        "total_tokens": tot["input_tokens"] + tot["output_tokens"],
+                    }})
+                    _emit_status(
+                        f"💰 Ahorrado en local: ${ls['saved']:.4f} esta tarea · "
+                        f"${tot['saved_usd']:.2f} en total ({(tot['input_tokens']+tot['output_tokens']):,} tokens gratis)"
+                    )
+            except Exception:
+                pass
+
             self._q.put({"type": "done", "data": full})
+
+            # Aviso push al móvil de que la tarea terminó (útil si te alejaste).
+            # Solo cuando hubo trabajo real (herramientas) para no spamear.
+            if tools_executed and not self._stop_flag:
+                try:
+                    from app.api import alert_sender
+                    if alert_sender.cloud_configured():
+                        preview = " ".join((full or "").split())[:140] or "Respuesta lista."
+                        alert_sender.send_threat_alert(
+                            title="✅ CyberAgent — tarea completada",
+                            body=preview,
+                        )
+                except Exception:
+                    pass
         except Exception as exc:
             import traceback
             self._q.put({"type": "error", "data": str(exc) + "\n" + traceback.format_exc()})
@@ -336,6 +454,26 @@ class AgentRunner:
         from app.model_router import FAST_MODEL
 
         _tools_used = tools if tools is not None else TOOLS_SCHEMA
+
+        # ── Backend Mistral (nube) ───────────────────────────────────────────
+        if getattr(self, "_mistral", False):
+            from app.brain import stream_mistral
+            try:
+                content, tool_calls, _reasoning = stream_mistral(
+                    self.model, history, _tools_used,
+                    emit_token=lambda d: self._q.put({"type": "token", "data": d}),
+                    emit_reasoning=lambda d: self._q.put({"type": "reasoning", "data": d}),
+                    should_stop=lambda: self._stop_flag,
+                )
+                return content, tool_calls
+            except Exception as exc:
+                # Fallback automático a Ollama local si Mistral falla
+                self._q.put({"type": "reasoning",
+                             "data": f"⚠️ Mistral falló ({exc}); sigo con el modelo local."})
+                self._mistral = False
+                self.model = FAST_MODEL
+
+        # ── Backend Ollama (local) ───────────────────────────────────────────
         history = prepare_history_for_ollama(history, _tools_used)
         num_ctx = self._auto_ctx(history)
         # DEBATE-003: keep fast model always hot; power model evicts after idle period
@@ -346,16 +484,23 @@ class AgentRunner:
             "tools":      _tools_used,
             "stream":     True,
             "keep_alive": keep_alive,
-            "options":    {"num_ctx": num_ctx, "temperature": 0.6, "top_p": 0.9,
+            # Thinking nativo: OFF por defecto. En streaming+tools este abliterado
+            # vuelca el razonamiento (a veces en chino) al contenido → inestable.
+            # Interruptor para experimentar: CYBERAGENT_THINK=1.
+            "think":      os.environ.get("CYBERAGENT_THINK", "0") == "1"
+                          and any(t in (self.model or "").lower() for t in ("qwen3", "huihui")),
+            "options":    {"num_ctx": num_ctx, "temperature": 0.3, "top_p": 0.95,
                            "repeat_penalty": 1.05, "top_k": 40},
         }
         _t = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
         MAX_ATTEMPTS = 3
         RETRY_WAIT   = 25
 
+        from app.brain import split_think, strip_lead_artifacts
         for attempt in range(MAX_ATTEMPTS):
             content    = ""
             tool_calls: dict = {}
+            _think_state = False   # parser de <think> para el stream local
             try:
                 with httpx.Client(timeout=_t) as client:
                     with client.stream("POST", OLLAMA_URL, json=payload) as resp:
@@ -381,10 +526,21 @@ class AgentRunner:
                             if "error" in chunk:
                                 raise RuntimeError(f"Ollama: {chunk['error']}")
                             msg   = chunk.get("message", {})
+                            tdelta = msg.get("thinking", "")
+                            if tdelta:   # razonamiento nativo (campo separado)
+                                self._q.put({"type": "reasoning", "data": tdelta})
                             delta = msg.get("content", "")
                             if delta:
-                                content += delta
-                                self._q.put({"type": "token", "data": delta})
+                                # Separa <think> inline (modo herramientas) → razonamiento
+                                _r, _c, _think_state = split_think(delta, _think_state)
+                                if _r:
+                                    self._q.put({"type": "reasoning", "data": _r})
+                                if _c:
+                                    if not content:
+                                        _c = strip_lead_artifacts(_c)
+                                    if _c:
+                                        content += _c
+                                        self._q.put({"type": "token", "data": _c})
                             for tc in msg.get("tool_calls", []):
                                 idx = tc.get("index", len(tool_calls))
                                 fn  = tc.get("function", {})
@@ -397,6 +553,14 @@ class AgentRunner:
                                     args = json.dumps(args, ensure_ascii=False)
                                 tool_calls[idx]["args"] += args
                             if chunk.get("done"):
+                                try:
+                                    from app import local_usage
+                                    local_usage.log_local(
+                                        chunk.get("prompt_eval_count", 0),
+                                        chunk.get("eval_count", 0),
+                                        model=self.model, context="agent")
+                                except Exception:
+                                    pass
                                 break
                 break  # éxito
 

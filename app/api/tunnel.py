@@ -5,6 +5,42 @@ import httpx
 CLOUD_URL = os.environ.get("CYBERAGENT_CLOUD_URL", "")
 SECRET    = os.environ.get("CYBERAGENT_CLOUD_SECRET", "")
 
+# URL pública activa del túnel (para servir archivos por enlace al usuario).
+_ACTIVE_TUNNEL_URL: str | None = None
+_SINGLETON: "TunnelManager | None" = None
+_SINGLETON_LOCK = threading.Lock()
+
+
+def get_public_url() -> str:
+    """Devuelve la URL pública vigente (túnel Cloudflare) o un override por env."""
+    return (_ACTIVE_TUNNEL_URL or os.environ.get("CYBERAGENT_PUBLIC_URL", "")).rstrip("/")
+
+
+def ensure_tunnel(wait_secs: float = 0.0, local_port: int = 8765) -> str:
+    """
+    Garantiza que el túnel esté arrancado y devuelve la URL pública.
+    Idempotente: reutiliza el túnel singleton si ya existe.
+    Con wait_secs>0 espera (bloqueante) hasta tener URL — útil al servir un
+    archivo para devolver ya un enlace público y no uno local.
+    """
+    global _SINGLETON
+    override = os.environ.get("CYBERAGENT_PUBLIC_URL", "").rstrip("/")
+    if override:
+        return override
+    if _ACTIVE_TUNNEL_URL:
+        return _ACTIVE_TUNNEL_URL
+    with _SINGLETON_LOCK:
+        if _ACTIVE_TUNNEL_URL:
+            return _ACTIVE_TUNNEL_URL
+        if _SINGLETON is None:
+            _SINGLETON = TunnelManager(local_port=local_port)
+            _SINGLETON.start(wait_secs=wait_secs if wait_secs > 0 else 0.0)
+    if wait_secs > 0:
+        deadline = time.time() + wait_secs
+        while time.time() < deadline and not _ACTIVE_TUNNEL_URL:
+            time.sleep(0.25)
+    return _ACTIVE_TUNNEL_URL or ""
+
 
 class TunnelManager:
     def __init__(self, local_port: int = 8765):
@@ -48,6 +84,8 @@ class TunnelManager:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                # Sin ventana de consola (antes saltaba al frente cada vez).
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             url_re = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
             try:
@@ -56,6 +94,8 @@ class TunnelManager:
                     m = url_re.search(line)
                     if m and self._url is None:
                         self._url = m.group(0)
+                        global _ACTIVE_TUNNEL_URL
+                        _ACTIVE_TUNNEL_URL = self._url
                         self._register(self._url)
             finally:
                 self._proc.stdout.close()

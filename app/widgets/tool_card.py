@@ -68,11 +68,65 @@ class ToolActivityRow(QFrame):
         self._result_box.hide()
         root.addWidget(self._result_box)
 
+    @staticmethod
+    def _diff_html(result: dict) -> str:
+        import html as _html
+        path = str(result.get("path") or "archivo").replace("\\", "/").split("/")[-1]
+        reps = result.get("replacements", 1)
+        if result.get("syntax_ok") is False:
+            badge = " <span style='color:#f85149'>⚠ sintaxis rota</span>"
+        elif result.get("syntax_ok") is True:
+            badge = " <span style='color:#3fb950'>✓ compila</span>"
+        else:
+            badge = ""
+        rows = [f"<div style='color:#c9d1d9;margin-bottom:4px'>✎ {_html.escape(path)} "
+                f"<span style='color:#8b949e'>({reps} cambio{'s' if reps != 1 else ''})</span>{badge}</div>"]
+        for line in (result.get("diff") or "").split("\n"):
+            esc = _html.escape(line) or "&nbsp;"
+            c = line[:1]
+            if line.startswith(("+++", "---")):
+                color, bg = "#8b949e", "transparent"
+            elif line.startswith("@@"):
+                color, bg = "#58a6ff", "transparent"
+            elif c == "+":
+                color, bg = "#7ee2a8", "rgba(63,185,80,0.13)"
+            elif c == "-":
+                color, bg = "#f9928c", "rgba(248,81,73,0.13)"
+            else:
+                color, bg = "#8b949e", "transparent"
+            rows.append(f"<div style='color:{color};background:{bg};white-space:pre-wrap'>{esc}</div>")
+        return "<div style='font-family:Consolas,monospace;font-size:11px'>" + "".join(rows) + "</div>"
+
+    @staticmethod
+    def _todos_html(todos: list) -> str:
+        import html as _html
+        done = sum(1 for t in todos if t.get("status") == "completed")
+        rows = [f"<div style='color:#c9d1d9;font-weight:600;margin-bottom:4px'>"
+                f"✓ Tareas ({done}/{len(todos)})</div>"]
+        for t in todos:
+            st = t.get("status")
+            if st == "completed":
+                icon, color, deco = "✓", "#3fb950", "line-through"
+            elif st == "in_progress":
+                icon, color, deco = "▶", "#e3b341", "none"
+            else:
+                icon, color, deco = "○", "#8b949e", "none"
+            rows.append(f"<div style='color:{color};text-decoration:{deco}'>"
+                        f"{icon}&nbsp;&nbsp;{_html.escape(str(t.get('content','')))}</div>")
+        return "<div style='font-family:Consolas,monospace;font-size:12px'>" + "".join(rows) + "</div>"
+
     def set_done(self, result=None):
         self._status.setText("done")
         self._status.setStyleSheet("color: #3fb950; font-size: 11px;")
         if result is not None and self._result_box:
-            self._result_box.setPlainText(self._format_payload(result))
+            if isinstance(result, dict) and isinstance(result.get("diff"), str) and result["diff"].strip():
+                self._result_box.setHtml(self._diff_html(result))
+                self._result_box.setMaximumHeight(320)
+            elif isinstance(result, dict) and isinstance(result.get("todos"), list):
+                self._result_box.setHtml(self._todos_html(result["todos"]))
+                self._result_box.setMaximumHeight(260)
+            else:
+                self._result_box.setPlainText(self._format_payload(result))
             self._result_box.show()
 
     def set_cancelled(self):

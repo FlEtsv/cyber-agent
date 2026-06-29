@@ -7,7 +7,7 @@ _OLLAMA_URL = "http://localhost:11434/api/chat"
 try:
     from app.ollama_client import OLLAMA_MODEL as _MODEL
 except Exception:
-    _MODEL = "cyberagent-original"
+    _MODEL = "cyberagent-24b"
 _SYSTEM     = (
     "Eres un analizador de ciberseguridad. Analiza el resultado de una herramienta "
     "ejecutada por un agente IA y determina si contiene actividad maliciosa, sospechosa "

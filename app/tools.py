@@ -641,6 +641,348 @@ TOOLS_SCHEMA = [
         }, "required": ["task"]}
     }},
     {"type": "function", "function": {
+        "name": "mistral_studio",
+        "description": "Usa las herramientas NATIVAS de Mistral Studio: búsqueda web real con citaciones, "
+                       "intérprete de código (ejecuta Python en sandbox), generación de imágenes y "
+                       "consulta de librerías de documentos. Devuelve texto y, si genera imágenes/archivos, "
+                       "una URL pública para el usuario. Úsalo para buscar en internet de forma fiable, "
+                       "calcular/graficar, o generar imágenes.",
+        "parameters": {"type": "object", "properties": {
+            "prompt": {"type": "string", "description": "Instrucción o pregunta para Mistral con sus herramientas"},
+            "connectors": {"type": "array", "items": {"type": "string",
+                           "enum": ["web_search", "code_interpreter", "image_generation", "document_library"]},
+                           "description": "Herramientas a habilitar (default: web_search)"},
+            "model": {"type": "string", "description": "Modelo Mistral (default: mistral-medium-latest)"},
+        }, "required": ["prompt"]}
+    }},
+    {"type": "function", "function": {
+        "name": "generate_document",
+        "description": "Genera un documento (PDF, HTML, Markdown o TXT) a partir de contenido y lo deja "
+                       "listo para servir por URL pública al usuario. Ideal para entregar informes, "
+                       "reportes de auditoría o resultados formateados.",
+        "parameters": {"type": "object", "properties": {
+            "content": {"type": "string", "description": "Contenido del documento (admite Markdown)"},
+            "filename": {"type": "string", "description": "Nombre de archivo (ej: informe.pdf)"},
+            "fmt": {"type": "string", "enum": ["pdf", "html", "md", "txt"],
+                    "description": "Formato de salida (default: pdf)"},
+            "title": {"type": "string", "description": "Título del documento (opcional)"},
+        }, "required": ["content"]}
+    }},
+    {"type": "function", "function": {
+        "name": "serve_file",
+        "description": "Publica un archivo local existente y devuelve una URL pública (vía túnel Cloudflare) "
+                       "para que el usuario lo descargue o vea. Úsalo tras correr un script o generar un "
+                       "artefacto que el usuario deba recibir.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Ruta absoluta del archivo a publicar"},
+        }, "required": ["path"]}
+    }},
+    {"type": "function", "function": {
+        "name": "local_llm_consult",
+        "description": "Delega una subtarea en el modelo LOCAL (Ollama) sin enviar nada a la nube. "
+                       "Útil en modo fusionado cuando Mistral dirige pero quieres procesar datos privados "
+                       "o sensibles en local, o trabajar sin conexión.",
+        "parameters": {"type": "object", "properties": {
+            "prompt": {"type": "string", "description": "Instrucción para el modelo local"},
+            "model": {"type": "string", "description": "Modelo Ollama (default: el rápido configurado)"},
+        }, "required": ["prompt"]}
+    }},
+    {"type": "function", "function": {
+        "name": "git_op",
+        "description": "Control de versiones git: status, log, diff, branch, add, commit, push, pull, "
+                       "checkout, create_branch, clone. Trabaja sobre repos locales o clona remotos autorizados.",
+        "parameters": {"type": "object", "properties": {
+            "operation": {"type": "string",
+                          "enum": ["status", "log", "diff", "branch", "current_branch", "remotes",
+                                   "add", "commit", "push", "pull", "fetch", "checkout",
+                                   "create_branch", "clone"],
+                          "description": "Operación git a ejecutar"},
+            "repo_path": {"type": "string", "description": "Ruta del repo (default: directorio actual)"},
+            "message": {"type": "string", "description": "Mensaje de commit (para commit)"},
+            "remote": {"type": "string", "description": "Remoto (default: origin)"},
+            "branch": {"type": "string", "description": "Rama (para push/checkout/create_branch)"},
+            "url": {"type": "string", "description": "URL del repo (para clone)"},
+        }, "required": ["operation"]}
+    }},
+    {"type": "function", "function": {
+        "name": "read_document",
+        "description": "Lee y extrae el texto de un documento del usuario: PDF, Word (docx), Excel (xlsx), "
+                       "CSV, JSON o código/texto plano. Úsalo para analizar archivos que te pasen.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Ruta del archivo a leer"},
+            "max_pages": {"type": "integer", "description": "Máximo de páginas para PDF (default 50)"},
+        }, "required": ["path"]}
+    }},
+    {"type": "function", "function": {
+        "name": "browse_page",
+        "description": "Navegador headless real (Playwright): ejecuta JavaScript, abre SPAs, hace login, "
+                       "rellena formularios y hace clic. Devuelve el texto renderizado y enlaces. "
+                       "Úsalo cuando web_fetch no baste (páginas dinámicas/con JS).",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "description": "URL a abrir"},
+            "action": {"type": "string", "enum": ["read", "click", "fill", "screenshot"],
+                       "description": "Acción (default: read)"},
+            "selector": {"type": "string", "description": "Selector CSS (para click/fill)"},
+            "text": {"type": "string", "description": "Texto a escribir (para fill)"},
+            "wait_ms": {"type": "integer", "description": "Espera tras cargar (ms, default 1500)"},
+            "screenshot": {"type": "boolean", "description": "Adjuntar screenshot con URL pública"},
+        }, "required": ["url"]}
+    }},
+    {"type": "function", "function": {
+        "name": "http_check",
+        "description": "Verifica que una URL/endpoint responde de verdad: devuelve código HTTP, tiempo y "
+                       "un trozo del cuerpo. Úsalo para COMPROBAR que algo funciona (no asumas que está listo).",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "description": "URL a comprobar (https://...)"},
+            "method": {"type": "string", "description": "Método HTTP (default GET)"},
+            "expect_status": {"type": "integer", "description": "Código esperado, ej 200 (opcional)"},
+        }, "required": ["url"]}
+    }},
+    {"type": "function", "function": {
+        "name": "dns_resolve",
+        "description": "Resuelve un dominio a sus IPs (A/AAAA). Úsalo para verificar que un dominio EXISTE y "
+                       "apunta a donde debe (CNAME/propagación). Si falla con NXDOMAIN, el dominio no existe.",
+        "parameters": {"type": "object", "properties": {
+            "host": {"type": "string", "description": "Dominio o host (ej relay.ejemplo.com)"},
+        }, "required": ["host"]}
+    }},
+    {"type": "function", "function": {
+        "name": "port_check",
+        "description": "Comprueba si un puerto TCP está abierto (hay un servicio escuchando). "
+                       "Útil para verificar que un servidor local o remoto está arriba.",
+        "parameters": {"type": "object", "properties": {
+            "host": {"type": "string", "description": "Host o IP"},
+            "port": {"type": "integer", "description": "Puerto TCP"},
+        }, "required": ["host", "port"]}
+    }},
+    {"type": "function", "function": {
+        "name": "mistral_ocr",
+        "description": "OCR de Mistral: extrae el texto (markdown) de un PDF o imagen, desde URL o archivo "
+                       "local. Mucho mejor que el OCR local para documentos.",
+        "parameters": {"type": "object", "properties": {
+            "source": {"type": "string", "description": "URL https o ruta de archivo (PDF/imagen)"},
+        }, "required": ["source"]}
+    }},
+    {"type": "function", "function": {
+        "name": "mistral_vision",
+        "description": "Entiende una imagen con Pixtral (visión de Mistral) y responde una pregunta sobre ella.",
+        "parameters": {"type": "object", "properties": {
+            "image": {"type": "string", "description": "URL https o ruta de la imagen"},
+            "question": {"type": "string", "description": "Qué quieres saber de la imagen"},
+        }, "required": ["image"]}
+    }},
+    {"type": "function", "function": {
+        "name": "mistral_transcribe",
+        "description": "Transcribe un archivo de audio a texto con Voxtral (audio de Mistral).",
+        "parameters": {"type": "object", "properties": {
+            "audio_path": {"type": "string", "description": "Ruta del archivo de audio"},
+            "language": {"type": "string", "description": "Idioma (ej 'es'), opcional"},
+        }, "required": ["audio_path"]}
+    }},
+    {"type": "function", "function": {
+        "name": "mistral_embed",
+        "description": "Calcula embeddings (mistral-embed). Con 2 textos devuelve su similitud coseno (0-1).",
+        "parameters": {"type": "object", "properties": {
+            "texts": {"type": "array", "items": {"type": "string"}, "description": "1 o 2 textos"},
+        }, "required": ["texts"]}
+    }},
+    {"type": "function", "function": {
+        "name": "mistral_moderate",
+        "description": "Comprueba si un texto incumple políticas (API de moderación de Mistral).",
+        "parameters": {"type": "object", "properties": {
+            "text": {"type": "string", "description": "Texto a evaluar"},
+        }, "required": ["text"]}
+    }},
+    {"type": "function", "function": {
+        "name": "mistral_code_complete",
+        "description": "Completa código con Codestral (FIM): rellena entre el prompt y el suffix.",
+        "parameters": {"type": "object", "properties": {
+            "prompt": {"type": "string", "description": "Código antes del hueco"},
+            "suffix": {"type": "string", "description": "Código después del hueco (opcional)"},
+        }, "required": ["prompt"]}
+    }},
+    {"type": "function", "function": {
+        "name": "edit_file",
+        "description": "Edición QUIRÚRGICA de un archivo: reemplaza old_string por new_string sin reescribir "
+                       "el archivo entero. Úsala SIEMPRE para cambiar código (mucho más fiable que write_file). "
+                       "old_string debe ser único (añade contexto si hace falta) o usa replace_all.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Ruta del archivo"},
+            "old_string": {"type": "string", "description": "Texto exacto a reemplazar (respeta espacios/indentación)"},
+            "new_string": {"type": "string", "description": "Texto nuevo"},
+            "replace_all": {"type": "boolean", "description": "Reemplazar todas las apariciones (default false)"},
+        }, "required": ["path", "old_string", "new_string"]}
+    }},
+    {"type": "function", "function": {
+        "name": "lint_code",
+        "description": "Analiza un archivo de código con linters reales (CPU, gratis): Python con ruff "
+                       "(+ bandit de seguridad si security=true), JS/TS con node. Úsalo SIEMPRE tras "
+                       "editar código para detectar bugs/estilo/seguridad y autocorregirte antes de cerrar.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Ruta del archivo de código"},
+            "security": {"type": "boolean", "description": "Añadir escaneo de seguridad bandit (Python)"},
+        }, "required": ["path"]}
+    }},
+    {"type": "function", "function": {
+        "name": "run_tests",
+        "description": "Ejecuta la batería de tests (pytest/jest/go) y devuelve pass/fail. Úsalo tras "
+                       "cambiar código para verificar de verdad antes de cerrar (cierra el ciclo editar→testear→corregir).",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Carpeta del proyecto/tests (default '.')"},
+            "framework": {"type": "string", "enum": ["auto", "pytest", "jest", "go"]},
+            "k": {"type": "string", "description": "Filtro de tests (pytest -k / jest -t)"},
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "apply_patch",
+        "description": "Aplica un diff unificado tipo git que toca VARIOS archivos a la vez, atómico. "
+                       "Para refactors grandes multi-archivo (multi_edit es de 1 archivo).",
+        "parameters": {"type": "object", "properties": {
+            "patch": {"type": "string", "description": "Diff unificado (--- a/.. +++ b/.. @@ ..)"},
+        }, "required": ["patch"]}
+    }},
+    {"type": "function", "function": {
+        "name": "code_symbols",
+        "description": "Lista clases/funciones de un archivo con su línea (te ubicas sin leerlo entero). "
+                       "Con `find`, devuelve también dónde se usa ese nombre (find_references).",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Archivo de código"},
+            "find": {"type": "string", "description": "Nombre a buscar referencias (opcional)"},
+        }, "required": ["path"]}
+    }},
+    {"type": "function", "function": {
+        "name": "cve_lookup",
+        "description": "Consulta la API pública de NVD (gratis, sin key): detalles y CVSS de un CVE "
+                       "('CVE-2024-XXXX') o búsqueda por palabras clave.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "ID de CVE o palabras clave"},
+        }, "required": ["query"]}
+    }},
+    {"type": "function", "function": {
+        "name": "threat_intel",
+        "description": "Reputación de un IOC (IP/hash/dominio/URL) vía VirusTotal o AbuseIPDB "
+                       "(requiere API key gratuita en el entorno).",
+        "parameters": {"type": "object", "properties": {
+            "indicator": {"type": "string", "description": "IP, hash, dominio o URL"},
+            "kind": {"type": "string", "enum": ["auto", "ip", "hash", "domain", "url"]},
+        }, "required": ["indicator"]}
+    }},
+    {"type": "function", "function": {
+        "name": "yara_scan",
+        "description": "Escanea archivo/carpeta con reglas YARA (CPU) para detectar malware/IOCs. "
+                       "`rules` = texto YARA o ruta a un .yar.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Archivo o carpeta a escanear"},
+            "rules": {"type": "string", "description": "Reglas YARA (texto) o ruta .yar"},
+        }, "required": ["path", "rules"]}
+    }},
+    {"type": "function", "function": {
+        "name": "nmap_scan",
+        "description": "Escaneo con el nmap REAL (pentesting autorizado). Más potente que port_scan.",
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "description": "Host/red objetivo"},
+            "options": {"type": "string", "description": "Flags nmap (default '-sV -T4 --top-ports 100')"},
+        }, "required": ["target"]}
+    }},
+    {"type": "function", "function": {
+        "name": "web_audit",
+        "description": "Auditoría web ofensiva con la herramienta real (pentesting autorizado). "
+                       "tool: nikto | sqlmap | ffuf (ffuf usa FUZZ en el target).",
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "description": "URL objetivo"},
+            "tool": {"type": "string", "enum": ["nikto", "sqlmap", "ffuf"]},
+        }, "required": ["target"]}
+    }},
+    {"type": "function", "function": {
+        "name": "hash_crack",
+        "description": "Crackea hashes (pentesting autorizado). tool: john (CPU, NO usa GPU) | hashcat "
+                       "(GPU, competiría con el modelo). target = archivo con hashes.",
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "description": "Archivo con hashes"},
+            "wordlist": {"type": "string", "description": "Ruta al diccionario"},
+            "mode": {"type": "string", "description": "Formato john o -m de hashcat"},
+            "tool": {"type": "string", "enum": ["john", "hashcat"]},
+        }, "required": ["target"]}
+    }},
+    {"type": "function", "function": {
+        "name": "sql_query",
+        "description": "Ejecuta SQL sobre una base SQLite local (solo lectura salvo allow_write).",
+        "parameters": {"type": "object", "properties": {
+            "db_path": {"type": "string", "description": "Ruta del .db/.sqlite"},
+            "query": {"type": "string", "description": "Sentencia SQL"},
+            "allow_write": {"type": "boolean", "description": "Permitir INSERT/UPDATE/DELETE"},
+        }, "required": ["db_path", "query"]}
+    }},
+    {"type": "function", "function": {
+        "name": "todo_write",
+        "description": "Mantiene una lista de tareas (TODOs) VISIBLE para el usuario durante tareas "
+                       "largas o multi-paso. Llámala al planificar y cada vez que cambie el estado de un "
+                       "paso. Solo UN paso 'in_progress' a la vez; marca 'completed' nada más terminar.",
+        "parameters": {"type": "object", "properties": {
+            "todos": {"type": "array", "description": "Lista ordenada de pasos",
+                      "items": {"type": "object", "properties": {
+                          "content": {"type": "string", "description": "Descripción del paso"},
+                          "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]},
+                      }, "required": ["content", "status"]}},
+        }, "required": ["todos"]}
+    }},
+    {"type": "function", "function": {
+        "name": "multi_edit",
+        "description": "Aplica VARIAS ediciones quirúrgicas a UN archivo en una sola llamada, de forma "
+                       "ATÓMICA (si una falla no se escribe nada). Ideal para refactors o varios cambios "
+                       "relacionados. Cada edit usa el mismo contrato que edit_file.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Ruta del archivo"},
+            "edits": {"type": "array", "description": "Lista de ediciones en orden",
+                      "items": {"type": "object", "properties": {
+                          "old_string": {"type": "string", "description": "Texto exacto a reemplazar"},
+                          "new_string": {"type": "string", "description": "Texto nuevo"},
+                          "replace_all": {"type": "boolean", "description": "Default false"},
+                      }, "required": ["old_string", "new_string"]}},
+        }, "required": ["path", "edits"]}
+    }},
+    {"type": "function", "function": {
+        "name": "schedule_task",
+        "description": "Agenda una acción autónoma fuera de la conversación. Trigger: interval (cada N seg), "
+                       "at (fecha ISO), o file (al cambiar un archivo). Acción: tool o shell. "
+                       "Ej: ejecutar un escaneo cada hora, o avisarte cuando cambie un archivo.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "Nombre descriptivo de la tarea"},
+            "trigger": {"type": "object",
+                        "description": "{type:interval,seconds:N} | {type:at,iso:'2026-06-28T09:00'} | {type:file,path:'...'}"},
+            "action": {"type": "object",
+                       "description": "{type:tool,name:'...',args:{...}} | {type:shell,command:'...'}"},
+            "notify": {"type": "boolean", "description": "Notificar al ejecutar (default true)"},
+            "allow_dangerous": {"type": "boolean",
+                                "description": "Obligatorio en true para agendar acciones shell o herramientas "
+                                               "peligrosas (correrían sin aprobación). Pídelo al usuario antes."},
+        }, "required": ["name", "trigger", "action"]}
+    }},
+    {"type": "function", "function": {
+        "name": "send_message",
+        "description": "Envía un mensaje saliente para entregar resultados o avisar al usuario, por email "
+                       "(SMTP) o Telegram. Útil para reportar el resultado de una tarea o un enlace.",
+        "parameters": {"type": "object", "properties": {
+            "channel": {"type": "string", "enum": ["email", "telegram"],
+                        "description": "Canal de envío"},
+            "text": {"type": "string", "description": "Cuerpo del mensaje"},
+            "to": {"type": "string", "description": "Destinatario email (o chat_id Telegram); opcional si hay default"},
+            "subject": {"type": "string", "description": "Asunto (solo email)"},
+        }, "required": ["channel", "text"]}
+    }},
+    {"type": "function", "function": {
+        "name": "list_scheduled",
+        "description": "Lista las tareas programadas activas y su estado.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "cancel_scheduled",
+        "description": "Cancela una tarea programada por su id.",
+        "parameters": {"type": "object", "properties": {
+            "task_id": {"type": "string", "description": "id de la tarea a cancelar"},
+        }, "required": ["task_id"]}
+    }},
+    {"type": "function", "function": {
         "name": "start_screenshot_watch",
         "description": "Activa el modo vigilancia: captura la pantalla del PC automáticamente cada N segundos "
                        "y envía cada captura al chat en tiempo real. Útil para supervisión remota desde iPhone, "
@@ -663,13 +1005,15 @@ TOOLS_SCHEMA = [
     }},
 ] + MOBILE_TOOLS_SCHEMA
 
-DANGEROUS_TOOLS = {"shell", "write_file", "run_python", "install_package",
-                   "uninstall_package", "kill_process", "env_vars"} | MOBILE_DANGEROUS
+DANGEROUS_TOOLS = {"shell", "write_file", "edit_file", "multi_edit", "run_python", "install_package",
+                   "uninstall_package", "kill_process", "env_vars",
+                   "run_tests", "apply_patch"} | MOBILE_DANGEROUS
 
 ACTIVE_SECURITY_TOOLS = {
     "port_scan", "dir_bruteforce", "ping_sweep", "banner_grab",
     "web_crawl", "http_headers_check", "ssl_info", "dns_lookup",
     "whois_lookup", "traceroute", "arp_cache", "network_connections",
+    "nmap_scan", "web_audit", "hash_crack",
 }
 
 SENSITIVE_ACCESS_TOOLS = {
@@ -682,7 +1026,7 @@ DANGEROUS_TOOLS |= ACTIVE_SECURITY_TOOLS | SENSITIVE_ACCESS_TOOLS
 
 TOOL_CATEGORIES = {
     "core": {
-        "shell", "read_file", "write_file", "list_directory", "run_python",
+        "shell", "read_file", "write_file", "edit_file", "multi_edit", "list_directory", "run_python",
     },
     "web": {
         "web_search", "web_fetch", "http_request", "ssl_info",
@@ -716,6 +1060,14 @@ TOOL_CATEGORIES = {
     "encode": {"encode_decode"},
     "rag": {"rag_search", "rag_add"},
     "council": {"mistral_consult"},
+    "studio": {"mistral_studio", "local_llm_consult"},
+    "documents": {"generate_document", "serve_file"},
+    "devtools": {"git_op", "read_document", "browse_page"},
+    "verify": {"http_check", "dns_resolve", "port_check"},
+    "mistral": {"mistral_ocr", "mistral_vision", "mistral_transcribe",
+                "mistral_embed", "mistral_moderate", "mistral_code_complete"},
+    "automation": {"schedule_task", "list_scheduled", "cancel_scheduled"},
+    "messaging": {"send_message"},
     "self": {"list_self_files", "syntax_check", "restart_self"},
 }
 
@@ -970,6 +1322,83 @@ def execute_tool(name: str, args: dict) -> dict:
                                         args.get("mode", "audit"),
                                         bool(args.get("allow_sensitive", False)),
                                         int(args.get("max_tokens", 900))),
+            "mistral_studio":       lambda: _mistral_studio(
+                                        args["prompt"],
+                                        args.get("connectors"),
+                                        args.get("model")),
+            "generate_document":    lambda: _generate_document(
+                                        args["content"],
+                                        args.get("filename", "documento"),
+                                        args.get("fmt", "pdf"),
+                                        args.get("title")),
+            "serve_file":           lambda: _serve_file(args["path"]),
+            "local_llm_consult":    lambda: _local_llm_consult(
+                                        args["prompt"], args.get("model")),
+            # ── 2.0: git, ingesta, navegador, scheduler ──────────────────────
+            "git_op":               lambda: _ext().git_op(
+                                        args["operation"], args.get("repo_path", "."),
+                                        args.get("message", ""), args.get("remote", "origin"),
+                                        args.get("branch", ""), args.get("paths"),
+                                        args.get("url", "")),
+            "read_document":        lambda: _ext().read_document(
+                                        args["path"], int(args.get("max_pages", 50))),
+            "browse_page":          lambda: _ext().browse_page(
+                                        args["url"], args.get("action", "read"),
+                                        args.get("selector", ""), args.get("text", ""),
+                                        int(args.get("wait_ms", 1500)),
+                                        bool(args.get("screenshot", False))),
+            "http_check":           lambda: _ext().http_check(
+                                        args["url"], args.get("method", "GET"),
+                                        args.get("expect_status")),
+            "dns_resolve":          lambda: _ext().dns_resolve(args["host"]),
+            "port_check":           lambda: _ext().port_check(
+                                        args["host"], int(args["port"])),
+            "mistral_ocr":          lambda: _ext().mistral_ocr(args["source"]),
+            "mistral_vision":       lambda: _ext().mistral_vision(
+                                        args["image"], args.get("question", "Describe la imagen en detalle.")),
+            "mistral_transcribe":   lambda: _ext().mistral_transcribe(
+                                        args["audio_path"], args.get("language", "")),
+            "mistral_embed":        lambda: _ext().mistral_embed(args["texts"]),
+            "mistral_moderate":     lambda: _ext().mistral_moderate(args["text"]),
+            "mistral_code_complete": lambda: _ext().mistral_code_complete(
+                                        args["prompt"], args.get("suffix", "")),
+            "edit_file":            lambda: _ext().edit_file(
+                                        args["path"], args["old_string"], args["new_string"],
+                                        bool(args.get("replace_all", False))),
+            "multi_edit":           lambda: _ext().multi_edit(
+                                        args["path"], args.get("edits", [])),
+            "todo_write":           lambda: _ext().todo_write(args.get("todos", [])),
+            "lint_code":            lambda: _ext().lint_code(
+                                        args["path"], bool(args.get("security", False))),
+            "run_tests":            lambda: _ext().run_tests(
+                                        args.get("path", "."), args.get("framework", "auto"),
+                                        args.get("k", "")),
+            "apply_patch":          lambda: _ext().apply_patch(args.get("patch", "")),
+            "code_symbols":         lambda: _ext().code_symbols(
+                                        args["path"], args.get("find", "")),
+            "cve_lookup":           lambda: _ext().cve_lookup(args["query"]),
+            "threat_intel":         lambda: _ext().threat_intel(
+                                        args["indicator"], args.get("kind", "auto")),
+            "yara_scan":            lambda: _ext().yara_scan(args["path"], args["rules"]),
+            "nmap_scan":            lambda: _ext().nmap_scan(
+                                        args["target"], args.get("options", "-sV -T4 --top-ports 100")),
+            "web_audit":            lambda: _ext().web_audit(
+                                        args["target"], args.get("tool", "nikto")),
+            "hash_crack":           lambda: _ext().hash_crack(
+                                        args["target"], args.get("wordlist", ""),
+                                        args.get("mode", ""), args.get("tool", "john")),
+            "sql_query":            lambda: _ext().sql_query(
+                                        args["db_path"], args["query"],
+                                        bool(args.get("allow_write", False))),
+            "schedule_task":        lambda: _sched().add_task(
+                                        args["name"], args["trigger"], args["action"],
+                                        bool(args.get("notify", True)),
+                                        allow_dangerous=bool(args.get("allow_dangerous", False))),
+            "list_scheduled":       lambda: _sched().list_tasks(),
+            "cancel_scheduled":     lambda: _sched().cancel_task(args["task_id"]),
+            "send_message":         lambda: _ext().send_message(
+                                        args["channel"], args["text"],
+                                        args.get("to", ""), args.get("subject", "")),
             # Watch mode (WATCH-001) — returns config; server drives the loop
             "start_screenshot_watch": lambda: {
                 "watch_started": True,
@@ -1057,6 +1486,59 @@ def _mistral_consult(
     )
 
 
+def _ext():
+    """Import perezoso del módulo de extensiones 2.0 (git/ingesta/navegador)."""
+    from app import tools_ext
+    return tools_ext
+
+
+def _sched():
+    """Import perezoso del programador de tareas."""
+    from app import scheduler
+    return scheduler
+
+
+def _mistral_studio(prompt: str, connectors: list | None = None,
+                    model: str | None = None) -> dict:
+    """Herramientas nativas de Mistral Studio (web/code/image/docs)."""
+    from app.mistral_studio import run
+    return run(prompt, connectors=connectors, model=model)
+
+
+def _generate_document(content: str, filename: str = "documento",
+                       fmt: str = "pdf", title: str | None = None) -> dict:
+    from app.documents import generate_document
+    return generate_document(content, filename=filename, fmt=fmt, title=title)
+
+
+def _serve_file(path: str) -> dict:
+    from app.documents import serve_file
+    return serve_file(path)
+
+
+def _local_llm_consult(prompt: str, model: str | None = None) -> dict:
+    """Delega en el modelo local Ollama (no envía nada a la nube)."""
+    import httpx as _httpx
+    from app.ollama_client import OLLAMA_URL
+    from app.model_router import FAST_MODEL
+    mdl = model or FAST_MODEL
+    try:
+        r = _httpx.post(
+            OLLAMA_URL,
+            json={"model": mdl, "stream": False,
+                  "messages": [{"role": "user", "content": prompt}],
+                  "options": {"temperature": 0.4}},
+            timeout=_httpx.Timeout(connect=10, read=180, write=30, pool=5),
+        )
+        if r.status_code != 200:
+            return {"ok": False, "error": f"Ollama HTTP {r.status_code}: {r.text[:300]}"}
+        data = r.json()
+        return {"ok": True, "model": mdl,
+                "response": data.get("message", {}).get("content", "")}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 def _read_file(path: str, offset: int = 0, limit=None) -> dict:
     path = os.path.expandvars(os.path.expanduser(path))
     if not os.path.exists(path):
@@ -1070,13 +1552,21 @@ def _read_file(path: str, offset: int = 0, limit=None) -> dict:
         lines = lines[offset:]
     if limit:
         lines = lines[:limit]
-    content = "".join(lines)
+    # Numeración estilo `cat -n` (Nº⇥línea): el modelo localiza el código exacto y
+    # produce old_string correcto para edit_file. NUNCA incluyas el "Nº⇥" en edit_file
+    # ni lo escribas con write_file (edit_file ya tolera si se cuela por error).
+    start = offset + 1
+    numbered = "".join(
+        f"{start + i:>6}\t{ln if ln.endswith(chr(10)) else ln + chr(10)}"
+        for i, ln in enumerate(lines)
+    )
     return {
         "path":    path,
-        "content": content[:20000],
+        "content": numbered[:20000],
         "size":    os.path.getsize(path),
         "lines":   total,
         "shown":   f"{offset}–{offset + len(lines)}",
+        "format":  "líneas numeradas (Nº⇥). Para edit_file copia SOLO el código, sin el número ni el tab.",
     }
 
 
@@ -2014,9 +2504,23 @@ def _memory_info(top_n: int = 10) -> dict:
 
 
 def _web_search(query: str, max_results: int = 5) -> dict:
-    """Busca en DuckDuckGo HTML (sin API key)."""
+    """Búsqueda web. Prefiere Mistral (real, con fuentes); fallback DuckDuckGo HTML."""
     import re as _re
     max_results = min(int(max_results), 10)
+    # 1) Búsqueda real vía Mistral si hay API key
+    try:
+        from app.mistral_studio import available as _ms_avail, run as _ms_run
+        if _ms_avail():
+            res = _ms_run(
+                f"Busca en internet y responde con un resumen citando las fuentes (título + URL): {query}",
+                connectors=["web_search"],
+            )
+            if res.get("ok") and res.get("text"):
+                return {"query": query, "engine": "mistral_web_search",
+                        "answer": res["text"], "tools_used": res.get("tools_used", [])}
+    except Exception:
+        pass
+    # 2) Fallback DuckDuckGo HTML scraping
     try:
         import httpx
         headers = {

@@ -28,6 +28,17 @@ DEFAULT_PERMISSIONS = {
     # — Core (siempre auto) —
     "shell":                "auto",
     "write_file":           "auto",
+    "edit_file":            "auto",
+    "multi_edit":           "auto",
+    "todo_write":           "auto",
+    "lint_code":            "auto",
+    "run_tests":            "auto",
+    "apply_patch":          "auto",
+    "code_symbols":         "auto",
+    "cve_lookup":           "auto",
+    "threat_intel":         "auto",
+    "yara_scan":            "auto",
+    "sql_query":            "auto",
     "run_python":           "auto",
     "read_file":            "auto",
     "list_directory":       "auto",
@@ -111,6 +122,7 @@ TOOL_ICONS = {
 
 class MainWindow(QMainWindow):
     notification_pending = Signal(bool)  # True = hay aprobación pendiente
+    cost_updated = Signal()              # se emite tras cada llamada real a Mistral
 
     def __init__(self):
         super().__init__()
@@ -159,6 +171,32 @@ class MainWindow(QMainWindow):
         root_lay.addWidget(self._build_sidebar())
         root_lay.addWidget(self._build_main_area(), 1)
 
+        # Contador de consumo de Mistral: EVENT-DRIVEN — se refresca aprovechando
+        # cada llamada real a Mistral (no por polling). Fallback lento por si
+        # cambia el día con la app abierta.
+        from app import mistral_usage
+        self.cost_updated.connect(self._update_cost_lbl)
+        mistral_usage.add_listener(lambda _s: self.cost_updated.emit())
+        from PySide6.QtCore import QTimer
+        self._cost_timer = QTimer(self)
+        self._cost_timer.timeout.connect(self._update_cost_lbl)
+        self._cost_timer.start(60000)   # fallback lento (rollover de día)
+        self._update_cost_lbl()
+
+    def _update_cost_lbl(self):
+        try:
+            from app import mistral_usage
+            s = mistral_usage.get_summary("today")
+            if s.get("calls"):
+                ktok = (s["input_tokens"] + s["output_tokens"]) // 1000
+                self.cost_lbl.setText(
+                    f"💸 Mistral hoy: ${s['cost_usd']:.4f} · {s['calls']} llam · {ktok}k tok"
+                )
+            else:
+                self.cost_lbl.setText("💸 Mistral hoy: $0.0000")
+        except Exception:
+            pass
+
     def _on_model_changed(self, index: int):
         self.selected_model = self._model_ids[index]
         if hasattr(self, "model_status"):
@@ -184,10 +222,34 @@ class MainWindow(QMainWindow):
         logo.setObjectName("logo")
         lay.addWidget(logo)
 
-        self._model_ids = [OLLAMA_MODEL]
-        self.model_badge = QLabel(f"  Modelo activo\n  {OLLAMA_MODEL}")
-        self.model_badge.setObjectName("model_badge")
-        lay.addWidget(self.model_badge)
+        model_lbl = QLabel("  MODELO / CEREBRO")
+        model_lbl.setObjectName("sidebar_section_hdr")
+        lay.addWidget(model_lbl)
+
+        # Construye la lista de cerebros disponibles
+        self._model_ids = [OLLAMA_MODEL, "auto"]
+        model_labels = [f"🖥️ Local ({OLLAMA_MODEL})", "🔀 Auto (decide solo)"]
+        try:
+            from app.brain import mistral_available
+            if mistral_available():
+                self._model_ids += ["fused", "codestral-latest",
+                                    "mistral-large-latest", "mistral-medium-latest"]
+                model_labels += ["🤝 Fusionado (Mistral Medium 3 + local)",
+                                 "💻 Codestral (código)",
+                                 "🧠 Mistral Large", "🧠 Mistral Medium 3"]
+        except Exception:
+            pass
+
+        self.model_combo = QComboBox()
+        self.model_combo.setObjectName("persona_combo")
+        for lbl in model_labels:
+            self.model_combo.addItem(lbl)
+        self.model_combo.currentIndexChanged.connect(self._on_model_changed)
+        lay.addWidget(self.model_combo)
+
+        # Por defecto: LOCAL (gratis). Mistral/fused/Small quedan seleccionables a mano.
+        self.model_combo.setCurrentIndex(0)
+        self.selected_model = self._model_ids[0]
 
         persona_lbl = QLabel("  PERFIL")
         persona_lbl.setObjectName("sidebar_section_hdr")
@@ -316,6 +378,12 @@ class MainWindow(QMainWindow):
         self.status_lbl.setCursor(Qt.PointingHandCursor)
         self.status_lbl.mousePressEvent = self._on_status_click
         lay.addWidget(self.status_lbl)
+
+        # Contador de consumo de Mistral (siempre visible)
+        self.cost_lbl = QLabel("💸 Mistral hoy: —")
+        self.cost_lbl.setObjectName("status_bar")
+        self.cost_lbl.setToolTip("Consumo de Mistral de hoy (tokens y coste en USD). Se actualiza en vivo.")
+        lay.addWidget(self.cost_lbl)
 
         return sidebar
 
@@ -640,6 +708,7 @@ class MainWindow(QMainWindow):
         )
         _conv_id = self.active_conv  # snapshot — user may switch conversations mid-stream
         self.worker.token.connect(self._on_token)
+        self.worker.reasoning.connect(self._on_reasoning)
         self.worker.tool_call.connect(self._on_tool_call)
         self.worker.tool_result.connect(self._on_tool_result)
         self.worker.need_approval.connect(self._on_need_approval)
@@ -655,6 +724,17 @@ class MainWindow(QMainWindow):
     # ════════════════════════════════════════════════════════════════════
     # AGENT SIGNALS
     # ════════════════════════════════════════════════════════════════════
+
+    def _on_reasoning(self, text: str):
+        # Proceso/razonamiento: indicador atenuado, NO contamina la respuesta final
+        try:
+            one = " ".join((text or "").split())
+            if hasattr(self, "model_status"):
+                self.model_status.setText("💭 " + one[:80])
+            if hasattr(self.chat, "add_reasoning_step"):
+                self.chat.add_reasoning_step(text)
+        except Exception:
+            pass
 
     def _on_token(self, token: str):
         if self._response_bubble is None:

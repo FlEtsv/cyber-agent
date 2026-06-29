@@ -476,6 +476,27 @@ header {
   font-size: 11px;
   white-space: pre-wrap;
 }
+/* Diff estilo Claude Code (edit_file/multi_edit) */
+.tool-row-diff { flex-basis: 100%; margin: 8px 0 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.diff-head { padding: 7px 12px; background: var(--bg-elev, var(--bg)); color: var(--text); font-family: var(--mono); font-size: 11px; border-bottom: 1px solid var(--border); }
+.diff-stat { color: var(--dim, var(--muted)); }
+.diff-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+.diff-badge.ok  { color: var(--green); background: rgba(79,176,109,0.12); }
+.diff-badge.bad { color: #f85149; background: rgba(248,81,73,0.12); }
+.diff-body { margin: 0; padding: 8px 0; max-height: 320px; overflow: auto; background: #0b0d10; font-family: var(--mono); font-size: 11px; line-height: 1.45; }
+.diff-line { display: block; padding: 0 12px; white-space: pre-wrap; word-break: break-word; }
+.diff-line.add  { background: rgba(79,176,109,0.14); color: #7ee2a8; }
+.diff-line.del  { background: rgba(248,81,73,0.14); color: #f9928c; }
+.diff-line.hunk { color: #58a6ff; }
+.diff-line.meta { color: var(--muted); }
+.diff-line.ctx  { color: var(--muted); }
+/* Lista de tareas (todo_write) */
+.tool-row-todos { flex-basis: 100%; margin: 8px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev, var(--bg)); }
+.todos-head { color: var(--text); font-family: var(--mono); font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+.todo-item { font-family: var(--mono); font-size: 12px; padding: 2px 0; white-space: pre-wrap; }
+.todo-item.done    { color: var(--green); text-decoration: line-through; opacity: 0.75; }
+.todo-item.active  { color: #e3b341; font-weight: 600; }
+.todo-item.pending { color: var(--muted); }
 .approval-guide {
   color: var(--muted);
   font-size: 12px;
@@ -797,3 +818,32 @@ header {
   .msg-images img { max-width: 140px; max-height: 110px; }
   .approval-card { border-radius: 8px 8px 0 0; }
 }
+
+/* ── Razonamiento (proceso) — separado y atenuado vs respuesta final ─────── */
+.reasoning-section {
+  margin: 2px 0 10px;
+  border-left: 2px solid var(--accent, #4fb7c5);
+  background: rgba(79,183,197,0.07);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.reasoning-toggle {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 6px 10px; background: transparent; border: 0; cursor: pointer;
+  font: 600 11px/1.2 system-ui, sans-serif; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--accent, #4fb7c5);
+}
+.reasoning-toggle .r-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent, #4fb7c5); box-shadow: 0 0 8px var(--accent, #4fb7c5);
+}
+.reasoning-toggle.open .r-dot { animation: r-pulse 1.1s ease-in-out infinite; }
+@keyframes r-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
+.reasoning-stream {
+  padding: 2px 12px 10px; max-height: 230px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-word;
+  font: 400 12px/1.55 'Cascadia Code', Consolas, monospace;
+  color: var(--dim, #66717f); opacity: .82;
+}
+.reasoning-stream.collapsed { display: none; }
+.msg.ai .msg-content { opacity: 1; }

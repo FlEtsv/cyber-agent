@@ -1,12 +1,29 @@
 """
-Outbound WebSocket connector: PC → Cloud Run relay.
+Outbound WebSocket connector: PC → Cloudflare → Cloud Run relay.
 Receives mobile sessions from the relay, runs AgentRunner locally,
 streams results back through the relay.
+
+NOTA: El relay está expuesto a través de Cloudflare (Proxy DNS activado).
+      Cloudflare inyecta headers como CF-Connecting-IP (IP real del cliente).
 """
-import asyncio, json, os, threading, logging
+import asyncio, inspect, json, os, threading, logging
+from urllib.parse import quote
 import websockets
 
 from app.ollama_client import OLLAMA_MODEL
+
+# websockets >= 14 renombró el parámetro  extra_headers -> additional_headers.
+# Detectamos el nombre correcto para conectar con cualquier versión instalada
+# (con websockets 16.0 usar extra_headers lanzaba TypeError y el host NUNCA
+# llegaba a conectar con el relay).
+try:
+    _WS_HEADERS_KW = (
+        "additional_headers"
+        if "additional_headers" in inspect.signature(websockets.connect).parameters
+        else "extra_headers"
+    )
+except (ValueError, TypeError):
+    _WS_HEADERS_KW = "additional_headers"
 
 log = logging.getLogger("relay_connector")
 
@@ -15,9 +32,34 @@ _BACKOFF_MAX  = 60   # cap for exponential backoff
 _ANNOUNCE_INTERVAL = 20
 
 
+def _get_client_ip_from_headers(headers: dict) -> str:
+    """
+    Extrae la IP real del cliente desde headers de Cloudflare.
+    Cloudflare inyecta CF-Connecting-IP con la IP del cliente original.
+    """
+    # Header de Cloudflare: CF-Connecting-IP (ej: "203.0.113.195")
+    cf_ip = headers.get("CF-Connecting-IP", "")
+    if cf_ip:
+        return cf_ip
+    # Fallback: X-Forwarded-For (puede estar en Cloud Run)
+    forwarded_for = headers.get("X-Forwarded-For", "")
+    if forwarded_for:
+        # X-Forwarded-For puede ser una lista de IPs: "client, proxy1, proxy2"
+        return forwarded_for.split(",")[0].strip()
+    return "unknown"
+
+
+def _requested_model_from_message(msg: dict) -> str:
+    raw = msg.get("model")
+    if not isinstance(raw, str):
+        return "auto"
+    model = raw.strip()
+    return model or "auto"
+
+
 class RelayConnector:
     def __init__(self, relay_url: str, host_secret: str):
-        # relay_url: wss://xxx.run.app  (no trailing slash)
+        # relay_url: wss://relay.cyberagent.cloud (no trailing slash)
         self.ws_url     = relay_url.rstrip("/").replace("https://", "wss://").replace("http://", "ws://")
         self.http_url   = relay_url.rstrip("/").replace("wss://", "https://").replace("ws://", "http://")
         self.host_secret = host_secret
@@ -25,6 +67,7 @@ class RelayConnector:
         self._convs:   dict[str, list]   = {}   # session_id → conversation history
         self._ws       = None
         self._running  = False
+        self._use_cloudflare_headers = os.environ.get("USE_CLOUDFLARE_HEADERS", "True").lower() == "true"
 
     def start(self):
         """Start in a background thread."""
@@ -51,140 +94,268 @@ class RelayConnector:
         self._runners.clear()
 
     async def _async_run(self):
-        url = f"{self.ws_url}/host?secret={self.host_secret}"
         backoff = _BACKOFF_INIT
         while self._running:
-            connected = False
             try:
-                log.info(f"[relay] Conectando a {self.ws_url}/host")
-                async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
+                # El relay autentica el host por query param (?secret=...);
+                # mandamos también el header por compatibilidad futura.
+                async with websockets.connect(
+                    f"{self.ws_url}/host?secret={quote(self.host_secret, safe='')}",
+                    **{_WS_HEADERS_KW: {"X-Host-Secret": self.host_secret}},
+                    ping_interval=20,
+                    ping_timeout=60,
+                ) as ws:
                     self._ws = ws
-                    connected = True
-                    log.info("[relay] Conectado al relay")
-                    await self._handle(ws)
+                    backoff = _BACKOFF_INIT
+                    log.info(f"[relay] Conectado a {self.ws_url}/host")
+                    await self._handle_connection(ws)
             except Exception as e:
-                log.warning(f"[relay] Desconectado: {e}. Reintentando en {backoff}s…")
-            finally:
+                log.error(f"[relay] Error en conexión: {e}")
                 self._ws = None
-                self._stop_all_runners()
-            if not self._running:
-                break
-            await asyncio.sleep(backoff)
-            backoff = _BACKOFF_INIT if connected else min(backoff * 2, _BACKOFF_MAX)
+                if self._running:
+                    log.info(f"[relay] Reintentando en {backoff}s...")
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, _BACKOFF_MAX)
 
-    async def _announce_models(self, ws) -> bool:
-        """RELAY-BE-001: push current model list to relay right after connecting."""
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=3) as c:
-                r = await c.get("http://localhost:11434/api/tags")
-            models = [m["name"] for m in r.json().get("models", [])]
-        except Exception:
-            models = []
-        from app.model_router import FAST_MODEL, POWER_MODEL
-        active = FAST_MODEL  # fast model is always warm at startup
-        try:
-            await ws.send(json.dumps({"type": "models", "models": models, "active": active}))
-            return True
-        except Exception:
-            return False
-
-    async def _remote_reports_pc_online(self) -> bool:
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=5) as c:
-                r = await c.get(f"{self.http_url}/api/status", params={"t": str(os.getpid())})
-            if r.status_code != 200:
-                return True
-            data = r.json()
-            return bool(data.get("pc_online"))
-        except Exception:
-            return True
-
-    async def _announce_loop(self, ws):
-        while self._running:
-            await asyncio.sleep(_ANNOUNCE_INTERVAL)
-            if not await self._announce_models(ws):
-                try:
-                    await ws.close()
-                except Exception:
-                    pass
-                return
-            if not await self._remote_reports_pc_online():
-                log.warning("[relay] La revision activa no ve el PC online; forzando reconexion")
-                try:
-                    await ws.close()
-                except Exception:
-                    pass
-                return
-
-    async def _handle(self, ws):
-        # Announce model list immediately on connect
-        if not await self._announce_models(ws):
-            return
-        announce_task = asyncio.create_task(self._announce_loop(ws))
-
+    async def _handle_connection(self, ws):
+        """Main loop: receive messages from relay, spawn runners."""
         try:
             async for raw in ws:
                 try:
                     msg = json.loads(raw)
-                except Exception:
+                except json.JSONDecodeError:
                     continue
 
-                session_id = msg.get("session_id")
-                t = msg.get("type")
-
-                # RELAY-BE-003: relay pings us to confirm we're alive
-                if t == "ping":
-                    try:
-                        await ws.send(json.dumps({"type": "pong"}))
-                    except Exception:
-                        break
-                    if not await self._announce_models(ws):
-                        break
-                    continue
-
-                if t == "message":
-                    asyncio.create_task(self._on_message(ws, session_id, msg))
-                elif t == "approve":
-                    runner = self._runners.get(session_id)
-                    if runner:
-                        runner.approve(msg.get("tool_id", ""), bool(msg.get("approved", False)))
-                elif t == "stop":
-                    runner = self._runners.get(session_id)
-                    if runner:
-                        runner.stop()
-                elif t == "session_closed":
-                    runner = self._runners.pop(session_id, None)
-                    if runner:
-                        runner.stop()
-                    self._convs.pop(session_id, None)
+                msg_type = msg.get("type")
+                if msg_type == "message":
+                    # La web/relay envía type:"message". Lo corremos en una tarea
+                    # para NO bloquear el bucle de recepción (pings y siguientes
+                    # mensajes) mientras el agente trabaja.
+                    asyncio.create_task(self._handle_message(ws, msg))
+                elif msg_type == "stop":
+                    r = self._runners.get(msg.get("session_id", ""))
+                    if r:
+                        r.stop()
+                elif msg_type == "session:new":
+                    await self._handle_new_session(ws, msg)
+                elif msg_type == "session:resume":
+                    await self._handle_resume_session(ws, msg)
+                elif msg_type == "ping":
+                    await ws.send(json.dumps({"type": "pong"}))
+        except Exception as e:
+            log.error(f"[relay] Error en conexión: {e}")
         finally:
-            announce_task.cancel()
+            self._stop_all_runners()
 
-    async def _on_message(self, ws, session_id: str, msg: dict):
-        from app.api.agent_runner import AgentRunner
-
-        # Guard: stop concurrent coroutines for the same session
-        if session_id in self._runners:
+    async def _handle_message(self, ws, msg: dict):
+        """Procesa un mensaje del usuario (web→relay→host): corre el agente y
+        devuelve el stream de eventos etiquetados con session_id."""
+        session_id = msg.get("session_id", "")
+        content = (msg.get("content") or "").strip()
+        if not session_id or not content:
             return
 
-        content    = msg.get("content", "").strip()
-        device_ctx = msg.get("device", "móvil (relay)")
+        # Contexto: si el cliente envía su historial (sobrevive reconexiones y
+        # reinicios del host), lo usamos como fuente de verdad; si no, el estado local.
+        client_hist = msg.get("history")
+        if isinstance(client_hist, list) and client_hist:
+            conv = [m for m in client_hist
+                    if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")][-40:]
+            conv.append({"role": "user", "content": content})
+            self._convs[session_id] = conv
+        else:
+            conv = self._convs.setdefault(session_id, [])
+            conv.append({"role": "user", "content": content})
+        conv_trimmed = conv[-40:]
+        requested_model = _requested_model_from_message(msg)
+        try:
+            from app.agent_log import log as _log
+            _log("INFO", "relay", "Modelo solicitado desde relay",
+                 {"model": requested_model, "session": session_id})
+        except Exception:
+            pass
 
-        if session_id not in self._convs:
-            self._convs[session_id] = []
+        try:
+            from app.api.agent_runner import AgentRunner
+            runner = AgentRunner(
+                messages         = list(conv_trimmed),
+                model            = requested_model,
+                session_trust    = bool(msg.get("session_trust", False)),
+                tool_permissions = msg.get("permissions", {}) or {},
+                device_context   = "móvil (relay)",
+                expert_mode      = False,   # nunca auto-aprobar peligrosas en remoto
+            )
+        except Exception as e:
+            try:
+                await ws.send(json.dumps({"type": "error",
+                                          "data": f"Error iniciando agente: {e}",
+                                          "session_id": session_id}))
+            except Exception:
+                pass
+            return
 
-        self._convs[session_id].append({"role": "user", "content": content})
-        self._convs[session_id] = self._convs[session_id][-40:]
-
-        runner = AgentRunner(
-            messages         = list(self._convs[session_id]),
-            session_trust    = msg.get("session_trust", False),
-            tool_permissions = msg.get("permissions", {}),
-            device_context   = device_ctx,
-        )
         self._runners[session_id] = runner
+        loop = asyncio.get_running_loop()
+        q: asyncio.Queue = asyncio.Queue()
+        _SENTINEL = object()
+        full: list[str] = []
+
+        def _run():
+            try:
+                for evt in runner.events():
+                    loop.call_soon_threadsafe(q.put_nowait, evt)
+            except Exception as e:
+                loop.call_soon_threadsafe(q.put_nowait, {"type": "error", "data": str(e)})
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, _SENTINEL)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+        while True:
+            evt = await q.get()
+            if evt is _SENTINEL:
+                break
+            try:
+                await ws.send(json.dumps({**evt, "session_id": session_id}))
+            except Exception:
+                runner.stop()
+                break
+            if evt.get("type") == "done":
+                full.append(evt.get("data", ""))
+
+        if full:
+            conv.append({"role": "assistant", "content": full[0]})
+        self._runners.pop(session_id, None)
+
+    async def _handle_new_session(self, ws, msg: dict):
+        session_id = msg.get("session_id", "")
+        if not session_id:
+            return
+
+        # Extraer IP real del cliente si Cloudflare está activado
+        client_ip = "unknown"
+        if self._use_cloudflare_headers and hasattr(ws, "request_headers"):
+            client_ip = _get_client_ip_from_headers(ws.request_headers)
+
+        log.info(f"[relay] Nueva sesión: {session_id} (IP: {client_ip})")
+
+        # Inicializar conversación
+        self._convs[session_id] = []
+
+        # Crear runner
+        try:
+            from app.agent_runner import AgentRunner
+            from app.tools import execute_tool
+            from app.database import get_conversation, save_conversation
+
+            # Cargar historial si existe
+            conv = get_conversation(session_id)
+            if conv:
+                self._convs[session_id] = conv
+
+            model = _requested_model_from_message(msg)
+            runner = AgentRunner(
+                session_id=session_id,
+                model=model,
+                conversation=self._convs[session_id],
+                execute_tool=execute_tool,
+                client_ip=client_ip,  # Pasar IP real al runner
+            )
+            self._runners[session_id] = runner
+
+            # Enviar confirmación
+            await ws.send(json.dumps({
+                "type": "session:ready",
+                "session_id": session_id,
+                "model": model,
+            }))
+        except Exception:
+            runner.stop()
+            self._runners.pop(session_id, None)
+            return
+
+        loop = asyncio.get_running_loop()
+        q: asyncio.Queue = asyncio.Queue()
+        full = []
+        _SENTINEL = object()
+
+        def _run():
+            try:
+                for evt in runner.events():
+                    loop.call_soon_threadsafe(q.put_nowait, evt)
+            except Exception as e:
+                loop.call_soon_threadsafe(
+                    q.put_nowait, {"type": "error", "data": str(e)}
+                )
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, _SENTINEL)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+        while True:
+            evt = await q.get()
+            if evt is _SENTINEL:
+                break
+            try:
+                await ws.send(json.dumps({**evt, "session_id": session_id}))
+            except Exception:
+                runner.stop()
+                break
+            if evt["type"] in ("done", "error"):
+                if evt["type"] == "done":
+                    full.append(evt.get("data", ""))
+                break
+
+        if full:
+            self._convs[session_id].append({"role": "assistant", "content": full[0]})
+
+        self._runners.pop(session_id, None)
+
+    async def _handle_resume_session(self, ws, msg: dict):
+        session_id = msg.get("session_id", "")
+        if not session_id:
+            return
+
+        # Extraer IP real del cliente si Cloudflare está activado
+        client_ip = "unknown"
+        if self._use_cloudflare_headers and hasattr(ws, "request_headers"):
+            client_ip = _get_client_ip_from_headers(ws.request_headers)
+
+        log.info(f"[relay] Reanudando sesión: {session_id} (IP: {client_ip})")
+
+        try:
+            from app.agent_runner import AgentRunner
+            from app.tools import execute_tool
+            from app.database import get_conversation
+
+            conv = get_conversation(session_id)
+            if not conv:
+                await ws.send(json.dumps({
+                    "type": "error",
+                    "data": f"No se encontró la conversación para {session_id}",
+                    "session_id": session_id,
+                }))
+                return
+
+            self._convs[session_id] = conv
+
+            runner = AgentRunner(
+                session_id=session_id,
+                model=_requested_model_from_message(msg),
+                conversation=conv,
+                execute_tool=execute_tool,
+                client_ip=client_ip,  # Pasar IP real al runner
+            )
+            self._runners[session_id] = runner
+
+            await ws.send(json.dumps({
+                "type": "session:ready",
+                "session_id": session_id,
+            }))
+        except Exception:
+            runner.stop()
+            self._runners.pop(session_id, None)
+            return
 
         loop = asyncio.get_running_loop()
         q: asyncio.Queue = asyncio.Queue()

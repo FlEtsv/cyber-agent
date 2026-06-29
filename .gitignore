@@ -66,10 +66,17 @@ desktop.ini
 # Secrets / credentials
 .env
 *.env
+.env.*
+.env.bak*
+*.env.bak*
 *.pem
 *.key
 secrets.json
 credentials.json
+
+# Artefactos / config local (auditoría 29-jun-2026)
+.claude/
+alerta.txt
 
 # Temp
 tmp/
@@ -77,3 +84,6 @@ temp/
 *.tmp
 
 .env
+
+# Archivos generados por el agente y servidos por URL
+app/web/served/

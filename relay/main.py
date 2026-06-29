@@ -5,7 +5,7 @@ Acts as a fixed-URL bridge between the mobile browser and the PC agent.
 PC connects outbound  → wss://<relay>/host?secret=HOST_SECRET
 Mobile browser        → wss://<relay>/ws  (after login)
 """
-import asyncio, collections, json, os, time, uuid
+import asyncio, collections, hashlib, json, os, secrets, time, uuid
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -27,6 +27,10 @@ if not JWT_SECRET:
 # TOTP is mandatory by default on the relay.
 # Set TOTP_OPTIONAL=1 only in dev/test environments without an authenticator app.
 TOTP_REQUIRED = os.environ.get("TOTP_OPTIONAL", "0").lower() not in ("1", "true", "yes")
+PASSWORD_LOGIN_ENABLED = os.environ.get("PASSWORD_LOGIN_ENABLED", "0").lower() in ("1", "true", "yes")
+EMAIL_CODE_WEBHOOK_URL = os.environ.get("EMAIL_CODE_WEBHOOK_URL", "")
+EMAIL_CODE_WEBHOOK_SECRET = os.environ.get("EMAIL_CODE_WEBHOOK_SECRET", "")
+EMAIL_CODE_TTL = int(os.environ.get("EMAIL_CODE_TTL", "600"))
 
 if TOTP_REQUIRED and not RELAY_TOTP:
     import sys
@@ -50,6 +54,7 @@ app = FastAPI(docs_url=None, redoc_url=None)
 _RATE_WINDOW = 300   # seconds
 _RATE_MAX    = 10    # max login attempts per window per IP
 _rate_hits: dict[str, collections.deque] = {}
+_email_codes: dict[str, dict] = {}
 
 def _rate_ok(ip: str) -> bool:
     now = time.time()
@@ -78,6 +83,8 @@ class RelayState:
         self._send_fn = None   # set/cleared only inside host_ws coroutine
         self._models:  list[str] = []              # RELAY-BE-001: model list from PC
         self._active_model: str = ""               # fast/power model currently loaded
+        self._tools:   list[dict] = []             # catálogo de herramientas del PC
+        self._files:   list[dict] = []             # archivos generados (docs/imágenes)
 
         # RELAY-BE-002: per-session message buffers (last N messages for history restore)
         self._buffers: dict[str, collections.deque] = {}
@@ -116,21 +123,65 @@ class RelayState:
 state = RelayState()
 
 
-# ── Auth helpers ──────────────────────────────────────────────────────────────
+# ── Auth helpers (multi-cuenta) ───────────────────────────────────────────────
+def _accounts() -> list[tuple[str, str, str]]:
+    """Cuentas permitidas: (email, bcrypt_hash, totp_secret). La 2ª (pareja) se
+    activa poniendo RELAY_EMAIL2 / RELAY_PW_HASH2 / RELAY_TOTP_SECRET2 en el relay."""
+    accts: list[tuple[str, str, str]] = []
+    if RELAY_EMAIL:
+        accts.append((RELAY_EMAIL, RELAY_PW_HASH, RELAY_TOTP))
+    e2 = os.environ.get("RELAY_EMAIL2", "").strip()
+    if e2:
+        accts.append((e2, os.environ.get("RELAY_PW_HASH2", ""),
+                      os.environ.get("RELAY_TOTP_SECRET2", "")))
+    return accts
+
+
 def _verify_login(email: str, pw: str, totp: str) -> bool:
-    if email != RELAY_EMAIL:
-        return False
-    if not RELAY_PW_HASH:
-        return False
-    if not bcrypt.checkpw(pw.encode(), RELAY_PW_HASH.encode()):
-        return False
-    if TOTP_REQUIRED:
-        if not RELAY_TOTP:
+    email = (email or "").strip()
+    for acc_email, pw_hash, totp_secret in _accounts():
+        if email != acc_email:
+            continue
+        if not pw_hash or not bcrypt.checkpw(pw.encode(), pw_hash.encode()):
             return False
-        return pyotp.TOTP(RELAY_TOTP).verify(totp, valid_window=1)
-    if RELAY_TOTP:
-        return pyotp.TOTP(RELAY_TOTP).verify(totp, valid_window=1)
-    return True
+        if TOTP_REQUIRED:
+            return bool(totp_secret) and pyotp.TOTP(totp_secret).verify(totp, valid_window=1)
+        if totp_secret:
+            return pyotp.TOTP(totp_secret).verify(totp, valid_window=1)
+        return True
+    return False
+
+def _code_digest(code: str) -> str:
+    return hashlib.sha256(f"{JWT_SECRET}:{code}".encode()).hexdigest()
+
+def _device_context(request: Request, body: dict) -> dict:
+    return {
+        "label": str(body.get("device_label") or "")[:120],
+        "platform": str(body.get("platform") or "")[:80],
+        "user_agent": request.headers.get("user-agent", "")[:220],
+        "ip": request.client.host if request.client else "unknown",
+        "ts": int(time.time()),
+    }
+
+async def _send_email_code(email: str, code: str, device: dict) -> bool:
+    if not EMAIL_CODE_WEBHOOK_URL:
+        return False
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=12) as c:
+            resp = await c.post(
+                EMAIL_CODE_WEBHOOK_URL,
+                json={
+                    "secret": EMAIL_CODE_WEBHOOK_SECRET,
+                    "email": email,
+                    "code": code,
+                    "device": device,
+                    "ttl_seconds": EMAIL_CODE_TTL,
+                },
+            )
+        return 200 <= resp.status_code < 300
+    except Exception:
+        return False
 
 def _make_token(email: str) -> str:
     return jwt.encode(
@@ -163,12 +214,80 @@ def _check_ws_token(ws: WebSocket) -> bool:
 @app.get("/api/auth/status")
 async def auth_status():
     return {
-        "setup_done": bool(RELAY_EMAIL and RELAY_PW_HASH),
-        "totp_required": TOTP_REQUIRED or bool(RELAY_TOTP),
+        "setup_done": bool(RELAY_EMAIL),
+        "email": RELAY_EMAIL,
+        "email_code_enabled": bool(EMAIL_CODE_WEBHOOK_URL),
+        "password_login_enabled": PASSWORD_LOGIN_ENABLED,
+        "totp_required": PASSWORD_LOGIN_ENABLED and (TOTP_REQUIRED or bool(RELAY_TOTP)),
     }
+
+@app.post("/api/auth/email-code/request")
+async def auth_email_code_request(req: Request):
+    ip = req.client.host if req.client else "unknown"
+    if not _rate_ok(f"code:{ip}"):
+        return JSONResponse({"ok": False, "error": "Demasiados intentos. Espera unos minutos."}, status_code=429)
+    if not RELAY_EMAIL:
+        return JSONResponse({"ok": False, "error": "Email de acceso no configurado"}, status_code=503)
+
+    body = await req.json()
+    code = f"{secrets.randbelow(1000000):06d}"
+    device = _device_context(req, body)
+    sent = await _send_email_code(RELAY_EMAIL, code, device)
+    if not sent:
+        return JSONResponse({"ok": False, "error": "Canal de email no configurado"}, status_code=503)
+
+    _email_codes[ip] = {
+        "digest": _code_digest(code),
+        "expires": time.time() + EMAIL_CODE_TTL,
+        "attempts": 0,
+        "device": device,
+    }
+    return {"ok": True, "email": RELAY_EMAIL, "ttl_seconds": EMAIL_CODE_TTL}
+
+@app.post("/api/auth/email-code/verify")
+async def auth_email_code_verify(req: Request):
+    ip = req.client.host if req.client else "unknown"
+    body = await req.json()
+    code = str(body.get("code", "")).strip().replace(" ", "")
+    rec = _email_codes.get(ip)
+    if not rec or rec["expires"] < time.time():
+        _email_codes.pop(ip, None)
+        return JSONResponse({"ok": False, "error": "Codigo caducado. Pide uno nuevo."}, status_code=401)
+    rec["attempts"] += 1
+    if rec["attempts"] > 5:
+        _email_codes.pop(ip, None)
+        return JSONResponse({"ok": False, "error": "Demasiados intentos. Pide un codigo nuevo."}, status_code=429)
+    if len(code) != 6 or _code_digest(code) != rec["digest"]:
+        return JSONResponse({"ok": False, "error": "Codigo incorrecto"}, status_code=401)
+
+    _email_codes.pop(ip, None)
+    token = _make_token(RELAY_EMAIL)
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie("ca_token", token, httponly=True, samesite="lax",
+                    secure=True, max_age=JWT_HOURS * 3600)
+    return resp
+
+@app.post("/api/auth/totp/verify")
+async def auth_totp_verify(req: Request):
+    ip = req.client.host if req.client else "unknown"
+    if not _rate_ok(f"totp:{ip}"):
+        return JSONResponse({"ok": False, "error": "Demasiados intentos. Espera unos minutos."}, status_code=429)
+    if not RELAY_EMAIL or not RELAY_TOTP:
+        return JSONResponse({"ok": False, "error": "Authenticator no configurado"}, status_code=503)
+    body = await req.json()
+    code = str(body.get("code", "")).strip().replace(" ", "")
+    if not pyotp.TOTP(RELAY_TOTP).verify(code, valid_window=1):
+        return JSONResponse({"ok": False, "error": "Codigo incorrecto"}, status_code=401)
+    token = _make_token(RELAY_EMAIL)
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie("ca_token", token, httponly=True, samesite="lax",
+                    secure=True, max_age=JWT_HOURS * 3600)
+    return resp
 
 @app.post("/api/auth/login")
 async def auth_login(req: Request):
+    if not PASSWORD_LOGIN_ENABLED:
+        return JSONResponse({"ok": False, "error": "Login por contrasena deshabilitado"}, status_code=403)
     ip = req.client.host if req.client else "unknown"
     if not _rate_ok(ip):
         return JSONResponse({"ok": False, "error": "Demasiados intentos. Espera unos minutos."}, status_code=429)
@@ -348,6 +467,20 @@ async def host_ws(ws: WebSocket, secret: str = ""):
                         pass
                 continue
 
+            # Catálogo de herramientas y archivos generados (PC → relay → sesiones)
+            if msg_type in ("tools", "files"):
+                payload_list = msg.get(msg_type, [])
+                if msg_type == "tools":
+                    state._tools = payload_list
+                else:
+                    state._files = payload_list
+                for sid, mob in list(state.sessions.items()):
+                    try:
+                        await mob.send_json({"type": msg_type, "data": payload_list})
+                    except Exception:
+                        pass
+                continue
+
             session_id = msg.get("session_id")
             if not session_id:
                 continue
@@ -394,6 +527,8 @@ async def mobile_ws(ws: WebSocket):
             "pc_online":    state.pc_online(),
             "models":       state._models,
             "active_model": state._active_model,
+            "tools":        state._tools,
+            "files":        state._files,
             "session_id":   session_id,
         },
     })

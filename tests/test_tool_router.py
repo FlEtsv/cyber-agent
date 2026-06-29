@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.tool_router import (
     _ALWAYS,
+    _DEFAULT_LEAN,
     _keyword_route,
     route_tools,
     CATEGORIES,
@@ -33,10 +34,13 @@ class TestAlwaysTools:
         names = _names(result)
         assert _ALWAYS <= names
 
-    def test_no_match_returns_full_schema(self):
+    def test_no_match_returns_lean_plus_always(self):
+        # Sin match el router NO manda las ~90 tools (coste): devuelve el set LEAN
+        # + el núcleo _ALWAYS. Decisión de coste deliberada.
         result = route_tools("fjkqlmxyz completamente desconocido", use_llm=False)
         names = _names(result)
-        assert names == _ALL_TOOL_NAMES
+        assert names == (_DEFAULT_LEAN | _ALWAYS)
+        assert names <= _ALL_TOOL_NAMES
 
 
 # ── Keyword routing ───────────────────────────────────────────────────────────

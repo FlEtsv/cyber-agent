@@ -4,8 +4,8 @@ import hashlib
 import json
 from typing import Iterable
 
-RECENT_MESSAGES = 12
-SUMMARY_MAX_CHARS = 5000
+RECENT_MESSAGES = 18
+SUMMARY_MAX_CHARS = 6000
 MESSAGE_SNIPPET_CHARS = 700
 TOOL_PREVIEW_CHARS = 1200
 
@@ -31,19 +31,27 @@ def _message_line(message: dict) -> str:
 
 
 def summarize_messages(messages: Iterable[dict], max_chars: int = SUMMARY_MAX_CHARS) -> str:
+    msgs = list(messages)
     lines: list[str] = []
-    for message in messages:
+    first_user: str | None = None
+    for message in msgs:
         if message.get("role") not in ("user", "assistant"):
             continue
         content = _strip_status_lines(message.get("content") or "")
         if not content:
             continue
+        if first_user is None and message.get("role") == "user":
+            first_user = _shorten(" ".join(content.split()), 600)
         lines.append(_message_line(message))
 
     if not lines:
         return ""
 
-    summary = "Resumen acumulado de la conversacion anterior:\n" + "\n".join(lines[-40:])
+    head = ""
+    if first_user:
+        # El objetivo original SIEMPRE se preserva, aunque caiga fuera de los últimos 40.
+        head = f"OBJETIVO ORIGINAL DEL USUARIO: {first_user}\n\n"
+    summary = "Resumen acumulado de la conversacion anterior:\n" + head + "\n".join(lines[-40:])
     return _shorten(summary, max_chars)
 
 

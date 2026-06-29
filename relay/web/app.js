@@ -250,6 +250,30 @@ class CyberAgent {
         this._renderActivity('estado', data);
         break;
 
+      case 'reasoning':
+        this._hideQueueBadge();
+        // Exposición del consumo de Mistral en la web: el host emite
+        // "Consumo Mistral (sesión): $X · N llamadas" al terminar cada tarea.
+        if (typeof data === 'string' && data.indexOf('Consumo Mistral') !== -1) {
+          const b = this.$('cost-badge');
+          if (b) {
+            b.textContent = '💸 ' + data.replace(/^.*?:\s*/, '').split('·').slice(0, 2).join('·').trim();
+            b.hidden = false;
+          }
+        }
+        this._appendReasoning(data);
+        break;
+
+      case 'savings': {
+        const sb = this.$('savings-badge');
+        if (sb && data && typeof data.total_saved === 'number') {
+          sb.textContent = '💰 $' + data.total_saved.toFixed(2);
+          sb.title = `Ahorrado con el modelo local: $${data.total_saved.toFixed(4)} en total · ${(data.total_tokens || 0).toLocaleString()} tokens gratis`;
+          sb.hidden = false;
+        }
+        break;
+      }
+
       case 'token':
         this._hideQueueBadge();
         this._ensureAIBubble();
@@ -407,12 +431,17 @@ class CyberAgent {
       return;
     }
 
+    // Contexto previo (antes de añadir el mensaje actual): así el PC recuerda la
+    // conversación aunque el móvil se reconecte (nuevo session_id) o el host reinicie.
+    const priorHistory = this._historyForRelay();
+
     this._beginStreaming();
     this._addUserBubble(text, this.attachedImgs.map(i => i.dataUrl));
 
     this._send({
       type:          'message',
       content:       text,
+      history:       priorHistory,
       images:        this.attachedImgs.map(i => i.b64),
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
@@ -490,9 +519,31 @@ class CyberAgent {
     const body = document.createElement('div');
     body.className = 'msg-body';
 
+    // Reasoning / proceso (separado y atenuado, encima de la respuesta final)
+    const reasoningSection = document.createElement('div');
+    reasoningSection.className = 'reasoning-section';
+    reasoningSection.style.display = 'none';
+
+    const rToggle = document.createElement('button');
+    rToggle.className = 'reasoning-toggle open';
+    rToggle.innerHTML = '<span class="r-dot"></span><span class="r-label">Razonando…</span>';
+
+    const rStream = document.createElement('div');
+    rStream.className = 'reasoning-stream';
+
+    rToggle.addEventListener('click', () => {
+      const collapsed = rStream.classList.toggle('collapsed');
+      rToggle.classList.toggle('open', !collapsed);
+    });
+
+    reasoningSection.appendChild(rToggle);
+    reasoningSection.appendChild(rStream);
+    body.appendChild(reasoningSection);
+
     const contentEl = document.createElement('div');
     contentEl.className = 'msg-content';
-    body.appendChild(contentEl);
+    // El contenido del mensaje se añade DEBAJO de las acciones (ver más abajo),
+    // así el auto-scroll deja a la vista la respuesta final, no las acciones.
 
     // Actions section (collapsible)
     const actionsSection = document.createElement('div');
@@ -518,6 +569,9 @@ class CyberAgent {
     actionsSection.appendChild(actionsList);
     body.appendChild(actionsSection);
 
+    // La respuesta final va DEBAJO de sus acciones correspondientes.
+    body.appendChild(contentEl);
+
     wrap.appendChild(avatar);
     wrap.appendChild(body);
     this.messages.appendChild(wrap);
@@ -525,13 +579,34 @@ class CyberAgent {
     this.currentBubble = {
       el: wrap,
       contentEl,
+      reasoningSection,
+      rStream,
+      rToggle,
       actionsSection,
       actionsList,
       toggle,
       _raw: '',
+      _reasoning: '',
       _count: 0,
     };
 
+    this._scrollBottom();
+  }
+
+  _appendReasoning(text) {
+    if (text === undefined || text === null) return;
+    const chunk = typeof text === 'string' ? text : JSON.stringify(text);
+    this._ensureAIBubble();
+    const b = this.currentBubble;
+    // separa pasos con salto de línea si llegan como mensajes de estado
+    b._reasoning += (b._reasoning && !b._reasoning.endsWith('\n') ? '\n' : '') + chunk;
+    b.reasoningSection.style.display = '';
+    b.rStream.classList.remove('collapsed');
+    b.rToggle.classList.add('open');
+    b.rStream.textContent = b._reasoning;
+    b.rStream.scrollTop = b.rStream.scrollHeight;
+    this._setStatus('thinking', chunk.slice(0, 80));
+    this._renderActivity('razonamiento', chunk.slice(0, 120));
     this._scrollBottom();
   }
 
@@ -543,6 +618,15 @@ class CyberAgent {
   _finalizeAIBubble() {
     if (!this.currentBubble) return;
     this._renderCurrentBubble();
+    // Colapsa el razonamiento al terminar para que destaque la respuesta final
+    if (this.currentBubble._reasoning) {
+      this.currentBubble.rStream.classList.add('collapsed');
+      this.currentBubble.rToggle.classList.remove('open');
+      const lbl = this.currentBubble.rToggle.querySelector('.r-label');
+      if (lbl) lbl.textContent = 'Ver razonamiento';
+    } else if (this.currentBubble.reasoningSection) {
+      this.currentBubble.reasoningSection.style.display = 'none';
+    }
     this.report.messages.push({
       ts: new Date().toISOString(),
       role: 'assistant',
@@ -716,6 +800,16 @@ class CyberAgent {
     }
   }
 
+  _historyForRelay() {
+    // Historial reciente en formato {role, content} para dar contexto al PC.
+    try {
+      return this._loadLocalHistory()
+        .filter(m => (m.role === 'user' || m.role === 'assistant') && m.text)
+        .slice(-20)
+        .map(m => ({ role: m.role, content: String(m.text).slice(0, 4000) }));
+    } catch { return []; }
+  }
+
   _persistHistoryMessage(message) {
     const history = this._loadLocalHistory();
     history.push(message);
@@ -723,20 +817,11 @@ class CyberAgent {
   }
 
   async _requestHistory() {
-    if (!this.sessionId || this.messages.querySelector('.msg.restored, .msg.user, .msg.ai')) return;
-    let remote = [];
-    try {
-      const resp = await fetch(`/api/session/${encodeURIComponent(this.sessionId)}/history`, {
-        credentials: 'same-origin',
-      });
-      if (resp.ok) remote = await resp.json();
-    } catch {
-      remote = [];
-    }
-    if (!Array.isArray(remote) || remote.length === 0) {
-      remote = this._loadLocalHistory();
-    }
-    this._restoreHistory(remote);
+    // Fuente ÚNICA de verdad: el historial local de ESTA conversación.
+    // El buffer del relay es por-sesión (no sabe de conversaciones), así que
+    // mezclaba/duplicaba la respuesta al reconectar. Ya no lo usamos para mostrar.
+    if (this.messages.querySelector('.msg.restored, .msg.user, .msg.ai')) return;
+    this._restoreHistory(this._loadLocalHistory());
   }
 
   _restoreHistory(messages, opts = {}) {
@@ -838,13 +923,68 @@ class CyberAgent {
     t.status.textContent = 'done';
     t.status.className   = 'tool-row-status done';
     this._updateReportTool(id, 'done', result);
-    if (result !== null && !t.row.querySelector('.tool-row-result')) {
-      const pre = document.createElement('pre');
-      pre.className = 'tool-row-result';
-      const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-      pre.textContent = text.length > 3000 ? text.slice(0, 3000) + '\n... [salida recortada]' : text;
-      t.row.appendChild(pre);
+    if (result === null || t.row.querySelector('.tool-row-result, .tool-row-diff, .tool-row-todos')) return;
+    // Si la herramienta devolvió un diff (edit_file), píntalo rojo/verde como Claude Code.
+    if (result && typeof result === 'object' && typeof result.diff === 'string' && result.diff.trim()) {
+      t.row.appendChild(this._renderDiff(result));
+      return;
     }
+    // Lista de tareas (todo_write) → checklist visible.
+    if (result && typeof result === 'object' && Array.isArray(result.todos)) {
+      t.row.appendChild(this._renderTodos(result.todos));
+      return;
+    }
+    const pre = document.createElement('pre');
+    pre.className = 'tool-row-result';
+    const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+    pre.textContent = text.length > 3000 ? text.slice(0, 3000) + '\n... [salida recortada]' : text;
+    t.row.appendChild(pre);
+  }
+
+  _renderTodos(todos) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tool-row-todos';
+    const done = todos.filter(t => t.status === 'completed').length;
+    const head = document.createElement('div');
+    head.className = 'todos-head';
+    head.textContent = `✓ Tareas (${done}/${todos.length})`;
+    wrap.appendChild(head);
+    todos.forEach(t => {
+      const row = document.createElement('div');
+      const st = t.status === 'completed' ? 'done' : t.status === 'in_progress' ? 'active' : 'pending';
+      const icon = st === 'done' ? '✓' : st === 'active' ? '▶' : '○';
+      row.className = 'todo-item ' + st;
+      row.textContent = `${icon}  ${t.content}`;
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  _renderDiff(result) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tool-row-diff';
+    const head = document.createElement('div');
+    head.className = 'diff-head';
+    const path = result.path ? String(result.path).replace(/\\/g, '/').split('/').pop() : 'archivo';
+    let badge = '';
+    if (result.syntax_ok === false) badge = ' <span class="diff-badge bad">⚠ sintaxis rota</span>';
+    else if (result.syntax_ok === true) badge = ' <span class="diff-badge ok">✓ compila</span>';
+    head.innerHTML = `✎ ${escHtml(path)} <span class="diff-stat">(${result.replacements || 1} cambio${(result.replacements || 1) === 1 ? '' : 's'})</span>${badge}`;
+    wrap.appendChild(head);
+    const pre = document.createElement('pre');
+    pre.className = 'diff-body';
+    result.diff.split('\n').forEach(line => {
+      const span = document.createElement('span');
+      const c = line[0];
+      span.className = 'diff-line ' + (
+        line.startsWith('+++') || line.startsWith('---') ? 'meta' :
+        line.startsWith('@@') ? 'hunk' :
+        c === '+' ? 'add' : c === '-' ? 'del' : 'ctx');
+      span.textContent = line + '\n';
+      pre.appendChild(span);
+    });
+    wrap.appendChild(pre);
+    return wrap;
   }
   _setToolCancelled(id) {
     const t = this.toolRows.get(id);
@@ -1120,7 +1260,9 @@ class CyberAgent {
   _loadPreferences() {
     try {
       const prefs = JSON.parse(localStorage.getItem(this._prefsKey()) || '{}');
-      this.selectedModel = prefs.selectedModel || '';
+      // Por defecto: modo mixto (Mistral Medium 3 + local). Si el usuario eligió
+      // Auto explícitamente (''), se respeta con ?? (solo cae a fused si no hay pref).
+      this.selectedModel = prefs.selectedModel ?? '';   // por defecto: LOCAL (gratis)
       this.sessionTrust = !!prefs.sessionTrust;
       this.permissions = prefs.permissions && typeof prefs.permissions === 'object' ? prefs.permissions : {};
     } catch {
@@ -1181,11 +1323,35 @@ class CyberAgent {
   _syncModelSelect() {
     const select = this.$('model-select');
     if (!select) return;
+    const LABELS = {
+      '': '🔀 Auto (decide solo)',
+      'auto': '🔀 Auto (decide solo)',
+      'fused': '🤝 Fusionado (Mistral + local)',
+      'codestral-latest': '💻 Codestral (código)',
+      'mistral-large-latest': '🧠 Mistral Large',
+      'mistral-medium-latest': '🧠 Mistral Medium',
+    };
+    const prettyLocal = (m) => '🖥️ ' + m.replace(/:latest$/, '');
+    // Opciones SIEMPRE disponibles: el modo fusionado y los modelos de nube NO
+    // aparecen en availableModels (que solo lista los Ollama locales del host),
+    // así que los añadimos a mano o el selector se queda casi vacío.
+    const VIRTUAL = [
+      { value: 'fused',                 label: '🤝 Fusionado (Mistral Small + local)' },
+      { value: 'codestral-latest',      label: '💻 Codestral (código, barato)' },
+      { value: 'mistral-small-latest',  label: '⚡ Mistral Small (barato)' },
+      { value: 'mistral-medium-latest', label: '🧠 Mistral Medium (caro)' },
+      { value: 'mistral-large-latest',  label: '🧠 Mistral Large (muy caro)' },
+    ];
+    const virtualValues = new Set(VIRTUAL.map(v => v.value));
     const known = [
-      { value: '', label: 'Auto' },
-      { value: 'fast', label: 'Rapido' },
-      { value: 'power', label: 'Potente' },
-      ...this.availableModels.map(model => ({ value: model, label: model })),
+      { value: '', label: LABELS[''] },
+      ...VIRTUAL,
+      ...this.availableModels
+        .filter(model => model !== 'auto' && !virtualValues.has(model))   // '' ya representa Auto
+        .map(model => ({
+          value: model,
+          label: LABELS[model] || (/mistral|magistral|pixtral/i.test(model) ? '🧠 ' + model : prettyLocal(model)),
+        })),
     ];
     const seen = new Set();
     select.innerHTML = '';
@@ -1197,7 +1363,20 @@ class CyberAgent {
       el.textContent = opt.label;
       select.appendChild(el);
     });
-    select.value = seen.has(this.selectedModel) ? this.selectedModel : '';
+    const normalizedModel = this.selectedModel === 'auto' ? '' : this.selectedModel;
+    if (seen.has(normalizedModel)) {
+      select.value = normalizedModel;
+      if (this.selectedModel !== normalizedModel) {
+        this.selectedModel = normalizedModel;
+        this._savePreferences();
+      }
+    } else {
+      select.value = '';
+      if (this.selectedModel) {
+        this.selectedModel = '';
+        this._savePreferences();
+      }
+    }
   }
 
   _renderPermissionsList() {
@@ -1293,6 +1472,16 @@ class CyberAgent {
   }
 
   _scrollBottom() {
+    // Auto-scroll "pegajoso": solo seguimos al fondo si el usuario ya estaba
+    // cerca del fondo. Si subió a leer, no le arrancamos la vista.
+    if (this._stick === undefined) {
+      this._stick = true;
+      this.messages.addEventListener('scroll', () => {
+        const m = this.messages;
+        this._stick = (m.scrollHeight - m.scrollTop - m.clientHeight) < 90;
+      }, { passive: true });
+    }
+    if (!this._stick) return;
     requestAnimationFrame(() => {
       this.messages.scrollTop = this.messages.scrollHeight;
     });
@@ -1380,3 +1569,4 @@ class CyberAgent {
 
 // â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const app = new CyberAgent();
+window.app = app;

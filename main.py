@@ -8,8 +8,15 @@ if ctypes.windll.kernel32.GetLastError() == 183:   # ERROR_ALREADY_EXISTS
     # Traer la ventana existente al frente y salir
     hwnd = ctypes.windll.user32.FindWindowW(None, "⚡ CyberAgent")
     if hwnd:
-        ctypes.windll.user32.ShowWindow(hwnd, 9)        # SW_RESTORE
-        ctypes.windll.user32.SetForegroundWindow(hwnd)
+        # No robar el foco si hay un juego a pantalla completa delante.
+        try:
+            from app.winfocus import foreground_is_fullscreen
+            _busy = foreground_is_fullscreen()
+        except Exception:
+            _busy = False
+        if not _busy:
+            ctypes.windll.user32.ShowWindow(hwnd, 9)        # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
     sys.exit(0)
 
 # Carga .env
@@ -73,13 +80,53 @@ def main():
     tray = QSystemTrayIcon(_icon_normal, app)
     tray.setToolTip("CyberAgent — activo")
 
+    def tray_notify(title, body, icon=QSystemTrayIcon.Information, msecs=4000):
+        """Globo de notificación que se calla si hay un juego a pantalla
+        completa delante (para no sacarte del fullscreen mientras juegas)."""
+        try:
+            from app.winfocus import foreground_is_fullscreen
+            if foreground_is_fullscreen():
+                return
+        except Exception:
+            pass
+        tray.showMessage(title, body, icon, msecs)
+
     menu = QMenu()
-    show_action   = menu.addAction("⚡  Abrir CyberAgent")
-    update_action = menu.addAction("🔄  Buscar actualización")
-    vram_action   = menu.addAction("🎮  Liberar VRAM (para jugar)")
+    show_action    = menu.addAction("⚡  Abrir CyberAgent")
+    update_action  = menu.addAction("🔄  Buscar actualización")
+    vram_action    = menu.addAction("🎮  Liberar VRAM (para jugar)")
     menu.addSeparator()
-    quit_action   = menu.addAction("✕  Salir")
+    restart_action = menu.addAction("↻  Reiniciar CyberAgent")
+    quit_action    = menu.addAction("✕  Salir")
     tray.setContextMenu(menu)
+
+    def _restart_app():
+        """Relanza una instancia nueva y cierra la actual (control de instancia)."""
+        import subprocess
+        try:
+            tray_notify("CyberAgent", "Reiniciando…", QSystemTrayIcon.Information, 1500)
+        except Exception:
+            pass
+        # Libera el mutex de instancia única para que la nueva instancia arranque
+        try:
+            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+        except Exception:
+            pass
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable] + sys.argv[1:]
+        else:
+            py = sys.executable
+            pyw = py.replace("python.exe", "pythonw.exe")
+            if os.path.isfile(pyw):
+                py = pyw
+            cmd = [py, os.path.abspath(sys.argv[0])] + sys.argv[1:]
+        try:
+            flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen(cmd, cwd=os.path.dirname(os.path.abspath(sys.argv[0])) or None,
+                             creationflags=flags, close_fds=True)
+        except Exception as e:
+            print(f"[restart] {e}")
+        QTimer.singleShot(400, app.quit)
 
     def _toggle_window():
         if window.isVisible():
@@ -96,11 +143,12 @@ def main():
              "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue"],
             capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
         )
-        tray.showMessage("CyberAgent", "VRAM liberada — GPU lista para jugar",
-                         QSystemTrayIcon.Information, 3000)
+        tray_notify("CyberAgent", "VRAM liberada — GPU lista para jugar",
+                    QSystemTrayIcon.Information, 3000)
 
     show_action.triggered.connect(_toggle_window)
     vram_action.triggered.connect(_free_vram_tray)
+    restart_action.triggered.connect(_restart_app)
     quit_action.triggered.connect(app.quit)
 
     # Clic izquierdo en tray → mostrar/ocultar
@@ -137,7 +185,7 @@ def main():
         checker.update_available.connect(
             lambda loc, rem: (
                 window.notify_update_available(loc, rem),
-                tray.showMessage(
+                tray_notify(
                     "CyberAgent — Actualización disponible",
                     f"Nueva versión: {rem}",
                     QSystemTrayIcon.Information, 6000,
@@ -188,7 +236,7 @@ def main():
                 tm = TunnelManager(local_port=8765)
                 url = tm.start(wait_secs=20)
                 if url:
-                    tray.showMessage(
+                    tray_notify(
                         "CyberAgent — Túnel activo",
                         f"Acceso web: {url}",
                         QSystemTrayIcon.Information, 6000,
@@ -199,10 +247,19 @@ def main():
 
     QTimer.singleShot(5000, _start_tunnel)
 
+    # Reanuda tareas programadas persistidas (SCHED-001), sin bloquear el arranque
+    def _resume_scheduler():
+        try:
+            from app.scheduler import start_if_pending
+            start_if_pending()
+        except Exception as e:
+            print(f"[scheduler] {e}")
+    QTimer.singleShot(6000, _resume_scheduler)
+
     tray.show()
 
     # Notificación de bienvenida
-    tray.showMessage(
+    tray_notify(
         "CyberAgent activo",
         "Clic en el icono para abrir · Clic derecho para opciones",
         QSystemTrayIcon.Information, 3000,

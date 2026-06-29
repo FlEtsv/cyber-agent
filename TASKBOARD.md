@@ -63,10 +63,56 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
     
 
 
+## 🚀 CYBERAGENT 2.0 — RELEASE EN CURSO
+
+> Sesión 27-jun-2026 (Claude). Cerebro Mistral híbrido/fusionado + UI web responsive 2.0.
+> Verificado en vivo con API key real: 15/15 pruebas de integración + 4/4 endpoints UI + 67/67 regresión.
+
+### ✅ Hecho y verificado en esta sesión
+- Cerebro Mistral (large/medium) como agente real con function-calling sobre las 82 tools locales; modos `auto`/`fused`/manual; fallback a local. Probado end-to-end (memory_info, system_info, fused).
+- Herramientas nativas Mistral Studio: `web_search` real (Python 3.14.4 con fuente), `code_interpreter` (suma 100 primos=24133), image_generation, document_library.
+- Routing con guardrails: tareas ofensivas/sensibles se quedan en LOCAL (Mistral las rechazaría); modelos avisados en el system prompt.
+- Compactación: ancla de objetivo persistente + ctx configurable + resumen que preserva objetivo.
+- Razonamiento separado de la respuesta (evento `reasoning`, panel atenuado) en ambos frontends + desktop.
+- Documentos (PDF/HTML/MD/TXT) + `serve_file` + **auto-arranque de túnel Cloudflare** → "correr script/generar doc → URL pública" funciona solo (probado: trycloudflare devolvió enlace real).
+- Web 2.0 responsive (PC+móvil): app-shell con navegación Chat/Herramientas/Archivos/Ajustes, brain badge del cerebro activo, catálogo de 82 tools con permisos, galería de archivos generados, voz TTS. Endpoints `/api/tools` y `/api/files` + anuncio por websocket relay.
+
+### 📋 BACKLOG 2.0 — CARENCIAS DETECTADAS (pendiente aprobación Director con ✅)
+> Respuesta a "¿qué NO puede hacer el agente?". Priorizado por impacto.
+
+**P0 — Críticas**
+- ✅ `BROWSER-001` HECHO — `browse_page` (Playwright+Chromium): JS, SPA, login, fill, click, screenshot→URL. Probado contra example.com.
+- ✅ `GIT-001` HECHO — `git_op`: status/log/diff/branch/add/commit/push/pull/checkout/create_branch/clone (whitelist, sin shell).
+- ✅ `INGEST-001` HECHO — `read_document`: PDF (pypdf), Excel (openpyxl), Word (python-docx), CSV, JSON, código. Probado.
+- ✅ `SCHED-001` HECHO — `schedule_task`/`list_scheduled`/`cancel_scheduled` + motor `app/scheduler.py` (interval/at/file, acción tool/shell, persistente, opt-in). Ejecución verificada.
+- ✅ `MSG-001` HECHO — `send_message` (email SMTP + Telegram), config por env, degradación clara. Categoría `messaging`.
+- ✅ `HARDEN-001` HECHO — scheduler blindado: acciones shell/herramientas peligrosas requieren `allow_dangerous=true` explícito (no se agendan acciones sin supervisión por accidente).
+- ✅ `INSTALL-001` HECHO — app nativa Windows: `installer/install_shortcut.ps1` (+ `make_icon.py`) crea icono .ico + accesos directos Escritorio/Menú Inicio (pythonw, sin consola), `-Autostart` y `-Uninstall`. Tray con Abrir/**Reiniciar**/Salir; single-instance ya existente (mutex). Instalado y verificado.
+- ✅ `AUDIT-FUNC` HECHO — auditoría funcional 9/9: el modelo (Mistral) USA realmente cada tool vía el bucle del agente (read_document→ACME/4200€, git_op, browse_page→example.com, web_search→Canberra, schedule_task, generate_document+serve_file).
+
+**P1 — Importantes**
+- `SANDBOX-001` Ejecución de código en sandbox Docker local (aislar `run_python`/scripts no confiables del host).
+- `DB-001` Conector SQL externo (Postgres/MySQL/SQLite remoto) con consultas parametrizadas.
+- `VAULT-001` Gestor de secretos cifrado para credenciales de APIs de terceros (GitHub/Jira/cloud) usable por las tools.
+- `OFFSEC-001` Seguridad ofensiva avanzada: wrappers de nmap NSE, sqlmap, hashcat, radare2/Ghidra, análisis pcap, fuzzing. (uso autorizado).
+- `WINCTL-001` Control profundo de Windows: servicios start/stop, tareas programadas, reglas de firewall, usuarios.
+
+**P2 — Complementarias**
+- `VISION-001` Visión local estructurada (detección/comparación de objetos), no solo descripción.
+- `AUDIO-001` STT/TTS server-side + transcripción de audio/vídeo.
+- `ORCH-001` Orquestación multi-agente real (planner→workers especializados) más allá del modo fused.
+
+---
+
 ## ✅ OBJETIVOS IMPLEMENTADOS
 
 > Los agentes mueven aquí objetivos globales cuando el desglose asociado está completado y verificado.
 
+- **Cerebro multi-backend + Mistral como agente (no solo consulta).** `app/brain.py` (streaming Mistral con function-calling, normalización de historial al contrato Mistral con `tool_call_id` de 9 alfanuméricos y saneo de huérfanos), dispatch en `agent_runner._stream_once` y `ollama_client._stream_once`, router con escalado a nube (`model_router.route`), modos `auto`/`fused`/`mistral-*` seleccionables en web (`relay_connector._announce_models`) y desktop (combo en `main_window`). Fallback automático a local si Mistral falla.
+- **Integración de herramientas nativas de Mistral Studio.** `app/mistral_studio.py` (Conversations API: `web_search`, `code_interpreter`, `image_generation`, `document_library`), expuestas como tool `mistral_studio`; `web_search` ahora usa búsqueda real de Mistral con fallback DuckDuckGo. Tools cruzadas: Mistral usa las 82 locales por function-calling y el agente delega en local con `local_llm_consult`.
+- **Fix de compactación que perdía el objetivo.** Ancla `## OBJETIVO PERSISTENTE` fijada en el system prompt (no se compacta), `MAX_CTX` configurable (16384 def.), presupuesto de prompt escalado, `RECENT_MESSAGES=18` y resumen que preserva el objetivo original (`memory.summarize_messages`).
+- **Razonamiento separado de la respuesta final.** Nuevo evento/Signal `reasoning` (antes era `token`): web pinta panel atenuado y colapsable (`relay/web/app.js` + `style.css`), desktop indicador en barra de estado. Persona más natural + flujo "razonar sobre la verdad" en `_build_base_prompt`.
+- **Entrega de resultados al usuario.** `app/documents.py` (PDF/HTML/MD/TXT vía reportlab/markdown) + `serve_file`/`/served` montado en `server.py` + URL pública del túnel (`tunnel.get_public_url`). Tools `generate_document` y `serve_file`. *(Pendiente del Director: definir MISTRAL_API_KEY en el entorno — sin ella el cerebro nube queda inactivo y cae a local.)*
 - **Implementar sistema de reportes.** Cerrado por `REP-001` — export JSON/HTML en web/relay, reporte local desde `agent.log`, redacción de secretos y doc en `docs/SESSION_REPORTS.md`.
 - **Integrar las herramientas de Hacking.** Cerrado por `TOOL-001` — catálogo estructurado, permisos por riesgo (`DANGEROUS_TOOLS`, `ACTIVE_SECURITY_TOOLS`, `SENSITIVE_ACCESS_TOOLS`), grupo router `hacking`, doc en `docs/TOOLS.md`.
 - **Conseguir suit de herramientas global de precisión.** Cerrado por `TOOL-001`+`TOOL-002` — catálogo de 75+ herramientas, routing LLM mejorado con prompt detallado por categoría, grupo `desktop` completo añadido.
@@ -103,6 +149,10 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Escribe aquí ANTES de tocar cualquier archivo.
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
+
+[codex] AUTH-RECOVERY-005 — Recuperar acceso al relay y preparar login por email si hay proveedor SMTP: diagnosticar credenciales/TOTP desplegados, regenerar QR/credenciales si procede y mejorar flujo de recuperación sin romper auth actual — Archivos: `relay/main.py`, `relay/web/login.html`, `relay/web/login.css`, `relay/generate_secrets.py`, `tests/test_relay_integration.py`, `TASKBOARD.md`, `data/relay_totp_qr.png`, `data/relay_login_credentials.txt`, `data/relay_secrets.env` — Fecha: 2026-06-27 20:25
+
+[codex] MISTRAL-ROUTE-006 — Auditar y corregir el fallo del selector web relay donde `mistral-large-latest` no llega al runner del PC y cae en modelo local; revisar diagnósticos de fallback y contexto local insuficiente — Archivos: `relay/web/app.js`, `relay/web/ui.js`, `relay/web/index.html`, `app/api/relay_connector.py`, `app/api/agent_runner.py`, `app/ollama_client.py`, tests — ⚠️ zona ajena: `app/api/*` y `app/ollama_client.py` por ruteo/model execution de Claude — Fecha: 2026-06-27 22:10
 
 ---
 

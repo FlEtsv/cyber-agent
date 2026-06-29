@@ -8,7 +8,7 @@ import httpx
 
 
 DEFAULT_BASE_URL = "https://api.mistral.ai/v1"
-DEFAULT_MODEL = "mistral-large-latest"
+DEFAULT_MODEL = "mistral-medium-latest"  # escalada de nube = Medium (el local YA es Small)
 MAX_FIELD_CHARS = 12000
 
 
@@ -122,13 +122,24 @@ def consult_mistral(
             }
         data = response.json()
         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        usage = data.get("usage", {}) or {}
+        try:
+            from app import mistral_usage
+            mistral_usage.log_usage(
+                model,
+                usage.get("prompt_tokens", 0),
+                usage.get("completion_tokens", 0),
+                "consult",
+            )
+        except Exception:
+            pass
         return {
             "ok": True,
             "model": model,
             "mode": mode,
             "redacted": not allow_sensitive,
             "response": content,
-            "usage": data.get("usage", {}),
+            "usage": usage,
         }
     except Exception as exc:
         return {

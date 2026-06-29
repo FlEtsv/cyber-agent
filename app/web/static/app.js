@@ -82,6 +82,10 @@ class CyberAgent {
     this.pendingApproval = null;
     this.permissions   = {};
     this.sessionTrust  = false;
+    this.selectedModel = '';
+    this.sessionId     = '';
+    this.availableModels = [];
+    this.activeModel   = '';
     this.currentConversationId = '';
     this.conversations = [];
     this.outbox        = [];
@@ -90,6 +94,9 @@ class CyberAgent {
     this.reconnectNoticeTimer = null;
     this.connectionBanner = null;
     this.pcOnline = true;
+    this.queueBadge = null;
+    this.settingsPanel = null;
+    this.settingsBackdrop = null;
     this._watchContainer = null;
     this._watchFramesEl  = null;
     this._watchCounterEl = null;
@@ -122,11 +129,15 @@ class CyberAgent {
     this.conversationList = document.getElementById('conversation-list');
     this.activityList = document.getElementById('activity-list');
 
+    this._loadPreferences();
     this._loadConversations();
     this._ensureConnectionBanner();
+    this._ensureQueueBadge();
+    this._initSettingsPanel();
     this._installReportButton();
     this._initConversationPanel();
     this._bindUI();
+    this._bindDragDrop();
     this._connect();
   }
 
@@ -156,7 +167,7 @@ class CyberAgent {
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.7, 15000);
       this.reconnectTimer = setTimeout(() => this._connect(), wait);
     };
-    this.ws.onerror = () => this._setConnectionState('error', 'error WS', 'Error de conexion con el agente.', true);
+    this.ws.onerror = () => this._setConnectionState('error', 'error WS', 'Error de conexion con el relay.', true);
     this.ws.onmessage = e => {
       try {
         this._onMessage(JSON.parse(e.data));
@@ -208,21 +219,63 @@ class CyberAgent {
     switch (type) {
       case 'connected':
         this.pcOnline = data?.pc_online !== false;
+        this.sessionId = data?.session_id || '';
+        this.availableModels = data?.models || [];
+        this.activeModel = data?.active_model || '';
+        this._syncModelSelect();
         if (!this.pcOnline) {
           this._setConnectionState('offline', 'PC offline', 'El PC principal no esta conectado al relay.', true);
         } else {
           this._setConnectionState('', 'conectado');
         }
-        this._setHeaderModel(data?.models, data?.active_model || data?.active || '');
+        this._setHeaderModel(this.availableModels, this.activeModel);
+        this._requestHistory();
         this._showWelcome();
         break;
 
+      case 'models':
+        this.availableModels = data?.models || [];
+        this.activeModel = data?.active || data?.active_model || '';
+        this._syncModelSelect();
+        this._setHeaderModel(this.availableModels, this.activeModel);
+        break;
+
+      case 'history':
+        this._restoreHistory(Array.isArray(data) ? data : []);
+        break;
+
       case 'status':
+        if (this._handleQueueStatus(data)) break;
         this._setStatus('thinking', data);
         this._renderActivity('estado', data);
         break;
 
+      case 'reasoning':
+        this._hideQueueBadge();
+        // Exposición del consumo de Mistral en la web: el host emite
+        // "Consumo Mistral (sesión): $X · N llamadas" al terminar cada tarea.
+        if (typeof data === 'string' && data.indexOf('Consumo Mistral') !== -1) {
+          const b = this.$('cost-badge');
+          if (b) {
+            b.textContent = '💸 ' + data.replace(/^.*?:\s*/, '').split('·').slice(0, 2).join('·').trim();
+            b.hidden = false;
+          }
+        }
+        this._appendReasoning(data);
+        break;
+
+      case 'savings': {
+        const sb = this.$('savings-badge');
+        if (sb && data && typeof data.total_saved === 'number') {
+          sb.textContent = '💰 $' + data.total_saved.toFixed(2);
+          sb.title = `Ahorrado con el modelo local: $${data.total_saved.toFixed(4)} en total · ${(data.total_tokens || 0).toLocaleString()} tokens gratis`;
+          sb.hidden = false;
+        }
+        break;
+      }
+
       case 'token':
+        this._hideQueueBadge();
         this._ensureAIBubble();
         this.currentBubble._raw += data;
         this._renderCurrentBubble();
@@ -259,6 +312,7 @@ class CyberAgent {
         break;
 
       case 'done':
+        this._hideQueueBadge();
         this._finalizeAIBubble();
         this._renderActivity('respuesta', 'completada');
         this._endStreaming();
@@ -276,18 +330,47 @@ class CyberAgent {
     }
   }
 
-  // ── Watch mode ──────────────────────────────────────────────────────────────
+  // ── GPU queue badge ────────────────────────────────────────────────────────
+
+  _ensureQueueBadge() {
+    this.queueBadge = document.getElementById('queue-badge');
+    if (this.queueBadge) return;
+    const header = document.querySelector('header');
+    if (!header) return;
+    this.queueBadge = document.createElement('span');
+    this.queueBadge.id = 'queue-badge';
+    this.queueBadge.hidden = true;
+    header.appendChild(this.queueBadge);
+  }
+
+  _handleQueueStatus(data) {
+    if (typeof data !== 'string' || !/GPU ocupada|posici[oó]n\s+\d/i.test(data)) return false;
+    const pos = data.match(/posici[oó]n\s+(\d+)/i)?.[1] || '';
+    this._ensureQueueBadge();
+    if (this.queueBadge) {
+      this.queueBadge.textContent = pos ? `Cola #${pos}` : 'Cola GPU';
+      this.queueBadge.hidden = false;
+    }
+    this._setStatus('thinking', pos ? `cola GPU #${pos}` : 'cola GPU');
+    return true;
+  }
+
+  _hideQueueBadge() {
+    this._ensureQueueBadge();
+    if (this.queueBadge) this.queueBadge.hidden = true;
+  }
+
+  // ── Watch mode ─────────────────────────────────────────────────────────────
 
   _handleWatchFrame(data) {
     if (!this._watchContainer) {
-      // First frame: create the watch container in the chat
       const wrap = document.createElement('div');
       wrap.className = 'msg watch-mode';
       wrap.innerHTML = `
         <div class="watch-header">
-          <span class="watch-icon">&#x1F4F7;</span>
+          <span class="watch-icon">cam</span>
           <span class="watch-label">Modo Vigilancia</span>
-          <button class="watch-stop-btn" title="Detener vigilancia">&#x23F9;</button>
+          <button class="watch-stop-btn" title="Detener vigilancia">Stop</button>
           <span class="watch-counter">0 capturas</span>
         </div>
         <div class="watch-frames"></div>
@@ -310,7 +393,6 @@ class CyberAgent {
     img.title = `#${(seq || 0) + 1} - ${size || ''} - +${elapsed || 0}s`;
     img.loading = 'lazy';
 
-    // Keep only last 6 frames visible for performance
     this._watchFramesEl.appendChild(img);
     const frames = this._watchFramesEl.querySelectorAll('.watch-frame');
     if (frames.length > 6) frames[0].remove();
@@ -324,19 +406,18 @@ class CyberAgent {
   }
 
   _endWatchMode(frames) {
-    if (this._watchContainer) {
-      const hdr = this._watchContainer.querySelector('.watch-header');
-      if (hdr) {
-        hdr.querySelector('.watch-stop-btn')?.remove();
-        const lbl = hdr.querySelector('.watch-label');
-        if (lbl) lbl.textContent = 'Vigilancia finalizada';
-        const ctr = hdr.querySelector('.watch-counter');
-        if (ctr) ctr.textContent = `${frames} capturas`;
-      }
-      this._watchContainer = null;
-      this._watchFramesEl  = null;
-      this._watchCounterEl = null;
+    if (!this._watchContainer) return;
+    const hdr = this._watchContainer.querySelector('.watch-header');
+    if (hdr) {
+      hdr.querySelector('.watch-stop-btn')?.remove();
+      const lbl = hdr.querySelector('.watch-label');
+      if (lbl) lbl.textContent = 'Vigilancia finalizada';
+      const ctr = hdr.querySelector('.watch-counter');
+      if (ctr) ctr.textContent = `${frames} capturas`;
     }
+    this._watchContainer = null;
+    this._watchFramesEl = null;
+    this._watchCounterEl = null;
   }
 
   // â”€â”€ Send message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -346,9 +427,13 @@ class CyberAgent {
     if ((!text && this.attachedImgs.length === 0) || this.streaming) return;
     if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
       this._setConnectionState('offline', this.pcOnline ? 'reconectando...' : 'PC offline',
-        this.pcOnline ? 'Esperando reconexion con CyberAgent.' : 'El PC principal no esta conectado al relay.', true);
+        this.pcOnline ? 'Esperando reconexion con el relay.' : 'El PC principal no esta conectado al relay.', true);
       return;
     }
+
+    // Contexto previo (antes de añadir el mensaje actual): así el PC recuerda la
+    // conversación aunque el móvil se reconecte (nuevo session_id) o el host reinicie.
+    const priorHistory = this._historyForRelay();
 
     this._beginStreaming();
     this._addUserBubble(text, this.attachedImgs.map(i => i.dataUrl));
@@ -356,9 +441,11 @@ class CyberAgent {
     this._send({
       type:          'message',
       content:       text,
+      history:       priorHistory,
       images:        this.attachedImgs.map(i => i.b64),
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
+      model:         this.selectedModel || undefined,
       device:        `${this.isMobile ? 'movil' : 'PC'} ${this.platform}`,
     });
 
@@ -432,9 +519,31 @@ class CyberAgent {
     const body = document.createElement('div');
     body.className = 'msg-body';
 
+    // Reasoning / proceso (separado y atenuado, encima de la respuesta final)
+    const reasoningSection = document.createElement('div');
+    reasoningSection.className = 'reasoning-section';
+    reasoningSection.style.display = 'none';
+
+    const rToggle = document.createElement('button');
+    rToggle.className = 'reasoning-toggle open';
+    rToggle.innerHTML = '<span class="r-dot"></span><span class="r-label">Razonando…</span>';
+
+    const rStream = document.createElement('div');
+    rStream.className = 'reasoning-stream';
+
+    rToggle.addEventListener('click', () => {
+      const collapsed = rStream.classList.toggle('collapsed');
+      rToggle.classList.toggle('open', !collapsed);
+    });
+
+    reasoningSection.appendChild(rToggle);
+    reasoningSection.appendChild(rStream);
+    body.appendChild(reasoningSection);
+
     const contentEl = document.createElement('div');
     contentEl.className = 'msg-content';
-    body.appendChild(contentEl);
+    // El contenido del mensaje se añade DEBAJO de las acciones (ver más abajo),
+    // así el auto-scroll deja a la vista la respuesta final, no las acciones.
 
     // Actions section (collapsible)
     const actionsSection = document.createElement('div');
@@ -460,6 +569,9 @@ class CyberAgent {
     actionsSection.appendChild(actionsList);
     body.appendChild(actionsSection);
 
+    // La respuesta final va DEBAJO de sus acciones correspondientes.
+    body.appendChild(contentEl);
+
     wrap.appendChild(avatar);
     wrap.appendChild(body);
     this.messages.appendChild(wrap);
@@ -467,13 +579,34 @@ class CyberAgent {
     this.currentBubble = {
       el: wrap,
       contentEl,
+      reasoningSection,
+      rStream,
+      rToggle,
       actionsSection,
       actionsList,
       toggle,
       _raw: '',
+      _reasoning: '',
       _count: 0,
     };
 
+    this._scrollBottom();
+  }
+
+  _appendReasoning(text) {
+    if (text === undefined || text === null) return;
+    const chunk = typeof text === 'string' ? text : JSON.stringify(text);
+    this._ensureAIBubble();
+    const b = this.currentBubble;
+    // separa pasos con salto de línea si llegan como mensajes de estado
+    b._reasoning += (b._reasoning && !b._reasoning.endsWith('\n') ? '\n' : '') + chunk;
+    b.reasoningSection.style.display = '';
+    b.rStream.classList.remove('collapsed');
+    b.rToggle.classList.add('open');
+    b.rStream.textContent = b._reasoning;
+    b.rStream.scrollTop = b.rStream.scrollHeight;
+    this._setStatus('thinking', chunk.slice(0, 80));
+    this._renderActivity('razonamiento', chunk.slice(0, 120));
     this._scrollBottom();
   }
 
@@ -485,6 +618,15 @@ class CyberAgent {
   _finalizeAIBubble() {
     if (!this.currentBubble) return;
     this._renderCurrentBubble();
+    // Colapsa el razonamiento al terminar para que destaque la respuesta final
+    if (this.currentBubble._reasoning) {
+      this.currentBubble.rStream.classList.add('collapsed');
+      this.currentBubble.rToggle.classList.remove('open');
+      const lbl = this.currentBubble.rToggle.querySelector('.r-label');
+      if (lbl) lbl.textContent = 'Ver razonamiento';
+    } else if (this.currentBubble.reasoningSection) {
+      this.currentBubble.reasoningSection.style.display = 'none';
+    }
     this.report.messages.push({
       ts: new Date().toISOString(),
       role: 'assistant',
@@ -499,15 +641,19 @@ class CyberAgent {
     if (!text) return;
     const wrap = document.createElement('div');
     wrap.className = 'msg ai restored';
+
     const avatar = document.createElement('div');
     avatar.className = 'msg-avatar';
     avatar.textContent = 'AI';
+
     const body = document.createElement('div');
     body.className = 'msg-body';
+
     const contentEl = document.createElement('div');
     contentEl.className = 'msg-content';
     contentEl.innerHTML = renderMd(text);
     body.appendChild(contentEl);
+
     wrap.appendChild(avatar);
     wrap.appendChild(body);
     this._removeWelcome();
@@ -515,11 +661,7 @@ class CyberAgent {
   }
 
   _conversationsKey() {
-    return `ca_local_conversations_${location.host}`;
-  }
-
-  _historyKey() {
-    return `ca_local_history_${location.host}_${this.currentConversationId || 'default'}`;
+    return `ca_conversations_${location.host}`;
   }
 
   _loadConversations() {
@@ -531,7 +673,12 @@ class CyberAgent {
       this.conversations = [];
     }
     if (!this.conversations.length) {
-      this.conversations = [{ id: `chat_${Date.now()}`, title: 'Nuevo chat', updatedAt: Date.now(), count: 0 }];
+      this.conversations = [{
+        id: `chat_${Date.now()}`,
+        title: 'Nuevo chat',
+        updatedAt: Date.now(),
+        count: 0,
+      }];
     }
     this.currentConversationId = this.conversations[0].id;
     this._saveConversations();
@@ -548,13 +695,17 @@ class CyberAgent {
       if (button) this._switchConversation(button.dataset.conversationId);
     });
     this._renderConversationList();
-    this._renderActivity('system', 'Web local lista');
-    this._restoreHistory(this._loadLocalHistory(), { force: true });
+    this._renderActivity('system', 'Web lista');
   }
 
   _newConversation() {
     this.currentConversationId = `chat_${Date.now()}`;
-    this.conversations.unshift({ id: this.currentConversationId, title: 'Nuevo chat', updatedAt: Date.now(), count: 0 });
+    this.conversations.unshift({
+      id: this.currentConversationId,
+      title: 'Nuevo chat',
+      updatedAt: Date.now(),
+      count: 0,
+    });
     this._saveConversations();
     this._clearConversationView();
     this._renderConversationList();
@@ -575,36 +726,6 @@ class CyberAgent {
     this.currentBubble = null;
     this._hideApproval();
     this.messages.innerHTML = '';
-  }
-
-  _loadLocalHistory() {
-    try {
-      const raw = localStorage.getItem(this._historyKey());
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  _persistHistoryMessage(message) {
-    const history = this._loadLocalHistory();
-    history.push(message);
-    localStorage.setItem(this._historyKey(), JSON.stringify(history.slice(-80)));
-  }
-
-  _restoreHistory(messages, opts = {}) {
-    if (!Array.isArray(messages) || !messages.length) return;
-    if (!opts.force && this.messages.querySelector('.msg.restored')) return;
-    for (const item of messages.slice(-80)) {
-      if (item?.role === 'user') {
-        this._addUserBubble(item.text || '', item.images || [], { restored: true });
-      } else if (item?.role === 'assistant') {
-        this._addRestoredAIBubble(item.text || '');
-      }
-    }
-    this._removeWelcome();
-    this._scrollBottom();
   }
 
   _touchConversation(text = '', role = 'user') {
@@ -633,7 +754,14 @@ class CyberAgent {
       const item = document.createElement('button');
       item.className = `conversation-item${conv.id === this.currentConversationId ? ' active' : ''}`;
       item.dataset.conversationId = conv.id;
-      item.innerHTML = `<div class="conversation-title">${escHtml(conv.title || 'Nuevo chat')}</div><div class="conversation-meta">${conv.count || 0} eventos · ${this._formatTime(conv.updatedAt)}</div>`;
+      const title = document.createElement('div');
+      title.className = 'conversation-title';
+      title.textContent = conv.title || 'Nuevo chat';
+      const meta = document.createElement('div');
+      meta.className = 'conversation-meta';
+      meta.textContent = `${conv.count || 0} eventos · ${this._formatTime(conv.updatedAt)}`;
+      item.appendChild(title);
+      item.appendChild(meta);
       this.conversationList.appendChild(item);
     }
   }
@@ -644,7 +772,9 @@ class CyberAgent {
     item.className = 'activity-item';
     item.innerHTML = `<strong>${escHtml(kind)}</strong><br>${escHtml(String(text || '').slice(0, 180))}<div class="activity-meta">${this._formatTime(Date.now())}</div>`;
     this.activityList.prepend(item);
-    while (this.activityList.children.length > 20) this.activityList.lastElementChild.remove();
+    while (this.activityList.children.length > 20) {
+      this.activityList.lastElementChild.remove();
+    }
   }
 
   _formatTime(ts) {
@@ -653,6 +783,85 @@ class CyberAgent {
       return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
       return '';
+    }
+  }
+
+  _historyKey() {
+    return `ca_history_${location.host}_${this.currentConversationId || 'default'}`;
+  }
+
+  _loadLocalHistory() {
+    try {
+      const raw = localStorage.getItem(this._historyKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  _historyForRelay() {
+    // Historial reciente en formato {role, content} para dar contexto al PC.
+    try {
+      return this._loadLocalHistory()
+        .filter(m => (m.role === 'user' || m.role === 'assistant') && m.text)
+        .slice(-20)
+        .map(m => ({ role: m.role, content: String(m.text).slice(0, 4000) }));
+    } catch { return []; }
+  }
+
+  _persistHistoryMessage(message) {
+    const history = this._loadLocalHistory();
+    history.push(message);
+    localStorage.setItem(this._historyKey(), JSON.stringify(history.slice(-50)));
+  }
+
+  async _requestHistory() {
+    // Fuente ÚNICA de verdad: el historial local de ESTA conversación.
+    // El buffer del relay es por-sesión (no sabe de conversaciones), así que
+    // mezclaba/duplicaba la respuesta al reconectar. Ya no lo usamos para mostrar.
+    if (this.messages.querySelector('.msg.restored, .msg.user, .msg.ai')) return;
+    this._restoreHistory(this._loadLocalHistory());
+  }
+
+  _restoreHistory(messages, opts = {}) {
+    if (!Array.isArray(messages) || !messages.length) return;
+    if (!opts.force && this.messages.querySelector('.msg.restored')) return;
+    let assistantText = '';
+    let restored = 0;
+
+    const flushAssistant = () => {
+      if (!assistantText.trim()) return;
+      this._addRestoredAIBubble(assistantText);
+      assistantText = '';
+      restored++;
+    };
+
+    for (const item of messages.slice(-50)) {
+      const type = item?.type;
+      const role = item?.role;
+      if (role === 'user' || type === 'user_message') {
+        flushAssistant();
+        this._addUserBubble(item.text || item.content || '', item.images || [], { restored: true });
+        restored++;
+      } else if (role === 'assistant') {
+        flushAssistant();
+        this._addRestoredAIBubble(item.text || item.content || '');
+        restored++;
+      } else if (type === 'token') {
+        assistantText += item.data || '';
+      } else if (type === 'done') {
+        flushAssistant();
+      } else if (type === 'error') {
+        flushAssistant();
+        this._addRestoredAIBubble(`Error anterior: ${item.data || item.error || ''}`);
+        restored++;
+      }
+    }
+    flushAssistant();
+    if (restored) {
+      this._removeWelcome();
+      this._scrollBottom();
     }
   }
 
@@ -714,13 +923,68 @@ class CyberAgent {
     t.status.textContent = 'done';
     t.status.className   = 'tool-row-status done';
     this._updateReportTool(id, 'done', result);
-    if (result !== null && !t.row.querySelector('.tool-row-result')) {
-      const pre = document.createElement('pre');
-      pre.className = 'tool-row-result';
-      const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-      pre.textContent = text.length > 3000 ? text.slice(0, 3000) + '\n... [salida recortada]' : text;
-      t.row.appendChild(pre);
+    if (result === null || t.row.querySelector('.tool-row-result, .tool-row-diff, .tool-row-todos')) return;
+    // Si la herramienta devolvió un diff (edit_file), píntalo rojo/verde como Claude Code.
+    if (result && typeof result === 'object' && typeof result.diff === 'string' && result.diff.trim()) {
+      t.row.appendChild(this._renderDiff(result));
+      return;
     }
+    // Lista de tareas (todo_write) → checklist visible.
+    if (result && typeof result === 'object' && Array.isArray(result.todos)) {
+      t.row.appendChild(this._renderTodos(result.todos));
+      return;
+    }
+    const pre = document.createElement('pre');
+    pre.className = 'tool-row-result';
+    const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+    pre.textContent = text.length > 3000 ? text.slice(0, 3000) + '\n... [salida recortada]' : text;
+    t.row.appendChild(pre);
+  }
+
+  _renderTodos(todos) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tool-row-todos';
+    const done = todos.filter(t => t.status === 'completed').length;
+    const head = document.createElement('div');
+    head.className = 'todos-head';
+    head.textContent = `✓ Tareas (${done}/${todos.length})`;
+    wrap.appendChild(head);
+    todos.forEach(t => {
+      const row = document.createElement('div');
+      const st = t.status === 'completed' ? 'done' : t.status === 'in_progress' ? 'active' : 'pending';
+      const icon = st === 'done' ? '✓' : st === 'active' ? '▶' : '○';
+      row.className = 'todo-item ' + st;
+      row.textContent = `${icon}  ${t.content}`;
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  _renderDiff(result) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tool-row-diff';
+    const head = document.createElement('div');
+    head.className = 'diff-head';
+    const path = result.path ? String(result.path).replace(/\\/g, '/').split('/').pop() : 'archivo';
+    let badge = '';
+    if (result.syntax_ok === false) badge = ' <span class="diff-badge bad">⚠ sintaxis rota</span>';
+    else if (result.syntax_ok === true) badge = ' <span class="diff-badge ok">✓ compila</span>';
+    head.innerHTML = `✎ ${escHtml(path)} <span class="diff-stat">(${result.replacements || 1} cambio${(result.replacements || 1) === 1 ? '' : 's'})</span>${badge}`;
+    wrap.appendChild(head);
+    const pre = document.createElement('pre');
+    pre.className = 'diff-body';
+    result.diff.split('\n').forEach(line => {
+      const span = document.createElement('span');
+      const c = line[0];
+      span.className = 'diff-line ' + (
+        line.startsWith('+++') || line.startsWith('---') ? 'meta' :
+        line.startsWith('@@') ? 'hunk' :
+        c === '+' ? 'add' : c === '-' ? 'del' : 'ctx');
+      span.textContent = line + '\n';
+      pre.appendChild(span);
+    });
+    wrap.appendChild(pre);
+    return wrap;
   }
   _setToolCancelled(id) {
     const t = this.toolRows.get(id);
@@ -743,7 +1007,7 @@ class CyberAgent {
       : '';
     const alwaysBtn = alwaysAsk
       ? ''
-      : '<button class="btn btn-always" id="ap-always">Permitir siempre</button>';
+      : '<button class="btn btn-always"  id="ap-always">Permitir siempre</button>';
 
     this.approvalOverlay.innerHTML = `
       <div class="approval-card ${dangerous ? 'dangerous' : ''}">
@@ -772,8 +1036,12 @@ class CyberAgent {
     this.approvalOverlay.classList.remove('visible');
     this.approvalOverlay.innerHTML = '';
     this.pendingApproval = null;
-    if (always && !isAlwaysAskTool(name)) this.permissions[name] = 'auto';
-    // Send approval directly — must NOT go into outbox (server timeout may have already expired)
+    if (always && !isAlwaysAskTool(name)) {
+      this.permissions[name] = 'auto';
+      this._savePreferences();
+      this._renderPermissionsList();
+    }
+    // Send directly — must NOT go into outbox (server timeout may have already expired)
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'approve', tool_id: id, approved }));
     }
@@ -793,13 +1061,7 @@ class CyberAgent {
     input.type   = 'file';
     input.accept = 'image/*';
     input.multiple = true;
-    input.onchange = e => {
-      Array.from(e.target.files).slice(0, 4).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = ev => this._attachImage(ev.target.result);
-        reader.readAsDataURL(file);
-      });
-    };
+    input.onchange = e => this._attachFiles(e.target.files);
     input.click();
   }
 
@@ -826,6 +1088,10 @@ class CyberAgent {
   }
 
   _attachImage(dataUrl) {
+    if (this.attachedImgs.length >= 4) {
+      this._setStatus('error', 'maximo 4 imagenes');
+      return;
+    }
     const b64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
     this.attachedImgs.push({ dataUrl, b64 });
 
@@ -844,6 +1110,17 @@ class CyberAgent {
     thumb.appendChild(img);
     thumb.appendChild(rm);
     this.attachEl.appendChild(thumb);
+  }
+
+  _attachFiles(files) {
+    Array.from(files || [])
+      .filter(file => file.type?.startsWith('image/'))
+      .slice(0, Math.max(0, 4 - this.attachedImgs.length))
+      .forEach(file => {
+        const reader = new FileReader();
+        reader.onload = ev => this._attachImage(ev.target.result);
+        reader.readAsDataURL(file);
+      });
   }
 
   _resetAttachments() {
@@ -938,7 +1215,7 @@ class CyberAgent {
     this._setInputLocked(true);
     if (this.reconnectNoticeTimer) clearTimeout(this.reconnectNoticeTimer);
     this.reconnectNoticeTimer = setTimeout(() => {
-      this._showConnectionBanner('offline', 'Reconectando con CyberAgent. El envio se reactivara automaticamente.');
+      this._showConnectionBanner('offline', 'Reconectando con el relay. El envio se reactivara automaticamente.');
     }, 3000);
   }
 
@@ -974,6 +1251,160 @@ class CyberAgent {
     this._ensureConnectionBanner();
     this.connectionBanner.className = '';
     this.connectionBanner.textContent = '';
+  }
+
+  _prefsKey() {
+    return `ca_prefs_${location.host}`;
+  }
+
+  _loadPreferences() {
+    try {
+      const prefs = JSON.parse(localStorage.getItem(this._prefsKey()) || '{}');
+      // Por defecto: modo mixto (Mistral Medium 3 + local). Si el usuario eligió
+      // Auto explícitamente (''), se respeta con ?? (solo cae a fused si no hay pref).
+      this.selectedModel = prefs.selectedModel ?? '';   // por defecto: LOCAL (gratis)
+      this.sessionTrust = !!prefs.sessionTrust;
+      this.permissions = prefs.permissions && typeof prefs.permissions === 'object' ? prefs.permissions : {};
+    } catch {
+      this.selectedModel = '';
+      this.sessionTrust = false;
+      this.permissions = {};
+    }
+  }
+
+  _savePreferences() {
+    localStorage.setItem(this._prefsKey(), JSON.stringify({
+      selectedModel: this.selectedModel,
+      sessionTrust: this.sessionTrust,
+      permissions: this.permissions,
+    }));
+  }
+
+  _initSettingsPanel() {
+    this.settingsPanel = document.getElementById('settings-panel');
+    this.settingsBackdrop = document.getElementById('settings-backdrop');
+    const settingsBtn = document.getElementById('settings-btn');
+    if (!this.settingsPanel || !settingsBtn) return;
+
+    settingsBtn.addEventListener('click', () => this._toggleSettingsPanel());
+    this.settingsBackdrop?.addEventListener('click', () => this._toggleSettingsPanel(false));
+    this.$('settings-close')?.addEventListener('click', () => this._toggleSettingsPanel(false));
+    this.$('model-select')?.addEventListener('change', e => {
+      this.selectedModel = e.target.value;
+      this._savePreferences();
+    });
+    this.$('trust-toggle')?.addEventListener('change', e => {
+      this.sessionTrust = e.target.checked;
+      this._savePreferences();
+    });
+    this.$('permissions-list')?.addEventListener('change', e => {
+      if (e.target?.dataset?.tool) {
+        this.permissions[e.target.dataset.tool] = e.target.value;
+        this._savePreferences();
+      }
+    });
+    this._syncSettingsPanel();
+  }
+
+  _toggleSettingsPanel(force) {
+    if (!this.settingsPanel) return;
+    const open = force ?? !this.settingsPanel.classList.contains('open');
+    this.settingsPanel.classList.toggle('open', open);
+    this.settingsBackdrop?.classList.toggle('open', open);
+  }
+
+  _syncSettingsPanel() {
+    const trust = this.$('trust-toggle');
+    if (trust) trust.checked = this.sessionTrust;
+    this._syncModelSelect();
+    this._renderPermissionsList();
+  }
+
+  _syncModelSelect() {
+    const select = this.$('model-select');
+    if (!select) return;
+    const LABELS = {
+      '': '🔀 Auto (decide solo)',
+      'auto': '🔀 Auto (decide solo)',
+      'fused': '🤝 Fusionado (Mistral + local)',
+      'codestral-latest': '💻 Codestral (código)',
+      'mistral-large-latest': '🧠 Mistral Large',
+      'mistral-medium-latest': '🧠 Mistral Medium',
+    };
+    const prettyLocal = (m) => '🖥️ ' + m.replace(/:latest$/, '');
+    // Opciones SIEMPRE disponibles: el modo fusionado y los modelos de nube NO
+    // aparecen en availableModels (que solo lista los Ollama locales del host),
+    // así que los añadimos a mano o el selector se queda casi vacío.
+    const VIRTUAL = [
+      { value: 'fused',                 label: '🤝 Fusionado (Mistral Small + local)' },
+      { value: 'codestral-latest',      label: '💻 Codestral (código, barato)' },
+      { value: 'mistral-small-latest',  label: '⚡ Mistral Small (barato)' },
+      { value: 'mistral-medium-latest', label: '🧠 Mistral Medium (caro)' },
+      { value: 'mistral-large-latest',  label: '🧠 Mistral Large (muy caro)' },
+    ];
+    const virtualValues = new Set(VIRTUAL.map(v => v.value));
+    const known = [
+      { value: '', label: LABELS[''] },
+      ...VIRTUAL,
+      ...this.availableModels
+        .filter(model => model !== 'auto' && !virtualValues.has(model))   // '' ya representa Auto
+        .map(model => ({
+          value: model,
+          label: LABELS[model] || (/mistral|magistral|pixtral/i.test(model) ? '🧠 ' + model : prettyLocal(model)),
+        })),
+    ];
+    const seen = new Set();
+    select.innerHTML = '';
+    known.forEach(opt => {
+      if (seen.has(opt.value)) return;
+      seen.add(opt.value);
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.label;
+      select.appendChild(el);
+    });
+    const normalizedModel = this.selectedModel === 'auto' ? '' : this.selectedModel;
+    if (seen.has(normalizedModel)) {
+      select.value = normalizedModel;
+      if (this.selectedModel !== normalizedModel) {
+        this.selectedModel = normalizedModel;
+        this._savePreferences();
+      }
+    } else {
+      select.value = '';
+      if (this.selectedModel) {
+        this.selectedModel = '';
+        this._savePreferences();
+      }
+    }
+  }
+
+  _renderPermissionsList() {
+    const list = this.$('permissions-list');
+    if (!list) return;
+    const toolNames = Array.from(new Set([
+      ...Object.keys(TOOL_ICONS),
+      ...Object.keys(this.permissions),
+    ])).sort();
+    list.innerHTML = toolNames.map(name => {
+      const locked = isAlwaysAskTool(name);
+      const note = locked ? '<small>cloud: preguntar siempre</small>' : '';
+      const auto = locked ? '' : '<option value="auto">Auto</option>';
+      return `
+      <label class="permission-row">
+        <span>${escHtml(name)}${note}</span>
+        <select data-tool="${escHtml(name)}">
+          <option value="ask">Preguntar</option>
+          ${auto}
+          <option value="block">Bloquear</option>
+        </select>
+      </label>`;
+    }).join('');
+    list.querySelectorAll('select[data-tool]').forEach(sel => {
+      const name = sel.dataset.tool;
+      const value = this.permissions[name] || 'ask';
+      sel.value = isAlwaysAskTool(name) && value === 'auto' ? 'ask' : value;
+    });
   }
 
   _installReportButton() {
@@ -1041,6 +1472,16 @@ class CyberAgent {
   }
 
   _scrollBottom() {
+    // Auto-scroll "pegajoso": solo seguimos al fondo si el usuario ya estaba
+    // cerca del fondo. Si subió a leer, no le arrancamos la vista.
+    if (this._stick === undefined) {
+      this._stick = true;
+      this.messages.addEventListener('scroll', () => {
+        const m = this.messages;
+        this._stick = (m.scrollHeight - m.scrollTop - m.clientHeight) < 90;
+      }, { passive: true });
+    }
+    if (!this._stick) return;
     requestAnimationFrame(() => {
       this.messages.scrollTop = this.messages.scrollHeight;
     });
@@ -1104,7 +1545,28 @@ class CyberAgent {
     this.$('screen-btn').addEventListener('click', () => this.captureScreen());
     this.$('voice-btn').addEventListener('click',  () => this.toggleVoice());
   }
+
+  _bindDragDrop() {
+    const area = document.getElementById('input-area');
+    if (!area) return;
+    ['dragenter', 'dragover'].forEach(type => {
+      area.addEventListener(type, e => {
+        e.preventDefault();
+        area.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(type => {
+      area.addEventListener(type, e => {
+        e.preventDefault();
+        area.classList.remove('drag-over');
+      });
+    });
+    area.addEventListener('drop', e => {
+      this._attachFiles(e.dataTransfer?.files || []);
+    });
+  }
 }
 
 // â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const app = new CyberAgent();
+window.app = app;

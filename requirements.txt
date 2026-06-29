@@ -10,3 +10,14 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 qrcode[pil]>=7.4.2
 pytesseract>=0.3.13
+reportlab>=4.0.0
+# CyberAgent 2.0 — ingesta de documentos y navegador headless
+pypdf>=4.0.0
+openpyxl>=3.1.0
+python-docx>=1.1.0
+playwright>=1.40.0
+# Nota: tras instalar requirements ejecutar `playwright install chromium`
+
+# Linters CPU para lint_code (mejoran la calidad de código del modelo, sin GPU)
+ruff>=0.15
+bandit>=1.9

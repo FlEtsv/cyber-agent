@@ -3,8 +3,15 @@ from PySide6.QtCore import QThread, Signal
 from app.tools import TOOLS_SCHEMA, execute_tool, is_dangerous, tool_event_payload
 
 OLLAMA_URL   = "http://localhost:11434/api/chat"
-OLLAMA_MODEL = "cyberagent-original"
-MAX_CTX = 12288
+# Modelo local por defecto. Configurable por env (mismo valor que CYBERAGENT_FAST_MODEL)
+# para que toda la app sea consistente. Default: Mistral Small 24B Q4_K_M afinado.
+OLLAMA_MODEL = os.environ.get("CYBERAGENT_FAST_MODEL", "cyberagent-24b")
+# Contexto local configurable. La 5080 16GB con el 24B Q4_K_M ~14GB deja KV cache
+# justo para 16384 en f16 (100% GPU). Mistral nube usa su propio contexto 128k.
+try:
+    MAX_CTX = int(os.environ.get("CYBERAGENT_MAX_CTX", "16384"))
+except ValueError:
+    MAX_CTX = 16384
 
 # DEBATE-003: lazy model loading.
 # Fast model stays warm for a long session; power model unloads after inactivity.
@@ -22,13 +29,29 @@ def _normalize_keep_alive(value: str | int | float, default: str) -> str | int |
 
 FAST_KEEP_ALIVE  = _normalize_keep_alive(os.environ.get("CYBERAGENT_FAST_KEEP_ALIVE",  "24h"), "24h")
 POWER_KEEP_ALIVE = _normalize_keep_alive(os.environ.get("CYBERAGENT_POWER_KEEP_ALIVE", "10m"), "10m")
-PROMPT_BUDGET_TOKENS = 10500
+PROMPT_BUDGET_TOKENS = max(8000, MAX_CTX - 2200)  # deja margen para la respuesta
 TOOL_RESULT_CHARS = 4000
 ASSISTANT_HISTORY_CHARS = 6000
 USER_HISTORY_CHARS = 8000
 EMPTY_TOOL_TURN_LIMIT = 3
-MAX_AGENT_ITERATIONS = 30
-MAX_TOOL_EXECUTIONS = 40
+# Presupuestos de autonomía del agente. Más altos = persiste más hasta cumplir
+# el objetivo (antes paraba pronto). Ajustables por entorno.
+MAX_AGENT_ITERATIONS = int(os.environ.get("CYBERAGENT_MAX_ITERATIONS", "80"))
+MAX_TOOL_EXECUTIONS = int(os.environ.get("CYBERAGENT_MAX_TOOL_EXECUTIONS", "150"))
+
+# Paso de verificación OBLIGATORIO: antes de dar una tarea por terminada, el
+# agente debe comprobar con herramientas que de verdad funciona (evita que
+# declare "listo" sin verificar, como pasó con el dominio del relay).
+_VERIFY_PROMPT = (
+    "VERIFICACIÓN OBLIGATORIA antes de dar la tarea por terminada. No basta con "
+    "afirmar que está hecho.\n"
+    "1) Lista EXACTAMENTE qué archivos o configuración cambiaste.\n"
+    "2) Para CADA cambio, ejecuta una comprobación REAL con herramientas que lo "
+    "demuestre: corre el código/comando, prueba el endpoint con una petición real, "
+    "lee el archivo resultante, comprueba el proceso/puerto/DNS, etc.\n"
+    "3) Si algo NO se puede verificar o falla, dilo claramente y NO afirmes que está "
+    "'listo'. Reporta la evidencia concreta de cada comprobación."
+)
 
 
 def _ollama_is_up() -> bool:
@@ -90,20 +113,78 @@ def unload_model(model: str) -> bool:
 
 def _build_base_prompt() -> str:
     from datetime import datetime
-    return f"""Eres CyberAgent, agente autónomo de steve. {datetime.now().strftime("%d/%m/%Y %H:%M")}
+    return f"""Eres CyberAgent, el agente personal de Steve. {datetime.now().strftime("%d/%m/%Y %H:%M")}
 Sistema: RTX 5080 16GB · 64GB DDR5 · Win11 Pro + WSL2 · Python 3.14
 Proyecto: C:\\Users\\steve\\cyber-llm\\agent-native
+
+VOZ Y TRATO (importante): Habla como una inteligencia con criterio, no como una máquina.
+Sé directo, cálido y seguro; tutea a Steve. Da tu opinión y razona el porqué.
+Nada de muletillas robóticas ("Como modelo de lenguaje...", "Procesando..."). Frases naturales.
+Tu PROCESO/razonamiento se muestra aparte (atenuado); tu RESPUESTA final debe ser limpia,
+concreta y útil — no repitas en la respuesta los pasos del proceso.
+
+RAZONAR SOBRE LA VERDAD: Si Steve dice que tu respuesta es incorrecta, NO cedas sin más ni
+te limites a disculparte. Investiga: usa web_search/mistral_studio para verificar con fuentes,
+re-lee el dato real, contrasta evidencia y explica qué es verdad y por qué. Si tenías razón,
+defiéndelo con pruebas; si te equivocaste, corrige con la fuente que lo demuestra.
+
+ENTREGABLES: Cuando un resultado merezca quedar guardado o compartido (informe, script, salida),
+usa generate_document para crear un PDF/HTML y serve_file para darle a Steve una URL pública.
+
+SOBRE MISTRAL (NUBE) Y TÚ (LOCAL): Mistral es el cerebro de razonamiento general en la nube y
+trae herramientas (mistral_studio: búsqueda web, intérprete de código, imágenes; mistral_consult:
+segunda opinión). PERO Mistral tiene guardrails: RECHAZARÁ cualquier cosa que parezca ilegal o no
+ética (exploits, malware, evasión de antivirus, robo de credenciales, cracking, payloads ofensivos…),
+aunque sea un encargo autorizado de Steve. Tú (modelo local) NO tienes esa limitación para el trabajo
+de seguridad autorizado de Steve. Por tanto:
+- Para tareas ofensivas/sensibles de seguridad: RESUÉLVELAS TÚ en local. NO delegues en Mistral ni
+  escales a la nube: volvería rechazado y perderías tiempo.
+- Reserva Mistral/mistral_studio/mistral_consult para: razonamiento y arquitectura general, búsqueda
+  web, cálculo/gráficas, generación de imágenes, revisión de código no sensible y segundas opiniones.
+- Si Mistral rechaza algo, no insistas con él: continúa con tus medios locales.
 
 REGLA DE TRABAJO: Antes de actuar, di en 1 frase qué vas a comprobar o ejecutar.
 Si necesitas herramientas, úsalas y mantén al usuario informado con pasos breves.
 Cuando termines, entrega una conclusión clara: hecho, bloqueado o siguiente acción.
 Para tareas largas, trabaja por fases: plan corto, ejecución, verificación y siguiente paso.
+Para tareas multi-paso usa todo_write: crea la lista al planificar y actualiza el estado
+(in_progress→completed) según avances, así Steve VE el progreso. Solo un paso in_progress a la vez.
 Mantén un checklist mental del objetivo y continúa hasta completarlo o encontrar un bloqueo concreto.
 No encadenes herramientas indefinidamente sin explicar progreso: cada pocas acciones emite un checkpoint.
 Si una fase falla, intenta una alternativa razonable antes de declarar bloqueo.
 
+CEREBRO Y COSTE: eres un modelo POTENTE y local (Mistral Small 24B, gratis, sin censura).
+RESPONDE TÚ directamente lo que sabes — que es casi todo. NO malgastes la nube en trivialidades
+ni "consultes" lo que ya sabes. Usa web_search SOLO para datos ACTUALES o cambiantes (versiones,
+precios, noticias, CVEs recientes). La escalera, solo si de verdad la necesitas: para CÓDIGO duro
+→ Codestral (mistral_code_complete); para razonamiento que NO puedas resolver → ofrece a Steve
+escalar a Mistral Medium (él decide con "Escalar" o el selector). NO escales a "Mistral Small" en
+la nube: tú YA eres Mistral Small. Orden: local (0€) → Codestral (código) → Medium (razonar duro).
+
+REGLA DE ORO (anti-derroche): si SABES la respuesta —ciencia, conceptos, cómo funciona algo,
+historia, definiciones— respóndela YA, de tu cabeza, SIN herramientas. Ejemplo: "¿por qué el
+cielo es azul?" → contesta directo (dispersión de Rayleigh), NUNCA busques en web eso. Usa
+herramientas SOLO si la tarea las EXIGE: actuar en el sistema (shell), leer/escribir ficheros, o
+un dato que cambia hoy (versión de software, precio, noticia, CVE reciente). Ante la duda: responde tú.
+
+PLAN ANTES DE GASTAR (rentabilidad): si la tarea es no trivial, ambigua o cara, NO ejecutes
+herramientas de golpe. Primero, en pocas líneas: propón un PLAN por pasos, ofrece 2-3 OPCIONES
+cuando las haya, y haz las PREGUNTAS necesarias para no equivocarte. Espera el OK de Steve y SOLO
+entonces ejecuta. Para charla o tareas triviales de 1-2 pasos claros, actúa directo sin plan.
+Esta fase de conversación/plan hazla siempre en local (gratis); reserva la nube para ejecutar.
+
+PROGRAMAR (clave): para CAMBIAR código usa edit_file (find/replace quirúrgico), NO reescribas el
+archivo entero con write_file (solo write_file para archivos nuevos). Flujo correcto:
+read_file para ver el código EXACTO (sale numerado "Nº⇥línea": úsalo para ubicarte, pero al
+editar copia SOLO el código, sin el número ni el tab) → edit_file con un old_string único
+(copia espacios e indentación tal cual) → lint_code para cazar bugs/estilo/seguridad (ruff/bandit, gratis) →
+ejecuta/comprueba que funciona (run_python, shell o el test) ANTES de
+darlo por hecho. Cambios mínimos y verificados. Para autocompletar código puro puedes usar
+mistral_code_complete (Codestral). NO te rindas a medias: si falla, lee el error, ajusta y
+reintenta hasta lograrlo o hasta un bloqueo concreto que expliques.
+
 EJEMPLOS DE COMPORTAMIENTO CORRECTO:
-• "haz que main.py imprima hola" → llama read_file(path=main.py) → llama write_file con cambio → listo
+• "haz que main.py imprima hola" → read_file(main.py) → edit_file(old_string, new_string) → ejecuta y verifica
 • "ejecuta el servidor" → llama shell(command="python main.py", shell_type=powershell)
 • "¿cuánta RAM hay?" → llama memory_info()
 • "busca vulnerabilidades en este código" → llama read_file → analiza → responde
@@ -114,15 +195,25 @@ EJEMPLOS DE COMPORTAMIENTO CORRECTO:
 • "haz un script que X" → escribe el código + llama write_file para guardarlo
 
 HERRAMIENTAS DISPONIBLES (úsalas directamente):
-shell · read_file · write_file · run_python · list_directory · search_files · grep_files
+shell · read_file · edit_file (editar código) · multi_edit (varios cambios atómicos en 1 archivo) · apply_patch (diff multi-archivo) · write_file (crear) · run_python · run_tests (pytest/jest) · lint_code (ruff/bandit) · code_symbols (ubicar funciones/usos) · list_directory · search_files · grep_files
+cve_lookup (NVD, gratis) · threat_intel (reputación IP/hash/URL) · yara_scan · nmap_scan · web_audit (nikto/sqlmap/ffuf) · hash_crack (john CPU / hashcat GPU) · sql_query (SQLite)
+mistral_ocr · mistral_vision · mistral_transcribe · mistral_embed · mistral_code_complete (Codestral)
+http_check · dns_resolve · port_check (verificar que algo funciona de verdad)
 web_search · web_fetch · http_request · ssl_info · http_headers_check · dir_bruteforce
 port_scan · dns_lookup · whois_lookup · traceroute · banner_grab · ping_sweep · arp_cache
 strings_extract · hex_dump · file_entropy · pe_info · file_metadata
 registry_query · list_services · check_persistence · network_connections
 process_tree · process_info · system_info · memory_info · gpu_info · list_processes
 install_package · kill_process · hash_file · diff_files · encode_decode · rag_search · rag_add
+mistral_studio (búsqueda web real + intérprete de código + generación de imágenes)
+mistral_consult (segunda opinión) · local_llm_consult (delegar en modelo local)
+generate_document (PDF/HTML/MD) · serve_file (publicar archivo por URL)
+git_op (commit/push/clone/diff/branch) · read_document (leer PDF/Excel/Word/CSV del usuario)
+browse_page (navegador headless real: JS/SPA/login/formularios)
+schedule_task · list_scheduled · cancel_scheduled (tareas autónomas programadas)
+send_message (entregar resultados/avisos por email o Telegram)
 
-Responde en español."""
+IMPORTANTE: razona y responde SIEMPRE en español. Nunca uses inglés ni chino, ni para pensar."""
 
 SYSTEM_PROMPT = _build_base_prompt()
 
@@ -336,6 +427,7 @@ def is_context_overflow_error(status_code: int, body: str) -> bool:
 
 class AgentWorker(QThread):
     token         = Signal(str)
+    reasoning     = Signal(str)     # proceso/razonamiento (NO es la respuesta final)
     tool_call     = Signal(dict)    # {id, name, args, dangerous}
     tool_result   = Signal(dict)    # {id, name, result}
     need_approval = Signal(dict)    # {id, name, args, dangerous}
@@ -394,17 +486,34 @@ class AgentWorker(QThread):
             last_user = next((m["content"] for m in reversed(self.messages)
                               if m["role"] == "user"), "")
             log("INFO", "run", "Mensaje usuario", {"msg": last_user[:200]})
-            if self.model == OLLAMA_MODEL:  # solo si no fue forzado manualmente
+            from app.brain import is_mistral_model, is_fused, resolve_model
+            if self.model in (OLLAMA_MODEL, "auto"):  # solo si no fue forzado manualmente
                 try:
                     from app.model_router import route
                     routed_model, reason = route(last_user)
                     if routed_model != self.model:
                         self.model = routed_model
-                        self.token.emit(f"[🔀 {reason}]\n\n")
+                        self.reasoning.emit(f"🔀 {reason}")
                 except Exception:
                     pass
+            self._mistral = is_mistral_model(self.model)
+            self._fused = is_fused(self.model)
+            if self._mistral:
+                self.reasoning.emit(
+                    f"🧠 Cerebro: Mistral ({resolve_model(self.model)})"
+                    + (" + delegación local (fused)" if self._fused else "")
+                )
 
             system  = self._build_system_with_rag()
+            # Ancla de objetivo persistente (sobrevive a la compactación)
+            if last_user:
+                system += (
+                    "\n\n## 🎯 OBJETIVO PERSISTENTE DE ESTA TAREA (NO LO PIERDAS)\n"
+                    + last_user.strip()[:2000]
+                    + "\n\nMantén SIEMPRE este objetivo en mente. Tras cada herramienta "
+                    "comprueba si avanzas hacia él. No te declares terminado hasta cumplirlo "
+                    "o encontrar un bloqueo concreto que expliques."
+                )
             from app.memory import build_layered_history
             history = build_layered_history(system, list(self.messages), self.conversation_id)
             full    = ""
@@ -421,8 +530,8 @@ class AgentWorker(QThread):
             tool_execution_count = 0
 
             def _emit_status(text: str):
-                msg = f"\n\n[estado] {text}\n\n"
-                self.token.emit(msg)
+                # Proceso/razonamiento: señal propia, separada de la respuesta final
+                self.reasoning.emit(text)
 
             # Router: LLM elige categorías → fallback keyword → schema completo
             try:
@@ -439,6 +548,7 @@ class AgentWorker(QThread):
 
             _emit_status("Inicio la tarea y la dividiré en pasos verificables.")
 
+            verification_done = False  # fuerza una pasada de verificación antes de cerrar
             for iteration in range(MAX_AGENT_ITERATIONS):
                 if self._stop:
                     break
@@ -458,14 +568,8 @@ class AgentWorker(QThread):
                     break
 
                 # Expandir tools si iteración 2+ (modelo puede encadenar herramientas nuevas)
-                if iteration > 0 and called_tool_names:
-                    try:
-                        from app.tool_router import route_tools
-                        _routed_tools = route_tools(
-                            last_user, history, called_tool_names
-                        )
-                    except Exception:
-                        pass
+                # Contexto LEAN: routeamos una sola vez (sin re-rutear cada
+                # iteración, que inflaba el esquema de tools en cada turno).
 
                 log("INFO", "run", f"Iteración {iteration} — llamando _stream_once",
                     {"num_tools": len(_routed_tools), "history_len": len(history)})
@@ -499,6 +603,15 @@ class AgentWorker(QThread):
                     continue
 
                 if not tool_calls_raw:
+                    # Verificación OBLIGATORIA: si hizo trabajo real y aún no ha
+                    # verificado, le forzamos UNA pasada de comprobación con tools
+                    # antes de aceptar el "hecho".
+                    if tools_executed and not verification_done:
+                        verification_done = True
+                        log("INFO", "run", "Verificación obligatoria — forzando comprobación antes de cerrar")
+                        _emit_status("Antes de cerrar, verifico que lo hecho funciona de verdad.")
+                        history.append({"role": "user", "content": _VERIFY_PROMPT})
+                        continue
                     log("INFO", "run", "Sin tool_calls_raw — terminando iteraciones",
                         {"tools_executed": tools_executed, "content_empty": not content.strip()})
                     # Si ejecutó tools sin generar texto → síntesis SIN tools (fuerza texto)
@@ -645,6 +758,29 @@ class AgentWorker(QThread):
         import time
 
         _tools_used = tools if tools is not None else TOOLS_SCHEMA
+
+        # ── Backend Mistral (nube) ───────────────────────────────────────────
+        if getattr(self, "_mistral", False):
+            from app.brain import stream_mistral
+            try:
+                content, tool_calls, _r = stream_mistral(
+                    self.model, history, _tools_used,
+                    emit_token=lambda d: self.token.emit(d),
+                    emit_reasoning=lambda d: self.reasoning.emit(d),
+                    should_stop=lambda: self._stop,
+                )
+                # Adaptar forma {idx:{name,args}} → {idx:{name,args_str}} del desktop
+                adapted = {i: {"name": v["name"], "args_str": v["args"]}
+                           for i, v in tool_calls.items()}
+                return content, adapted
+            except Exception as exc:
+                log_exception("stream_once", f"Mistral falló: {exc} — fallback local")
+                self.reasoning.emit(f"⚠️ Mistral falló ({exc}); sigo con el modelo local.")
+                self._mistral = False
+                from app.model_router import FAST_MODEL
+                self.model = FAST_MODEL
+
+        # ── Backend Ollama (local) ───────────────────────────────────────────
         history = prepare_history_for_ollama(history, _tools_used)
         num_ctx = self._auto_ctx(history)
         log("INFO", "stream_once", "Iniciando llamada Ollama",
@@ -655,7 +791,11 @@ class AgentWorker(QThread):
             "messages": history,
             "tools":    _tools_used,
             "stream":   True,
-            "options":  {"num_ctx": num_ctx, "temperature": 0.6, "top_p": 0.9,
+            # Thinking nativo OFF por defecto (inestable en streaming+tools con este
+            # abliterado). Interruptor: CYBERAGENT_THINK=1.
+            "think":    os.environ.get("CYBERAGENT_THINK", "0") == "1"
+                        and any(t in (self.model or "").lower() for t in ("qwen3", "huihui")),
+            "options":  {"num_ctx": num_ctx, "temperature": 0.3, "top_p": 0.95,
                          "repeat_penalty": 1.05, "top_k": 40},
         }
 
@@ -665,9 +805,11 @@ class AgentWorker(QThread):
         MAX_ATTEMPTS = 3
         RETRY_WAIT   = 25  # segundos entre reintentos
 
+        from app.brain import split_think, strip_lead_artifacts
         for attempt in range(MAX_ATTEMPTS):
             content        = ""
             tool_calls_raw = {}
+            _think_state   = False   # parser de <think> para el stream local
             try:
                 with httpx.Client(timeout=_t) as client:
                     with client.stream("POST", OLLAMA_URL, json=payload) as resp:
@@ -696,10 +838,21 @@ class AgentWorker(QThread):
                                 raise RuntimeError(f"Ollama: {chunk['error']}")
 
                             msg   = chunk.get("message", {})
+                            tdelta = msg.get("thinking", "")
+                            if tdelta:   # razonamiento nativo (campo separado)
+                                self.reasoning.emit(tdelta)
                             delta = msg.get("content", "")
                             if delta:
-                                content += delta
-                                self.token.emit(delta)
+                                # Separa <think> inline (modo herramientas) → proceso
+                                _r, _c, _think_state = split_think(delta, _think_state)
+                                if _r:
+                                    self.reasoning.emit(_r)
+                                if _c:
+                                    if not content:
+                                        _c = strip_lead_artifacts(_c)
+                                    if _c:
+                                        content += _c
+                                        self.token.emit(_c)
 
                             for tc in msg.get("tool_calls", []):
                                 idx = tc.get("index", len(tool_calls_raw))
@@ -717,6 +870,14 @@ class AgentWorker(QThread):
                                 log("INFO", "stream_once", "done=True recibido",
                                     {"content_len": len(content),
                                      "tool_calls_count": len(tool_calls_raw)})
+                                try:
+                                    from app import local_usage
+                                    local_usage.log_local(
+                                        chunk.get("prompt_eval_count", 0),
+                                        chunk.get("eval_count", 0),
+                                        model=self.model, context="agent")
+                                except Exception:
+                                    pass
                                 break
 
                 # Éxito — salir del loop de reintentos

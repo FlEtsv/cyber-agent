@@ -1,4 +1,4 @@
-const CACHE = 'cyberagent-v2';
+const CACHE = 'cyberagent-v11';
 const PRECACHE = ['/', '/static/style.css', '/static/app.js'];
 
 self.addEventListener('install', e => {

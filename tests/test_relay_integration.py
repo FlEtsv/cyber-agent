@@ -15,6 +15,12 @@ import relay.main as relay
 @pytest.fixture()
 def relay_client(monkeypatch):
     monkeypatch.setattr(relay, "HOST_SECRET", "host-secret")
+    monkeypatch.setattr(relay, "RELAY_EMAIL", "steve@test.local")
+    monkeypatch.setattr(relay, "RELAY_TOTP", "")
+    monkeypatch.setattr(relay, "PASSWORD_LOGIN_ENABLED", False)
+    monkeypatch.setattr(relay, "EMAIL_CODE_WEBHOOK_URL", "")
+    monkeypatch.setattr(relay, "EMAIL_CODE_WEBHOOK_SECRET", "")
+    relay._email_codes.clear()
     relay.state.host_ws = None
     relay.state.host_q = asyncio.Queue(maxsize=100)
     relay.state.sessions.clear()
@@ -40,6 +46,7 @@ def relay_client(monkeypatch):
         relay.state._active_model = ""
         relay.state._buffers.clear()
         relay.state._host_id = 0
+        relay._email_codes.clear()
         if relay.state._ping_task is not None:
             relay.state._ping_task.cancel()
             relay.state._ping_task = None
@@ -59,6 +66,59 @@ def test_mobile_session_reports_pc_offline(relay_client):
         mobile.send_json({"type": "message", "content": "hola"})
         no_pc = mobile.receive_json()
         assert no_pc == {"type": "error", "data": "PC no conectado"}
+
+
+def test_auth_status_uses_fixed_email_and_code_login(relay_client):
+    status = relay_client.get("/api/auth/status").json()
+
+    assert status["setup_done"] is True
+    assert status["email"] == "steve@test.local"
+    assert status["password_login_enabled"] is False
+
+
+def test_email_code_request_requires_configured_webhook(relay_client):
+    resp = relay_client.post("/api/auth/email-code/request", json={"device_label": "Windows"})
+
+    assert resp.status_code == 503
+    assert resp.json()["error"] == "Canal de email no configurado"
+
+
+def test_email_code_login_sets_cookie(relay_client, monkeypatch):
+    sent = {}
+
+    async def fake_send(email, code, device):
+        sent["email"] = email
+        sent["code"] = code
+        sent["device"] = device
+        return True
+
+    monkeypatch.setattr(relay, "EMAIL_CODE_WEBHOOK_URL", "https://script.google.test/webapp")
+    monkeypatch.setattr(relay, "_send_email_code", fake_send)
+
+    request = relay_client.post("/api/auth/email-code/request", json={"device_label": "Windows PC"})
+    assert request.status_code == 200
+    assert request.json()["email"] == "steve@test.local"
+    assert sent["email"] == "steve@test.local"
+    assert sent["device"]["label"] == "Windows PC"
+
+    verify = relay_client.post("/api/auth/email-code/verify", json={"code": sent["code"]})
+    assert verify.status_code == 200
+    assert verify.json()["ok"] is True
+    assert "ca_token" in verify.cookies
+
+
+def test_fixed_email_totp_login_sets_cookie(relay_client, monkeypatch):
+    import pyotp
+
+    secret = pyotp.random_base32()
+    monkeypatch.setattr(relay, "RELAY_TOTP", secret)
+    code = pyotp.TOTP(secret).now()
+
+    verify = relay_client.post("/api/auth/totp/verify", json={"code": code})
+
+    assert verify.status_code == 200
+    assert verify.json()["ok"] is True
+    assert "ca_token" in verify.cookies
 
 
 def test_relay_bridges_models_messages_approvals_and_history(relay_client):

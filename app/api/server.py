@@ -82,6 +82,11 @@ async def _generic_exc(request: Request, exc: Exception):
 if (WEB_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
+# Archivos generados por el agente (documentos, imágenes) servidos por URL pública.
+_SERVED = WEB_DIR / "served"
+_SERVED.mkdir(parents=True, exist_ok=True)
+app.mount("/served", StaticFiles(directory=str(_SERVED)), name="served")
+
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 
@@ -177,6 +182,63 @@ async def api_status():
         return {"ollama": True, "models": models}
     except Exception:
         return {"ollama": False, "models": []}
+
+
+@app.get("/api/tools")
+async def api_tools():
+    """Catálogo completo de herramientas: categoría, riesgo y descripción."""
+    try:
+        from app.tools import TOOLS_SCHEMA, TOOL_CATEGORIES, DANGEROUS_TOOLS
+        cat_of = {}
+        for cat, names in TOOL_CATEGORIES.items():
+            for n in names:
+                cat_of.setdefault(n, cat)
+        out = []
+        for t in TOOLS_SCHEMA:
+            fn = t.get("function", {})
+            name = fn.get("name", "")
+            desc = (fn.get("description", "") or "").split("\n")[0][:160]
+            params = list((fn.get("parameters", {}).get("properties", {}) or {}).keys())
+            out.append({
+                "name": name,
+                "category": cat_of.get(name, "otros"),
+                "dangerous": name in DANGEROUS_TOOLS,
+                "description": desc,
+                "params": params,
+            })
+        out.sort(key=lambda x: (x["category"], x["name"]))
+        return {"ok": True, "tools": out, "count": len(out)}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "tools": []}
+
+
+@app.get("/api/files")
+async def api_files():
+    """Archivos generados por el agente (documentos/imágenes) con su URL pública."""
+    import time as _t
+    try:
+        from app.api.tunnel import get_public_url
+        base = get_public_url()
+    except Exception:
+        base = ""
+    items = []
+    try:
+        for p in sorted(_SERVED.glob("*"), key=lambda x: x.stat().st_mtime, reverse=True):
+            if not p.is_file():
+                continue
+            ext = p.suffix.lower().lstrip(".")
+            kind = ("image" if ext in ("png", "jpg", "jpeg", "webp", "gif")
+                    else "pdf" if ext == "pdf"
+                    else "doc" if ext in ("html", "md", "txt", "docx") else "file")
+            url = f"{base}/served/{p.name}" if base else f"/served/{p.name}"
+            items.append({
+                "name": p.name, "url": url, "kind": kind, "ext": ext,
+                "bytes": p.stat().st_size, "mtime": int(p.stat().st_mtime),
+            })
+    except Exception as e:
+        return {"ok": False, "error": str(e), "files": []}
+    return {"ok": True, "files": items, "count": len(items),
+            "public_base": base, "generated_at": int(_t.time())}
 
 
 # ── Vision helper ─────────────────────────────────────────────────────────────

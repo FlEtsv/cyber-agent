@@ -770,4 +770,27 @@ QScrollBar::handle:horizontal {
 }
 QScrollBar::handle:horizontal:hover { background: rgba(88, 166, 255, 0.4); }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+
+/* ══════════════════════════════════════════════════════
+   PULIDO PROFESIONAL — tooltips, estados pressed/focus, scrollbar fino
+══════════════════════════════════════════════════════ */
+QToolTip {
+    background: #12161c;
+    color: #e8edf3;
+    border: 1px solid #303946;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 11px;
+}
+/* Feedback al pulsar: todos los botones se "hunden" sutilmente */
+QPushButton:pressed { padding-top: 1px; }
+QPushButton#btn_new_conv:pressed,
+QPushButton#trust_btn:pressed { background: rgba(79, 183, 197, 0.14); }
+QPushButton:disabled { color: #5b6573; border-color: #242a31; }
+/* Foco accesible coherente con la web (acento cian) */
+QListWidget#conv_list::item:focus,
+QComboBox#model_combo:focus { border: 1px solid #4fb7c5; outline: none; }
+/* Scrollbar un pelín más ancho al pasar el ratón = más fácil de agarrar */
+QScrollBar::handle:vertical:hover { background: #4fb7c5; }
+QScrollBar::handle:horizontal:hover { background: #4fb7c5; }
 """

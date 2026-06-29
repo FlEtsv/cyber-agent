@@ -168,6 +168,17 @@ input[type="text"] {
 input:focus { border-color: var(--accent); }
 input::placeholder { color: var(--dim); }
 
+.readonly-field {
+  background: rgba(11,13,16,0.72);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 11px 12px;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
 button[type="submit"], button:not(.hidden) {
   background: var(--accent);
   border: none;
