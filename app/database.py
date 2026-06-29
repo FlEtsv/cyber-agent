@@ -90,11 +90,30 @@ def init_db():
                 summary TEXT NOT NULL DEFAULT '',
                 updated_at TEXT DEFAULT (datetime('now'))
             );
+            -- A1: carpetas / categorías (workspace). parent_id => subcategorías.
+            CREATE TABLE IF NOT EXISTS folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                parent_id INTEGER,
+                color TEXT,
+                context TEXT DEFAULT '',
+                default_model TEXT,
+                position INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """)
+        # Migración idempotente: columnas nuevas en conversations.
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(conversations)")}
+        if "folder_id" not in cols:
+            c.execute("ALTER TABLE conversations ADD COLUMN folder_id INTEGER")
+        if "color" not in cols:
+            c.execute("ALTER TABLE conversations ADD COLUMN color TEXT")
 
-def create_conversation(title="Nueva conversación"):
+def create_conversation(title="Nueva conversación", folder_id=None):
     with get_conn() as c:
-        cur = c.execute("INSERT INTO conversations (title) VALUES (?)", (title,))
+        cur = c.execute(
+            "INSERT INTO conversations (title, folder_id) VALUES (?,?)",
+            (title, folder_id))
         return cur.lastrowid
 
 def update_title(conv_id, title):
@@ -153,3 +172,66 @@ def save_memory_summary(conv_id, summary):
             """,
             (conv_id, summary),
         )
+
+
+# ── A1: Carpetas / categorías (workspace) ────────────────────────────────────
+_FOLDER_FIELDS = {"name", "parent_id", "color", "context", "default_model", "position"}
+
+
+def create_folder(name, parent_id=None, color=None, context="", default_model=None):
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT INTO folders (name, parent_id, color, context, default_model) "
+            "VALUES (?,?,?,?,?)",
+            (name.strip()[:120], parent_id, color, context or "", default_model))
+        return cur.lastrowid
+
+
+def get_folders():
+    with get_conn() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT * FROM folders ORDER BY position, name")]
+
+
+def get_folder(folder_id):
+    with get_conn() as c:
+        row = c.execute("SELECT * FROM folders WHERE id=?", (folder_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def update_folder(folder_id, **fields):
+    fields = {k: v for k, v in fields.items() if k in _FOLDER_FIELDS}
+    if not fields:
+        return
+    sets = ", ".join(f"{k}=?" for k in fields)
+    with get_conn() as c:
+        c.execute(f"UPDATE folders SET {sets} WHERE id=?",
+                  (*fields.values(), folder_id))
+
+
+def delete_folder(folder_id):
+    """Borra la carpeta. Sus conversaciones y subcarpetas quedan al nivel del padre
+    (no se borran datos del usuario)."""
+    with get_conn() as c:
+        c.execute("BEGIN")
+        try:
+            row = c.execute("SELECT parent_id FROM folders WHERE id=?", (folder_id,)).fetchone()
+            parent = row["parent_id"] if row else None
+            c.execute("UPDATE conversations SET folder_id=? WHERE folder_id=?", (parent, folder_id))
+            c.execute("UPDATE folders SET parent_id=? WHERE parent_id=?", (parent, folder_id))
+            c.execute("DELETE FROM folders WHERE id=?", (folder_id,))
+            c.execute("COMMIT")
+        except Exception:
+            c.execute("ROLLBACK")
+            raise
+
+
+def move_conversation(conv_id, folder_id):
+    with get_conn() as c:
+        c.execute("UPDATE conversations SET folder_id=?, updated_at=datetime('now') WHERE id=?",
+                  (folder_id, conv_id))
+
+
+def set_conversation_color(conv_id, color):
+    with get_conn() as c:
+        c.execute("UPDATE conversations SET color=? WHERE id=?", (color, conv_id))
