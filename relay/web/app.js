@@ -230,8 +230,15 @@ class CyberAgent {
         }
         this._setHeaderModel(this.availableModels, this.activeModel);
         this._requestHistory();
+        this._loadFolders();
         this._showWelcome();
         break;
+
+      case 'workspace:result': {
+        const cb = this._wsReq && this._wsReq[evt.req_id];
+        if (cb) { delete this._wsReq[evt.req_id]; cb(evt); }
+        break;
+      }
 
       case 'models':
         this.availableModels = data?.models || [];
@@ -446,6 +453,7 @@ class CyberAgent {
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
       model:         this.selectedModel || undefined,
+      folder_id:     this._currentFolderId() || undefined,
       device:        `${this.isMobile ? 'movil' : 'PC'} ${this.platform}`,
     });
 
@@ -660,6 +668,90 @@ class CyberAgent {
     this.messages.appendChild(wrap);
   }
 
+  // ── Workspace: carpetas sincronizadas con el backend (protocolo workspace:*) ──
+  _workspace(action, payload = {}) {
+    return new Promise((resolve) => {
+      const req_id = 'ws_' + Math.random().toString(36).slice(2, 10);
+      this._wsReq = this._wsReq || {};
+      this._wsReq[req_id] = resolve;
+      this._send({ type: 'workspace:' + action, req_id, ...payload });
+      setTimeout(() => {
+        if (this._wsReq && this._wsReq[req_id]) { delete this._wsReq[req_id]; resolve({ error: 'timeout' }); }
+      }, 12000);
+    });
+  }
+
+  async _loadFolders() {
+    const r = await this._workspace('get');
+    if (Array.isArray(r.folders)) { this.folders = r.folders; this._renderConversationList(); }
+  }
+
+  _folderById(id) { return (this.folders || []).find(f => String(f.id) === String(id)); }
+
+  _currentFolderId() {
+    const c = (this.conversations || []).find(x => x.id === this.currentConversationId);
+    return c ? (c.folderId || null) : null;
+  }
+
+  async _createFolder() {
+    const name = prompt('Nombre de la categoría (carpeta):');
+    if (!name || !name.trim()) return null;
+    const context = prompt('Contexto para esta carpeta (ej: "Eres un ingeniero senior"). Opcional:') || '';
+    const r = await this._workspace('folder_create', { name: name.trim(), context });
+    if (r.error) { alert('Error: ' + r.error); return null; }
+    await this._loadFolders();
+    return r.id || null;
+  }
+
+  async _pickFolder(title = '¿Para quién es este chat?') {
+    const folders = this.folders || [];
+    const labels = ['(Sin carpeta)', ...folders.map(f => f.name), '+ Nueva categoría…'];
+    const choice = prompt(title + '\n\n' + labels.map((l, i) => `${i}. ${l}`).join('\n') + '\n\nEscribe el número:');
+    if (choice === null) return undefined;            // cancelado
+    const idx = parseInt(choice, 10);
+    if (isNaN(idx) || idx === 0) return null;          // sin carpeta
+    if (idx === labels.length - 1) return await this._createFolder();
+    const f = folders[idx - 1];
+    return f ? f.id : null;
+  }
+
+  async _convMenu(convId) {
+    const a = prompt('Conversación:\n1. Mover a carpeta\n2. Color\n3. Borrar\n\nNúmero:');
+    const conv = this.conversations.find(c => c.id === convId);
+    if (!conv) return;
+    if (a === '1') {
+      const fid = await this._pickFolder('Mover a:');
+      if (fid === undefined) return;
+      conv.folderId = fid || null;
+    } else if (a === '2') {
+      const col = prompt('Color hex (ej #54c7d8), vacío = quitar:', conv.color || '');
+      if (col === null) return;
+      conv.color = col.trim() || null;
+    } else if (a === '3') {
+      if (!confirm('¿Borrar esta conversación?')) return;
+      this.conversations = this.conversations.filter(c => c.id !== convId);
+      if (this.currentConversationId === convId) {
+        this.currentConversationId = (this.conversations[0] || {}).id || null;
+        this._clearConversationView(); this._showWelcome();
+      }
+    } else { return; }
+    this._saveConversations();
+    this._renderConversationList();
+  }
+
+  async _editFolder(fid) {
+    const f = this._folderById(fid);
+    if (!f) return;
+    const a = prompt(`Carpeta "${f.name}":\n1. Renombrar\n2. Contexto\n3. Color\n4. Modelo por defecto\n5. Borrar\n\nNúmero:`);
+    if (a === '1') { const n = prompt('Nuevo nombre:', f.name); if (n) await this._workspace('folder_update', { id: f.id, name: n }); }
+    else if (a === '2') { const c = prompt('Contexto (eres…):', f.context || ''); if (c !== null) await this._workspace('folder_update', { id: f.id, context: c }); }
+    else if (a === '3') { const c = prompt('Color hex:', f.color || '#54c7d8'); if (c !== null) await this._workspace('folder_update', { id: f.id, color: c }); }
+    else if (a === '4') { const m = prompt('Modelo por defecto (cyberagent-24b, codestral-latest…; vacío = ninguno):', f.default_model || ''); if (m !== null) await this._workspace('folder_update', { id: f.id, default_model: m.trim() || null }); }
+    else if (a === '5') { if (!confirm('¿Borrar la carpeta? Las conversaciones NO se borran.')) return; await this._workspace('folder_delete', { id: f.id }); }
+    else { return; }
+    await this._loadFolders();
+  }
+
   _conversationsKey() {
     return `ca_conversations_${location.host}`;
   }
@@ -689,8 +781,16 @@ class CyberAgent {
   }
 
   _initConversationPanel() {
+    this._collapsed = this._collapsed || {};
     this.$('new-chat-btn')?.addEventListener('click', () => this._newConversation());
+    this.$('new-folder-btn')?.addEventListener('click', () => this._createFolder());
     this.conversationList?.addEventListener('click', e => {
+      const menu = e.target.closest?.('[data-conv-menu]');
+      if (menu) { e.stopPropagation(); this._convMenu(menu.dataset.convMenu); return; }
+      const fedit = e.target.closest?.('[data-folder-edit]');
+      if (fedit) { e.stopPropagation(); this._editFolder(fedit.dataset.folderEdit); return; }
+      const ftog = e.target.closest?.('[data-folder-toggle]');
+      if (ftog) { this._collapsed[ftog.dataset.folderToggle] = !this._collapsed[ftog.dataset.folderToggle]; this._renderConversationList(); return; }
       const button = e.target.closest?.('[data-conversation-id]');
       if (button) this._switchConversation(button.dataset.conversationId);
     });
@@ -698,13 +798,16 @@ class CyberAgent {
     this._renderActivity('system', 'Web lista');
   }
 
-  _newConversation() {
+  async _newConversation() {
+    const folderId = await this._pickFolder();   // "¿para quién es?"
+    if (folderId === undefined) return;          // cancelado
     this.currentConversationId = `chat_${Date.now()}`;
     this.conversations.unshift({
       id: this.currentConversationId,
       title: 'Nuevo chat',
       updatedAt: Date.now(),
       count: 0,
+      folderId: folderId || null,
     });
     this._saveConversations();
     this._clearConversationView();
@@ -750,19 +853,67 @@ class CyberAgent {
   _renderConversationList() {
     if (!this.conversationList) return;
     this.conversationList.innerHTML = '';
-    for (const conv of this.conversations.slice(0, 30)) {
+    this._collapsed = this._collapsed || {};
+    const convs = this.conversations.slice(0, 60);
+    const folders = this.folders || [];
+
+    const renderConv = (conv) => {
       const item = document.createElement('button');
       item.className = `conversation-item${conv.id === this.currentConversationId ? ' active' : ''}`;
       item.dataset.conversationId = conv.id;
+      if (conv.color) item.style.borderLeft = `3px solid ${conv.color}`;
       const title = document.createElement('div');
       title.className = 'conversation-title';
       title.textContent = conv.title || 'Nuevo chat';
       const meta = document.createElement('div');
       meta.className = 'conversation-meta';
       meta.textContent = `${conv.count || 0} eventos · ${this._formatTime(conv.updatedAt)}`;
-      item.appendChild(title);
-      item.appendChild(meta);
+      const m = document.createElement('span');
+      m.className = 'conv-menu-btn';
+      m.textContent = '⋯';
+      m.dataset.convMenu = conv.id;
+      item.appendChild(title); item.appendChild(meta); item.appendChild(m);
       this.conversationList.appendChild(item);
+    };
+
+    const groups = new Map();
+    for (const c of convs) {
+      const k = (c.folderId != null) ? String(c.folderId) : '';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(c);
+    }
+
+    const renderFolder = (f, depth = 0) => {
+      const k = String(f.id);
+      const open = !this._collapsed[k];
+      const h = document.createElement('div');
+      h.className = 'folder-header';
+      h.style.paddingLeft = `${8 + depth * 12}px`;
+      h.dataset.folderToggle = k;
+      h.innerHTML =
+        `<span class="folder-caret">${open ? '▾' : '▸'}</span>` +
+        `<span class="folder-dot" style="background:${f.color || 'var(--dim)'}"></span>` +
+        `<span class="folder-name">${escHtml(f.name)}</span>` +
+        `<span class="folder-count">${(groups.get(k) || []).length || ''}</span>` +
+        `<span class="folder-edit" data-folder-edit="${k}">⚙</span>`;
+      this.conversationList.appendChild(h);
+      if (open) (groups.get(k) || []).forEach(renderConv);
+    };
+
+    folders.filter(f => !f.parent_id).forEach(f => {
+      renderFolder(f, 0);
+      folders.filter(s => String(s.parent_id) === String(f.id)).forEach(s => renderFolder(s, 1));
+    });
+
+    const loose = groups.get('') || [];
+    if (loose.length) {
+      if (folders.length) {
+        const h = document.createElement('div');
+        h.className = 'folder-header';
+        h.innerHTML = `<span class="folder-caret"></span><span class="folder-name dim">Sin carpeta</span>`;
+        this.conversationList.appendChild(h);
+      }
+      loose.forEach(renderConv);
     }
   }
 
