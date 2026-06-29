@@ -965,16 +965,26 @@ class CyberAgent {
     return opts;
   }
 
+  _parentOptions() {
+    // Solo categorías de primer nivel pueden ser padre (jerarquía de 2 niveles).
+    const opts = [{ value: '', label: '(ninguna — categoría principal)' }];
+    (this.folders || []).filter(f => !f.parent_id)
+      .forEach(f => opts.push({ value: String(f.id), label: f.name }));
+    return opts;
+  }
+
   async _createFolder() {
-    const r = await this._modal({ title: 'Nueva categoría', submitLabel: 'Crear', fields: [
+    const r = await this._modal({ title: 'Nueva categoría / proyecto', submitLabel: 'Crear', fields: [
       { name: 'name', label: 'Nombre', placeholder: 'Ingeniería' },
+      { name: 'parent_id', label: 'Dentro de (categoría padre)', type: 'select', options: this._parentOptions() },
       { name: 'context', label: 'Contexto (opcional)', type: 'textarea', placeholder: 'Eres un ingeniero senior…' },
       { name: 'color', label: 'Color', type: 'color', value: '#54c7d8' },
       { name: 'default_model', label: 'Modelo por defecto', type: 'select', options: this._modelOptions() },
     ]});
     if (!r || !r.name.trim()) return null;
     const res = await this._workspace('folder_create', {
-      name: r.name.trim(), context: r.context || '', color: r.color, default_model: r.default_model || null });
+      name: r.name.trim(), parent_id: r.parent_id ? Number(r.parent_id) : null,
+      context: r.context || '', color: r.color, default_model: r.default_model || null });
     if (res.error) { this._menu('Error: ' + res.error, [{ label: 'OK', value: 1 }]); return null; }
     await this._loadFolders();
     return res.id || null;

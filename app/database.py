@@ -221,6 +221,25 @@ def get_folder(folder_id):
         return dict(row) if row else None
 
 
+def folder_context_chain(folder_id):
+    """WEBPROD-010: cadena de carpetas de raíz→hoja (categoría → subcategoría),
+    para heredar el contexto del padre en las subcategorías/proyectos."""
+    chain = []
+    seen = set()
+    with get_conn() as c:
+        fid = folder_id
+        while fid is not None and fid not in seen and len(chain) < 6:
+            seen.add(fid)
+            row = c.execute("SELECT * FROM folders WHERE id=?", (fid,)).fetchone()
+            if not row:
+                break
+            d = dict(row)
+            chain.append(d)
+            fid = d.get("parent_id")
+    chain.reverse()  # raíz primero
+    return chain
+
+
 def update_folder(folder_id, **fields):
     fields = {k: v for k, v in fields.items() if k in _FOLDER_FIELDS}
     if not fields:

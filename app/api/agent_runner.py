@@ -179,10 +179,18 @@ class AgentRunner:
                 f"- PC: acceso total al sistema Windows."
             )
 
-            # A3: contexto específico de la carpeta (p.ej. "eres ingeniero…")
-            if self._folder and (self._folder.get("context") or "").strip():
-                system += (f"\n\n## CONTEXTO DE LA CARPETA «{self._folder['name']}»\n"
-                           + self._folder["context"].strip()[:2000])
+            # A3/WEBPROD-010: contexto de la carpeta + herencia desde la categoría
+            # padre (categoría → subcategoría/proyecto). Raíz primero.
+            if self._folder:
+                try:
+                    from app import database as _db
+                    chain = _db.folder_context_chain(self._folder["id"])
+                except Exception:
+                    chain = [self._folder]
+                for fld in chain:
+                    ctx = (fld.get("context") or "").strip()
+                    if ctx:
+                        system += (f"\n\n## CONTEXTO DE «{fld['name']}»\n" + ctx[:2000])
 
             last_user = next(
                 (m["content"] for m in reversed(self.messages) if m["role"] == "user"), ""
