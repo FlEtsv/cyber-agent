@@ -470,6 +470,7 @@ class CyberAgent {
     // Para el footer de feedback/escalada: recordamos el ultimo prompt, si es de
     // programacion y con que modelo se respondio (vacio = modelo local).
     this._lastUserText = text;
+    this._lastWasImageGen = false;
     this._lastIsProgramming = this._looksLikeProgramming(text);
     const sel = (this.selectedModel && this.selectedModel !== 'auto') ? this.selectedModel : '';
     this._currentResponseModel = sel;
@@ -682,6 +683,7 @@ class CyberAgent {
 
   _appendFeedbackFooter(bubble) {
     if (!bubble || !bubble.contentEl) return;
+    if (this._lastWasImageGen) return;   // las imágenes no se "escalan"
     const body = bubble.contentEl.parentElement;
     if (!body || body.querySelector('.msg-feedback')) return;
 
@@ -1627,6 +1629,7 @@ class CyberAgent {
       return;
     }
     this._addUserBubble('🎨 Crear imagen: ' + prompt);
+    this._lastWasImageGen = true;   // no mostrar footer de escalada en esta respuesta
     this._beginStreaming();
     this._send({
       type: 'generate_image',
@@ -1889,10 +1892,14 @@ class CyberAgent {
     const statusEl = this.$('google-status');
     if (!statusEl) return;
     this.$('google-connect')?.addEventListener('click', async () => {
-      statusEl.textContent = 'Abriendo autorización en el PC… elige tu cuenta.';
+      statusEl.textContent = 'Abriendo autorización en el PC… elige tu cuenta y acepta.';
       const r = await this._workspace('google_connect');
-      this._googleRender(r.error ? { ok: false, error: r.error } : r);
+      // La autorización puede tardar más que el timeout del canal: no mostramos
+      // "timeout" como error; confirmamos con el estado real y reintentos.
+      if (r && r.connected) this._googleRender(r);
+      else if (r && r.error && r.error !== 'timeout') this._googleRender({ error: r.error });
       this._googleRefresh();
+      [4000, 10000, 20000].forEach(ms => setTimeout(() => this._googleRefresh(), ms));
     });
     this.$('google-disconnect')?.addEventListener('click', async () => {
       await this._workspace('google_disconnect');

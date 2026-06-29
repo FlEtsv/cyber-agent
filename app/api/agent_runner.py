@@ -501,10 +501,12 @@ class AgentRunner:
                 pass
 
             # WEBPROD-009: coste de ESTA respuesta + acumulado del mes (todos los modelos).
-            try:
-                self._q.put({"type": "cost", "data": self._build_cost()})
-            except Exception:
-                pass
+            # Solo si el snapshot inicial existe (si no, el diff no sería fiable).
+            if self._cost_start is not None:
+                try:
+                    self._q.put({"type": "cost", "data": self._build_cost()})
+                except Exception:
+                    pass
 
             self._q.put({"type": "done", "data": full})
 

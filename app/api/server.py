@@ -497,6 +497,58 @@ async def websocket_chat(ws: WebSocket):
                 await _stop_watch()
                 continue
 
+            if t and t.startswith("workspace:"):
+                # Paridad local: carpetas/archivos/google por el mismo dispatch que el relay.
+                ws_action = t.split(":", 1)[1]
+                if ws_action == "google_connect":
+                    from app import google_suite as _g
+                    ws_data = await asyncio.to_thread(_g.google_connect)
+                else:
+                    from app import workspace as _wsmod
+                    ws_data = _wsmod.handle_sync(ws_action, data)
+                await ws.send_json({"type": "workspace:result", "req_id": data.get("req_id"),
+                                    "action": ws_action, **ws_data})
+                continue
+
+            if t == "generate_image":
+                # WEBPROD-005: paridad con el relay para el botón 🎨 en localhost.
+                prompt = (data.get("content") or data.get("prompt") or "").strip()
+                if not prompt:
+                    continue
+                await ws.send_json({"type": "status", "data": "🎨 Generando imagen…"})
+                try:
+                    from app.mistral_studio import available as _ms_av, run as _ms_run
+                    if not _ms_av():
+                        await ws.send_json({"type": "token",
+                            "data": "No puedo crear imágenes: falta MISTRAL_API_KEY."})
+                    else:
+                        res = await asyncio.to_thread(_ms_run, prompt, ["image_generation"])
+                        imgs = res.get("files") or []
+                        if imgs:
+                            import os as _os
+                            try:
+                                from app import database as _db
+                                for f in imgs:
+                                    _db.register_file(f.get("path", ""),
+                                        name=_os.path.basename(f.get("path", "")) or "imagen.png",
+                                        url=f.get("url"), conversation_id=data.get("conversation_id"),
+                                        folder_id=data.get("folder_id"), kind="image")
+                            except Exception:
+                                pass
+                            md = f"🎨 Imagen generada para: *{prompt}*\n\n" + "\n".join(
+                                f"![imagen]({f.get('url')})" for f in imgs if f.get("url"))
+                            await ws.send_json({"type": "token", "data": md})
+                            await ws.send_json({"type": "files", "data": [
+                                {"name": _os.path.basename(f.get("path", "")) or "imagen.png",
+                                 "url": f.get("url"), "kind": "image"} for f in imgs]})
+                        else:
+                            await ws.send_json({"type": "token",
+                                "data": (res or {}).get("text") or "No se generó ninguna imagen."})
+                except Exception as e:
+                    await ws.send_json({"type": "token", "data": f"Error generando la imagen: {e}"})
+                await ws.send_json({"type": "done"})
+                continue
+
             if t == "message":
                 content = data.get("content", "").strip()
                 images  = data.get("images", [])

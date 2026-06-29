@@ -188,11 +188,15 @@ class RelayConnector:
             await _send({"type": "done"})
             return
 
+        # Nombre robusto en Windows y POSIX (rutas con \ o /).
+        import os as _os
+        def _fname(f):
+            return _os.path.basename(f.get("path", "")) or "imagen.png"
         # Registra cada imagen como archivo de la conversación y arma la respuesta.
         try:
             from app import database as db
             for f in files:
-                db.register_file(f.get("path", ""), name=(f.get("path", "").split("/")[-1] or "imagen.png"),
+                db.register_file(f.get("path", ""), name=_fname(f),
                                  url=f.get("url"), conversation_id=msg.get("conversation_id"),
                                  folder_id=msg.get("folder_id"), kind="image")
         except Exception:
@@ -201,65 +205,22 @@ class RelayConnector:
             f"![imagen]({f.get('url')})" for f in files if f.get("url"))
         await _send({"type": "token", "data": md})
         await _send({"type": "files", "data": [
-            {"name": (f.get("path", "").split("/")[-1] or "imagen.png"),
-             "url": f.get("url"), "kind": "image"} for f in files]})
+            {"name": _fname(f), "url": f.get("url"), "kind": "image"} for f in files]})
         await _send({"type": "done"})
 
     async def _handle_workspace(self, ws, msg: dict):
-        """CRUD de carpetas/conversaciones del workspace (web→relay→host→SQLite).
-        El backend (SQLite del PC) es la fuente de verdad sincronizada."""
-        from app import database as db
+        """CRUD de carpetas/conversaciones/archivos del workspace (web→relay→host→SQLite).
+        Usa el dispatch compartido (app/workspace.py). google_connect bloquea (abre
+        el navegador) → se ejecuta en un hilo."""
+        from app import workspace as _ws
         action = (msg.get("type") or "").split(":", 1)[1]
         rid = msg.get("req_id")
-        data: dict = {}
-        try:
-            if action == "get":
-                data = {"folders": db.get_folders(), "conversations": db.get_conversations()}
-            elif action == "files_get":
-                data = {"files": db.get_files(
-                    conversation_id=msg.get("conversation_id", "__all__"),
-                    favorites_only=bool(msg.get("favorites_only", False)))}
-            elif action == "file_favorite":
-                db.set_file_favorite(msg["file_id"], bool(msg.get("favorite", True)))
-                data = {"ok": True}
-            elif action == "file_delete":
-                db.delete_file(msg["file_id"])
-                data = {"ok": True}
-            elif action == "conv_files_cleanup":
-                db.cleanup_conversation_files(msg.get("conversation_id"))
-                data = {"ok": True}
-            elif action == "google_status":
-                from app import google_suite as _g
-                data = _g.google_status()
-            elif action == "google_connect":
-                from app import google_suite as _g
-                loop = asyncio.get_running_loop()
-                data = await loop.run_in_executor(None, _g.google_connect)
-            elif action == "google_disconnect":
-                from app import google_suite as _g
-                data = _g.google_disconnect()
-            elif action == "folder_create":
-                data = {"id": db.create_folder(
-                    msg.get("name", ""), msg.get("parent_id"), msg.get("color"),
-                    msg.get("context", ""), msg.get("default_model"))}
-            elif action == "folder_update":
-                db.update_folder(msg["id"], **{k: msg[k] for k in
-                    ("name", "parent_id", "color", "context", "default_model", "position")
-                    if k in msg})
-                data = {"ok": True}
-            elif action == "folder_delete":
-                db.delete_folder(msg["id"])
-                data = {"ok": True}
-            elif action == "conv_move":
-                db.move_conversation(msg["conv_id"], msg.get("folder_id"))
-                data = {"ok": True}
-            elif action == "conv_color":
-                db.set_conversation_color(msg["conv_id"], msg.get("color"))
-                data = {"ok": True}
-            else:
-                data = {"error": f"acción desconocida: {action}"}
-        except Exception as e:
-            data = {"error": f"{type(e).__name__}: {e}"}
+        if action == "google_connect":
+            from app import google_suite as _g
+            loop = asyncio.get_running_loop()
+            data = await loop.run_in_executor(None, _g.google_connect)
+        else:
+            data = _ws.handle_sync(action, msg)
         try:
             # session_id obligatorio: el relay reenvía al cliente correcto por él.
             await ws.send(json.dumps({"type": "workspace:result",
