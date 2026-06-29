@@ -159,6 +159,8 @@ class RelayConnector:
         try:
             if action == "get":
                 data = {"folders": db.get_folders(), "conversations": db.get_conversations()}
+            elif action == "files_get":
+                data = {"files": db.get_files()}
             elif action == "folder_create":
                 data = {"id": db.create_folder(
                     msg.get("name", ""), msg.get("parent_id"), msg.get("color"),

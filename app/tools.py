@@ -12,6 +12,22 @@ _CACHE_TTL = 30  # segundos
 _CACHEABLE_TOOLS = frozenset({"system_info", "gpu_info", "memory_info"})
 
 
+import threading as _threading
+_exec_ctx = _threading.local()
+
+
+def set_exec_context(folder_id=None, conversation_id=None):
+    """A4: el agente fija aquí la carpeta/conversación activa antes de ejecutar
+    herramientas, para que los archivos generados se registren en su carpeta."""
+    _exec_ctx.folder_id = folder_id
+    _exec_ctx.conversation_id = conversation_id
+
+
+def get_exec_context():
+    return (getattr(_exec_ctx, "folder_id", None),
+            getattr(_exec_ctx, "conversation_id", None))
+
+
 def _cache_key(name: str, args: dict) -> str:
     return name + "|" + json.dumps(args, sort_keys=True)
 

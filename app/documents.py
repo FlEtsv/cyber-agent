@@ -108,12 +108,22 @@ def generate_document(content: str, filename: str = "documento", fmt: str = "pdf
     except Exception as exc:
         return {"ok": False, "error": str(exc), "fmt": fmt}
 
+    url = public_url_for(path)
+    # A4: registra el archivo en la carpeta/conversación activa del agente.
+    try:
+        from app.tools import get_exec_context
+        from app import database as _db
+        fld, conv = get_exec_context()
+        _db.register_file(path, name=fname, url=url, folder_id=fld, conversation_id=conv)
+    except Exception:
+        pass
+
     return {
         "ok": True,
         "fmt": fmt,
         "path": path,
         "filename": fname,
-        "url": public_url_for(path),
+        "url": url,
         "bytes": os.path.getsize(path),
     }
 

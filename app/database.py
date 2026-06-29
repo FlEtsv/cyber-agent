@@ -101,6 +101,16 @@ def init_db():
                 position INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now'))
             );
+            -- A4: archivos generados, asociados a carpeta/conversación.
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT NOT NULL,
+                name TEXT,
+                url TEXT,
+                folder_id INTEGER,
+                conversation_id INTEGER,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """)
         # Migración idempotente: columnas nuevas en conversations.
         cols = {r["name"] for r in c.execute("PRAGMA table_info(conversations)")}
@@ -235,6 +245,27 @@ def move_conversation(conv_id, folder_id):
 def set_conversation_color(conv_id, color):
     with get_conn() as c:
         c.execute("UPDATE conversations SET color=? WHERE id=?", (color, conv_id))
+
+
+def register_file(path, name=None, url=None, folder_id=None, conversation_id=None):
+    """A4: registra un archivo generado, asociado a una carpeta/conversación."""
+    try:
+        with get_conn() as c:
+            c.execute(
+                "INSERT INTO files (path, name, url, folder_id, conversation_id) VALUES (?,?,?,?,?)",
+                (str(path), name or os.path.basename(str(path)), url, folder_id, conversation_id))
+    except Exception:
+        pass
+
+
+def get_files(folder_id="__all__"):
+    with get_conn() as c:
+        if folder_id == "__all__":
+            rows = c.execute("SELECT * FROM files ORDER BY created_at DESC LIMIT 300")
+        else:
+            rows = c.execute(
+                "SELECT * FROM files WHERE folder_id IS ? ORDER BY created_at DESC", (folder_id,))
+        return [dict(r) for r in rows]
 
 
 def get_conversation_folder(conv_id):

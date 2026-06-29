@@ -507,6 +507,11 @@ class AgentWorker(QThread):
                     and self.model in (OLLAMA_MODEL, "auto")):
                 self.model = self._folder["default_model"]
                 self.reasoning.emit(f"📁 Carpeta «{self._folder['name']}» → modelo {self.model}")
+            try:
+                from app.tools import set_exec_context
+                set_exec_context(self._folder["id"] if self._folder else None, self.conversation_id)
+            except Exception:
+                pass
             from app.brain import is_mistral_model, is_fused, resolve_model
             if self.model in (OLLAMA_MODEL, "auto"):  # solo si no fue forzado manualmente
                 try:

@@ -101,6 +101,12 @@ class AgentRunner:
                 self.model = self._folder["default_model"]
                 self._q.put({"type": "reasoning",
                              "data": f"📁 Carpeta «{self._folder['name']}» → modelo {self.model}"})
+            try:
+                from app.tools import set_exec_context
+                set_exec_context(self._folder["id"] if self._folder else self.folder_id,
+                                 self.conversation_id)
+            except Exception:
+                pass
             from app.brain import is_mistral_model, is_fused, resolve_model
             if self.model in (OLLAMA_MODEL, "auto"):
                 try:
