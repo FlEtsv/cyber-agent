@@ -109,6 +109,7 @@ class RelayConnector:
                     self._ws = ws
                     backoff = _BACKOFF_INIT
                     log.info(f"[relay] Conectado a {self.ws_url}/host")
+                    await self._send_models(ws)
                     await self._handle_connection(ws)
             except Exception as e:
                 log.error(f"[relay] Error en conexión: {e}")
@@ -117,6 +118,26 @@ class RelayConnector:
                     log.info(f"[relay] Reintentando en {backoff}s...")
                     await asyncio.sleep(backoff)
                     backoff = min(backoff * 2, _BACKOFF_MAX)
+
+    async def _send_models(self, ws):
+        """Tras conectar, manda al relay la lista de modelos del PC para poblar el
+        selector de la web (el relay espera type:'models'). Sin esto el selector
+        del móvil aparece vacío."""
+        try:
+            models: list[str] = []
+            try:
+                async with __import__("httpx").AsyncClient(timeout=3) as c:
+                    r = await c.get("http://localhost:11434/api/tags")
+                    models = [m["name"] for m in r.json().get("models", [])]
+            except Exception:
+                pass
+            await ws.send(json.dumps({
+                "type": "models",
+                "models": models,
+                "active": OLLAMA_MODEL,
+            }))
+        except Exception as e:
+            log.error(f"[relay] No se pudieron enviar modelos: {e}")
 
     async def _handle_connection(self, ws):
         """Main loop: receive messages from relay, spawn runners."""
