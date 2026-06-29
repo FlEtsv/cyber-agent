@@ -55,7 +55,21 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > **Steve escribe aquí.** Los agentes leen esto primero en cada sesión.
 > Si hay texto aquí, tiene prioridad sobre todo el BACKLOG.
 
-*(todos los objetivos han sido implementados y movidos a OBJETIVOS IMPLEMENTADOS)*
+**OBJ-WEBPROD — La web como PRODUCTO PRINCIPAL (no extensión del relay).** (Steve, 2026-06-29)
+La web pasa a ser el agente principal de Steve: producto de primera clase, mobile-first,
+que comparte backend con el PC (modelo local + SQLite fuente de verdad) con el relay como
+cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → sección
+"WEB COMO PRODUCTO PRINCIPAL" (`WEBPROD-001..015`). Reglas que Steve fijó por chat:
+- Nuestro modelo se llama "**Modelo local**" en toda la UI.
+- Footer por respuesta: "¿Es útil?" (verde) + "Escalar a superior". Escalera reactiva
+  (la decide el usuario): programación → Codestral → Mistral Large; resto → Medium → Large.
+- Mistral creación + interpretación de imágenes.
+- Menú de gasto por mensaje (icono $ → modal con coste por tokens/€ individual y acumulado
+  mensual de todos los modelos).
+- Carpetas/categorías/proyectos con contexto; adjuntos por conversación (archivos/links/
+  scripts), favoritos que persisten aunque se borre la conversación.
+- Arreglar adjuntar imágenes (roto en web) y permitir adjuntos NO-imagen.
+- Suite Google con una implementación cómoda y usable.
 
         
     
@@ -175,6 +189,11 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 > Mover aquí desde EN PROGRESO al terminar.
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
+[claude] WEBPROD-001 — Web como producto único en `apps/web` (relay invisible; fin duplicación) — Commit: dc1449e — Fecha: 2026-06-29
+[claude] WEBPROD-002 — Identidad de producto PWA (manifest, sw v12, README) — Commit: 847256f — Fecha: 2026-06-29
+[claude] WEBPROD-003 — Modo offline parcial (chats/carpetas/archivos con PC apagado) — Commit: c470b7e — Fecha: 2026-06-29
+[claude] WEBPROD-004 — "Modelo local" + footer feedback/escalada reactiva — Commit: 9f45d7f — Fecha: 2026-06-29
+
 [claude] RELAY-BE-001+002+003 — Relay upgrade backend: modelos passthrough, buffer de sesión 50 msgs + endpoint history, ping/pong PC 15s — Commit: c392367 — Fecha: 2026-06-25
 [codex] RELAY-UI-001..005 — Frontend relay remoto: historial remoto/localStorage restaurable, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Validación: node --check relay/web/app.js + pytest 47/47 — Commit: 0ba9c1e — Fecha: 2026-06-25 07:45
 [codex] TEST-002 — Tests de integración relay mock PC↔relay↔cliente: estado PC offline, modelos, mensaje con modelo/session trust/permisos, aprobación y buffer de historial — Validación: pytest tests 49/49 — Commit: 60d8ce5 — Fecha: 2026-06-25 07:49
@@ -278,6 +297,31 @@ Ningún agente pide permisos, autorizaciones, confirmaciones de ejecución, conf
 |----|----|-------------|----------|--------|-----------|
 | GUI-001 | ✅ | Panel visual de catálogo de herramientas en la GUI desktop: lista por categoría con badge de riesgo, filtro, y link a manual | `app/widgets/tools_panel.py`, `app/widgets/main_window.py`, `app/styles.py` | codex | media |
 | GUI-002 | ✅ | Badges de categoría y riesgo en action rows del chat web/relay: icono de categoría + color por riesgo (alto=rojo, bajo=verde) | `app/web/static/app.js`, `relay/web/app.js`, `app/web/static/style.css`, `relay/web/style.css` | codex | media |
+
+---
+
+### 🌐 WEB COMO PRODUCTO PRINCIPAL — Desglose de OBJ-WEBPROD (Steve, 2026-06-29)
+
+> Dirigido por Steve por chat → tratado como aprobado (✅). Zona: Claude (web `apps/web/`,
+> backend `app/`, relay). Mobile-first. Commit por mejora.
+
+| ID | ✅ | Descripción | Archivos | Estado |
+|----|----|-------------|----------|--------|
+| WEBPROD-001 | ✅ | Web pasa a producto único en `apps/web` (relay = cable; fin de la duplicación `app/web/static`) | `apps/web/*`, `app/api/server.py`, `relay/main.py`, `relay/deploy.ps1`, `.gitignore` | HECHO `dc1449e` |
+| WEBPROD-002 | ✅ | Identidad de producto PWA (manifest id/scope/shortcuts, sw v12 cachea ui.js + fallback navegación, README) | `apps/web/manifest.json`, `apps/web/sw.js`, `apps/web/README.md` | HECHO `847256f` |
+| WEBPROD-003 | ✅ | Offline parcial: leer chats/carpetas/archivos con el PC apagado (cache localStorage + fallback) | `apps/web/app.js` | HECHO `c470b7e` |
+| WEBPROD-004 | ✅ | "Modelo local" en la UI + footer "¿Es útil?"/"Escalar" con escalera reactiva (prog→Codestral→Large; resto→Medium→Large) | `apps/web/app.js`, `apps/web/style.css` | HECHO `9f45d7f` |
+| WEBPROD-005 | ✅ | Mistral creación de imágenes accesible desde la web (backend `mistral_studio` ya genera FLUX; exponer en UI) | `apps/web/*`, `app/tools.py` | pendiente |
+| WEBPROD-006 | ✅ | Mistral interpretación de imágenes (visión Pixtral) sobre adjuntos | `app/brain.py`, `app/tools.py`, `apps/web/*` | pendiente |
+| WEBPROD-007 | ✅ | Web mobile-first "hecha y derecha" (responsive pro, gestos, layout móvil) | `apps/web/style.css`, `apps/web/index.html`, `apps/web/app.js` | pendiente |
+| WEBPROD-008 | ✅ | Improve total dentro de límites Cloud Run con coste mínimo (caché, compresión, min-instances) | `relay/main.py`, `relay/deploy.ps1`, `apps/web/sw.js` | pendiente |
+| WEBPROD-009 | ✅ | Menú de gasto por mensaje: icono $ → modal coste por tokens/€ individual + acumulado mensual de todos los modelos | `apps/web/app.js`, `apps/web/style.css`, `app/api/*`, `app/mistral_usage.py`, `app/local_usage.py` | pendiente |
+| WEBPROD-010 | ✅ | Carpetas/categorías/proyectos con contexto y modelo por defecto (terminar jerarquía y aplicación de contexto) | `app/database.py`, `app/api/*`, `apps/web/app.js` | pendiente |
+| WEBPROD-011 | ✅ | Adjuntos automáticos por conversación (archivos/links/scripts subidos o generados → archivos de esa conversación) | `app/database.py`, `app/api/*`, `apps/web/app.js`, `apps/web/ui.js` | pendiente |
+| WEBPROD-012 | ✅ | Favoritos: persistir adjuntos aunque se borre la conversación (flag favorite; al borrar conv, conservar favoritos) | `app/database.py`, `app/api/*`, `apps/web/*` | pendiente |
+| WEBPROD-013 | ✅ | BUG: adjuntar imágenes desde la web no funciona (no envía fotos) | `apps/web/app.js`, `apps/web/index.html` | pendiente |
+| WEBPROD-014 | ✅ | Adjuntar archivos NO-imagen (scripts, docs, pdf, csv…) desde la web | `apps/web/app.js`, `apps/web/index.html`, `app/api/*` | pendiente |
+| WEBPROD-015 | ✅ | Suite Google: implementación cómoda y usable (conexión OAuth fácil + acciones Gmail/Drive/Calendar desde la UI) | `app/google_suite.py`, `app/tools.py`, `apps/web/*` | pendiente |
 
 ---
 
