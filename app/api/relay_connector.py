@@ -142,10 +142,49 @@ class RelayConnector:
                     await self._handle_resume_session(ws, msg)
                 elif msg_type == "ping":
                     await ws.send(json.dumps({"type": "pong"}))
+                elif msg_type and msg_type.startswith("workspace:"):
+                    await self._handle_workspace(ws, msg)
         except Exception as e:
             log.error(f"[relay] Error en conexión: {e}")
         finally:
             self._stop_all_runners()
+
+    async def _handle_workspace(self, ws, msg: dict):
+        """CRUD de carpetas/conversaciones del workspace (web→relay→host→SQLite).
+        El backend (SQLite del PC) es la fuente de verdad sincronizada."""
+        from app import database as db
+        action = (msg.get("type") or "").split(":", 1)[1]
+        rid = msg.get("req_id")
+        data: dict = {}
+        try:
+            if action == "get":
+                data = {"folders": db.get_folders(), "conversations": db.get_conversations()}
+            elif action == "folder_create":
+                data = {"id": db.create_folder(
+                    msg.get("name", ""), msg.get("parent_id"), msg.get("color"),
+                    msg.get("context", ""), msg.get("default_model"))}
+            elif action == "folder_update":
+                db.update_folder(msg["id"], **{k: msg[k] for k in
+                    ("name", "parent_id", "color", "context", "default_model", "position")
+                    if k in msg})
+                data = {"ok": True}
+            elif action == "folder_delete":
+                db.delete_folder(msg["id"]); data = {"ok": True}
+            elif action == "conv_move":
+                db.move_conversation(msg["conv_id"], msg.get("folder_id")); data = {"ok": True}
+            elif action == "conv_color":
+                db.set_conversation_color(msg["conv_id"], msg.get("color")); data = {"ok": True}
+            else:
+                data = {"error": f"acción desconocida: {action}"}
+        except Exception as e:
+            data = {"error": f"{type(e).__name__}: {e}"}
+        try:
+            # session_id obligatorio: el relay reenvía al cliente correcto por él.
+            await ws.send(json.dumps({"type": "workspace:result",
+                                      "session_id": msg.get("session_id"),
+                                      "req_id": rid, "action": action, **data}))
+        except Exception:
+            pass
 
     async def _handle_message(self, ws, msg: dict):
         """Procesa un mensaje del usuario (web→relay→host): corre el agente y

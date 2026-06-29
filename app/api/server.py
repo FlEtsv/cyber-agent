@@ -741,6 +741,18 @@ def start_server(port: int = 8765):
     import uvicorn
     cfg = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
     srv = uvicorn.Server(cfg)
-    t   = threading.Thread(target=srv.run, daemon=True, name="cyberagent-api")
+
+    def _run():
+        try:
+            srv.run()
+        except Exception as e:
+            # Bajo pythonw el stderr se pierde: registramos el fallo real del server.
+            try:
+                from app.agent_log import log_exception
+                log_exception("api_server", f"uvicorn murió en :{port}: {e}")
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_run, daemon=True, name="cyberagent-api")
     t.start()
     return srv
