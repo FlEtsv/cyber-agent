@@ -944,10 +944,23 @@ def threat_intel(indicator: str, kind: str = "auto") -> dict:
             return {"ok": True, "source": "virustotal", "indicator": ind, "kind": kind,
                     "malicious": stats.get("malicious"), "suspicious": stats.get("suspicious"),
                     "harmless": stats.get("harmless"), "stats": stats}
+        # Fallback SIN key: GreyNoise Community (solo IPs, rate-limited, gratis).
+        if kind == "ip":
+            r = httpx.get(f"https://api.greynoise.io/v3/community/{ind}", timeout=15)
+            if r.status_code == 200:
+                d = r.json()
+                return {"ok": True, "source": "greynoise-community", "indicator": ind,
+                        "noise": d.get("noise"), "riot": d.get("riot"),
+                        "classification": d.get("classification"), "name": d.get("name"),
+                        "last_seen": d.get("last_seen"), "note": "sin key (GreyNoise community)"}
+            if r.status_code == 404:
+                return {"ok": True, "source": "greynoise-community", "indicator": ind,
+                        "classification": "unknown", "note": "IP no observada por GreyNoise"}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
-    return {"ok": False, "error": "falta API key (VIRUSTOTAL_API_KEY o ABUSEIPDB_API_KEY). "
-            "Ambas tienen plan gratuito."}
+    return {"ok": False, "error": "Para hash/dominio/URL falta API key "
+            "(VIRUSTOTAL_API_KEY o ABUSEIPDB_API_KEY, ambas con plan gratuito). "
+            "Las IPs ya funcionan sin key vía GreyNoise."}
 
 
 def yara_scan(path: str, rules: str) -> dict:
