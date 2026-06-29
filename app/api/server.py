@@ -516,6 +516,15 @@ async def websocket_chat(ws: WebSocket):
                     if descs:
                         content += "\n\n[Imágenes compartidas]\n" + "\n\n---\n\n".join(descs)
 
+                # WEBPROD-014/011: adjuntos NO-imagen (scripts/docs/pdf/csv…).
+                files = data.get("files") or []
+                if files:
+                    try:
+                        from app.attachments import process_attachments
+                        content += process_attachments(files)
+                    except Exception as e:
+                        content += f"\n\n[archivo adjunto — error: {e}]"
+
                 if not content:
                     continue
 

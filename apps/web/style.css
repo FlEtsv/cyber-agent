@@ -1112,6 +1112,24 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
   border: 1px solid var(--accent-line, #2a3850); border-radius: 999px;
 }
 
+/* ═══ Adjuntos no-imagen (chips de archivo) ═══ */
+.attachment-file {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 220px; padding: 5px 8px 5px 10px; border-radius: 8px;
+  background: var(--surface-2, #161b22); border: 1px solid var(--border, #2a313b);
+  font-size: 12.5px; color: var(--text, #e6edf3);
+}
+.attachment-file-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.msg-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.msg-file-chip {
+  display: inline-flex; align-items: center; font-size: 12px;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-soft, rgba(80,120,200,.10));
+  border: 1px solid var(--accent-line, #2a3850); color: var(--text-dim, #9aa6b2);
+}
+
 /* ═══ Anti-zoom móvil (iOS hace zoom al enfocar inputs <16px y por doble-tap) ═══ */
 html { touch-action: manipulation; }
 @media (max-width: 640px) {

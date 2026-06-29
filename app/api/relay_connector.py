@@ -213,6 +213,18 @@ class RelayConnector:
                 content = (content + await describe_images(images)).strip()
             except Exception as e:
                 content = (content + f"\n\n[imagen adjunta — error de visión: {e}]").strip()
+
+        # WEBPROD-014/011: adjuntos NO-imagen (scripts/docs/pdf/csv…) → contenido en el
+        # prompt + registro como archivo de la conversación.
+        files = msg.get("files") or []
+        if files:
+            try:
+                from app.attachments import process_attachments
+                content = (content + process_attachments(
+                    files, conversation_id=session_id, folder_id=msg.get("folder_id"))).strip()
+            except Exception as e:
+                content = (content + f"\n\n[archivo adjunto — error: {e}]").strip()
+
         if not content:
             return
 

@@ -77,6 +77,7 @@ class CyberAgent {
     this.ws            = null;
     this.streaming     = false;
     this.attachedImgs  = [];
+    this.attachedFiles = [];   // WEBPROD-014: adjuntos no-imagen (scripts/docs/pdf…)
     this.toolRows      = new Map();
     this.currentBubble = null;
     this.pendingApproval = null;
@@ -447,7 +448,7 @@ class CyberAgent {
 
   send() {
     const text = this.inputEl.value.trim();
-    if ((!text && this.attachedImgs.length === 0) || this.streaming) return;
+    if ((!text && this.attachedImgs.length === 0 && this.attachedFiles.length === 0) || this.streaming) return;
     if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
       this._setConnectionState('offline', this.pcOnline ? 'reconectando...' : 'PC offline',
         this.pcOnline ? 'Esperando reconexion con el relay.' : 'El PC principal no esta conectado al relay.', true);
@@ -459,7 +460,8 @@ class CyberAgent {
     const priorHistory = this._historyForRelay();
 
     this._beginStreaming();
-    this._addUserBubble(text, this.attachedImgs.map(i => i.dataUrl));
+    this._addUserBubble(text, this.attachedImgs.map(i => i.dataUrl),
+                        { files: this.attachedFiles.map(f => f.name) });
 
     // Para el footer de feedback/escalada: recordamos el ultimo prompt, si es de
     // programacion y con que modelo se respondio (vacio = modelo local).
@@ -473,6 +475,7 @@ class CyberAgent {
       content:       text,
       history:       priorHistory,
       images:        this.attachedImgs.map(i => i.b64),
+      files:         this.attachedFiles.length ? this.attachedFiles : undefined,
       session_trust: this.sessionTrust,
       permissions:   this.permissions,
       model:         this.selectedModel || undefined,
@@ -528,6 +531,14 @@ class CyberAgent {
       content.className = 'msg-content';
       content.innerHTML = renderMd(text);
       body.appendChild(content);
+    }
+
+    const fnames = opts.files || [];
+    if (fnames.length) {
+      const row = document.createElement('div');
+      row.className = 'msg-files';
+      row.innerHTML = fnames.map(n => `<span class="msg-file-chip">📎 ${escHtml(n)}</span>`).join('');
+      body.appendChild(row);
     }
 
     wrap.appendChild(avatar);
@@ -1524,19 +1535,86 @@ class CyberAgent {
     this.attachEl.appendChild(thumb);
   }
 
+  // Acepta cualquier mezcla de archivos: imágenes → galería; resto → adjuntos.
   _attachFiles(files) {
-    Array.from(files || [])
-      .filter(file => file.type?.startsWith('image/'))
-      .slice(0, Math.max(0, 4 - this.attachedImgs.length))
-      .forEach(file => {
+    Array.from(files || []).forEach(file => {
+      if (file.type?.startsWith('image/')) {
+        if (this.attachedImgs.length >= 4) return;
         const reader = new FileReader();
         reader.onload = ev => this._attachImage(ev.target.result);
         reader.readAsDataURL(file);
-      });
+      } else {
+        this._attachDocFile(file);
+      }
+    });
+  }
+
+  // WEBPROD-014: abrir selector de archivos (cualquier tipo).
+  openFilePicker() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.onchange = e => this._attachFiles(e.target.files);
+    input.click();
+  }
+
+  _isTextFile(file) {
+    const type = (file.type || '').toLowerCase();
+    if (type.startsWith('text/')) return true;
+    if (/(json|xml|javascript|x-sh|x-python|csv|yaml|toml|markdown|sql)/.test(type)) return true;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    return ['txt','md','markdown','csv','tsv','json','yaml','yml','xml','html','htm',
+            'css','js','mjs','cjs','ts','tsx','jsx','vue','svelte','py','java','c','h',
+            'cpp','hpp','cc','cs','go','rs','rb','php','sh','bash','zsh','ps1','bat','cmd',
+            'sql','log','ini','toml','conf','cfg','env','gradle','dockerfile','makefile',
+            'make','r','swift','kt','lua','pl','rs'].includes(ext);
+  }
+
+  _attachDocFile(file) {
+    if (this.attachedFiles.length >= 6) {
+      this._setStatus('error', 'máximo 6 archivos');
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      this._setStatus('error', `"${file.name}" supera 12 MB`);
+      return;
+    }
+    const isText = this._isTextFile(file);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const entry = isText
+        ? { name: file.name, kind: 'text', text: ev.target.result }
+        : { name: file.name, kind: 'binary', b64: ev.target.result };
+      this.attachedFiles.push(entry);
+      this._renderFileChip(entry);
+    };
+    if (isText) reader.readAsText(file);
+    else reader.readAsDataURL(file);
+  }
+
+  _renderFileChip(entry) {
+    const chip = document.createElement('div');
+    chip.className = 'attachment-file';
+    const icon = entry.kind === 'text' ? '📄' : '📎';
+    const label = document.createElement('span');
+    label.className = 'attachment-file-name';
+    label.textContent = `${icon} ${entry.name}`;
+    const rm = document.createElement('button');
+    rm.className = 'attachment-remove';
+    rm.textContent = 'x';
+    rm.onclick = () => {
+      const idx = this.attachedFiles.indexOf(entry);
+      if (idx > -1) this.attachedFiles.splice(idx, 1);
+      chip.remove();
+    };
+    chip.appendChild(label);
+    chip.appendChild(rm);
+    this.attachEl.appendChild(chip);
   }
 
   _resetAttachments() {
     this.attachedImgs = [];
+    this.attachedFiles = [];
     this.attachEl.innerHTML = '';
   }
 
@@ -1954,6 +2032,7 @@ class CyberAgent {
     });
 
     this.$('camera-btn').addEventListener('click', () => this.openCamera());
+    this.$('file-btn')?.addEventListener('click', () => this.openFilePicker());
     this.$('screen-btn').addEventListener('click', () => this.captureScreen());
     this.$('voice-btn').addEventListener('click',  () => this.toggleVoice());
   }
