@@ -168,6 +168,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 
 [codex] MISTRAL-ROUTE-006 — Auditar y corregir el fallo del selector web relay donde `mistral-large-latest` no llega al runner del PC y cae en modelo local; revisar diagnósticos de fallback y contexto local insuficiente — Archivos: `relay/web/app.js`, `relay/web/ui.js`, `relay/web/index.html`, `app/api/relay_connector.py`, `app/api/agent_runner.py`, `app/ollama_client.py`, tests — ⚠️ zona ajena: `app/api/*` y `app/ollama_client.py` por ruteo/model execution de Claude — Fecha: 2026-06-27 22:10
 
+
 ---
 
 ## ✅ COMPLETADO
@@ -193,6 +194,9 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 [claude] WEBPROD-002 — Identidad de producto PWA (manifest, sw v12, README) — Commit: 847256f — Fecha: 2026-06-29
 [claude] WEBPROD-003 — Modo offline parcial (chats/carpetas/archivos con PC apagado) — Commit: c470b7e — Fecha: 2026-06-29
 [claude] WEBPROD-004 — "Modelo local" + footer feedback/escalada reactiva — Commit: 9f45d7f — Fecha: 2026-06-29
+[claude] WEBPROD-013+006 — Fix adjuntar imágenes desde la web (el relay las descartaba) + visión local→Pixtral (`app/vision.py`) — Commit: 43ba89b — Fecha: 2026-06-29
+[claude] WEBPROD-014 — Adjuntar archivos NO-imagen (`app/attachments.py`, botón clip, drag&drop mixto) — Commit: fdddfdc — Fecha: 2026-06-29
+[claude] WEBPROD-011+012 — Backend adjuntos por conversación + favoritos persistentes (DB+protocolo+tests) — Commit: db7d59a — Fecha: 2026-06-29
 
 [claude] RELAY-BE-001+002+003 — Relay upgrade backend: modelos passthrough, buffer de sesión 50 msgs + endpoint history, ping/pong PC 15s — Commit: c392367 — Fecha: 2026-06-25
 [codex] RELAY-UI-001..005 — Frontend relay remoto: historial remoto/localStorage restaurable, panel de ajustes con modelo/session trust/permisos, badge de cola GPU, watch mode y drag & drop de imágenes — Validación: node --check relay/web/app.js + pytest 47/47 — Commit: 0ba9c1e — Fecha: 2026-06-25 07:45
@@ -312,16 +316,17 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 | WEBPROD-003 | ✅ | Offline parcial: leer chats/carpetas/archivos con el PC apagado (cache localStorage + fallback) | `apps/web/app.js` | HECHO `c470b7e` |
 | WEBPROD-004 | ✅ | "Modelo local" en la UI + footer "¿Es útil?"/"Escalar" con escalera reactiva (prog→Codestral→Large; resto→Medium→Large) | `apps/web/app.js`, `apps/web/style.css` | HECHO `9f45d7f` |
 | WEBPROD-005 | ✅ | Mistral creación de imágenes accesible desde la web (backend `mistral_studio` ya genera FLUX; exponer en UI) | `apps/web/*`, `app/tools.py` | pendiente |
-| WEBPROD-006 | ✅ | Mistral interpretación de imágenes (visión Pixtral) sobre adjuntos | `app/brain.py`, `app/tools.py`, `apps/web/*` | pendiente |
+| WEBPROD-006 | ✅ | Mistral interpretación de imágenes (visión Pixtral) sobre adjuntos | `app/vision.py`, `app/api/*` | HECHO `43ba89b` (visión local→Pixtral) |
 | WEBPROD-007 | ✅ | Web mobile-first "hecha y derecha" (responsive pro, gestos, layout móvil) | `apps/web/style.css`, `apps/web/index.html`, `apps/web/app.js` | pendiente |
 | WEBPROD-008 | ✅ | Improve total dentro de límites Cloud Run con coste mínimo (caché, compresión, min-instances) | `relay/main.py`, `relay/deploy.ps1`, `apps/web/sw.js` | pendiente |
 | WEBPROD-009 | ✅ | Menú de gasto por mensaje: icono $ → modal coste por tokens/€ individual + acumulado mensual de todos los modelos | `apps/web/app.js`, `apps/web/style.css`, `app/api/*`, `app/mistral_usage.py`, `app/local_usage.py` | pendiente |
 | WEBPROD-010 | ✅ | Carpetas/categorías/proyectos con contexto y modelo por defecto (terminar jerarquía y aplicación de contexto) | `app/database.py`, `app/api/*`, `apps/web/app.js` | pendiente |
-| WEBPROD-011 | ✅ | Adjuntos automáticos por conversación (archivos/links/scripts subidos o generados → archivos de esa conversación) | `app/database.py`, `app/api/*`, `apps/web/app.js`, `apps/web/ui.js` | pendiente |
-| WEBPROD-012 | ✅ | Favoritos: persistir adjuntos aunque se borre la conversación (flag favorite; al borrar conv, conservar favoritos) | `app/database.py`, `app/api/*`, `apps/web/*` | pendiente |
-| WEBPROD-013 | ✅ | BUG: adjuntar imágenes desde la web no funciona (no envía fotos) | `apps/web/app.js`, `apps/web/index.html` | pendiente |
-| WEBPROD-014 | ✅ | Adjuntar archivos NO-imagen (scripts, docs, pdf, csv…) desde la web | `apps/web/app.js`, `apps/web/index.html`, `app/api/*` | pendiente |
+| WEBPROD-011 | ✅ | Adjuntos automáticos por conversación (archivos/links/scripts subidos o generados → archivos de esa conversación) | `app/database.py`, `app/attachments.py`, `app/api/*`, `apps/web/app.js` | BACKEND HECHO `db7d59a` (falta vista Archivos por conversación en ui.js) |
+| WEBPROD-012 | ✅ | Favoritos: persistir adjuntos aunque se borre la conversación (flag favorite; al borrar conv, conservar favoritos) | `app/database.py`, `app/api/*`, `apps/web/*` | BACKEND HECHO `db7d59a` (falta ⭐ en la vista Archivos) |
+| WEBPROD-013 | ✅ | BUG: adjuntar imágenes desde la web no funciona (no envía fotos) | `app/vision.py`, `app/api/relay_connector.py` | HECHO `43ba89b` (relay descartaba las imágenes) |
+| WEBPROD-014 | ✅ | Adjuntar archivos NO-imagen (scripts, docs, pdf, csv…) desde la web | `app/attachments.py`, `apps/web/*`, `app/api/*` | HECHO `fdddfdc` |
 | WEBPROD-015 | ✅ | Suite Google: implementación cómoda y usable (conexión OAuth fácil + acciones Gmail/Drive/Calendar desde la UI) | `app/google_suite.py`, `app/tools.py`, `apps/web/*` | pendiente |
+| WEBPROD-016 | ✅ | Integración con Google Apps Script para controlar emails y el ecosistema Google. **LA ÚLTIMA**: requiere interacción de Steve (autorizar script, desplegar webapp) | `app/*`, `apps/web/*`, `relay/apps_script_email_code.gs` | pendiente (última, necesita Steve) |
 
 ---
 
