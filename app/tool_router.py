@@ -74,6 +74,9 @@ CATEGORIES: dict[str, set[str]] = {
     # Base de conocimiento vectorial interna del agente
     "rag":       {"rag_search", "rag_add"},
     "council":   {"mistral_consult"},
+    # Google Workspace: Gmail, Drive, Calendar (leer/buscar/enviar)
+    "google":    {"gmail_search", "gmail_read", "gmail_send",
+                  "gdrive_search", "gdrive_read", "gcalendar_events"},
     # Auto-inspección y reinicio del propio agente
     "self":      {"list_self_files", "syntax_check", "restart_self"},
 }
@@ -144,6 +147,10 @@ _KW: dict[str, set[str]] = {
                   "portapapeles","clipboard","credencial","credential","abrir",
                   "open","browser","naveg","formulario","form","hotkey","atajo"},
     "media":     {"notificaci","notification","notifica","avisa"},
+    "google":    {"gmail","correo","email","e-mail","bandeja","inbox","drive",
+                  "google drive","documento de google","hoja de cálculo","sheet",
+                  "calendario","calendar","evento","agenda google","cita","reunión",
+                  "mis correos","leer correo","envía un correo","manda un correo"},
     "rag":       {"recuerda","remember","aprende","learn","conocimiento",
                   "knowledge","rag","guardar conocimiento","base de datos","vectorial"},
     "self":      {"código propio","tu código","modif","repair","mejora",
@@ -202,6 +209,7 @@ código en la nube, generación de imágenes; o delegar una subtarea al modelo l
 - devtools: git (commit/push/clone/diff), leer documentos del usuario (PDF/Excel/Word/CSV), \
 navegador headless real para webs con JavaScript/SPA/login/formularios
 - automation: agendar tareas autónomas (cada N tiempo, a una hora, o al cambiar un archivo)
+- google: Gmail, Google Drive y Calendar — leer/buscar correos, archivos y eventos; enviar correo
 - self: listar, verificar sintaxis o reiniciar el propio agente
 
 REGLAS DE DESAMBIGUACIÓN:

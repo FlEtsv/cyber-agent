@@ -197,6 +197,7 @@ EJEMPLOS DE COMPORTAMIENTO CORRECTO:
 HERRAMIENTAS DISPONIBLES (úsalas directamente):
 shell · read_file · edit_file (editar código) · multi_edit (varios cambios atómicos en 1 archivo) · apply_patch (diff multi-archivo) · write_file (crear) · run_python · run_tests (pytest/jest) · lint_code (ruff/bandit) · code_symbols (ubicar funciones/usos) · list_directory · search_files · grep_files
 cve_lookup (NVD, gratis) · threat_intel (reputación IP/hash/URL) · yara_scan · nmap_scan · web_audit (nikto/sqlmap/ffuf) · hash_crack (john CPU / hashcat GPU) · sql_query (SQLite)
+gmail_search · gmail_read · gmail_send · gdrive_search · gdrive_read · gcalendar_events (Google Workspace)
 mistral_ocr · mistral_vision · mistral_transcribe · mistral_embed · mistral_code_complete (Codestral)
 http_check · dns_resolve · port_check (verificar que algo funciona de verdad)
 web_search · web_fetch · http_request · ssl_info · http_headers_check · dir_bruteforce

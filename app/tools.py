@@ -914,6 +914,54 @@ TOOLS_SCHEMA = [
         }, "required": ["db_path", "query"]}
     }},
     {"type": "function", "function": {
+        "name": "gmail_search",
+        "description": "Busca correos en Gmail (sintaxis Gmail: 'from:jefe is:unread newer_than:7d'). "
+                       "Devuelve remitente/asunto/fecha/snippet e id para leer con gmail_read.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Consulta estilo Gmail"},
+            "max_results": {"type": "integer", "description": "Máx correos (default 10)"},
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "gmail_read",
+        "description": "Lee el cuerpo completo de un correo por su id (obtenido de gmail_search).",
+        "parameters": {"type": "object", "properties": {
+            "message_id": {"type": "string", "description": "ID del mensaje"},
+        }, "required": ["message_id"]}
+    }},
+    {"type": "function", "function": {
+        "name": "gmail_send",
+        "description": "Envía un correo desde tu cuenta de Gmail (acción sensible: pide aprobación).",
+        "parameters": {"type": "object", "properties": {
+            "to": {"type": "string", "description": "Destinatario"},
+            "subject": {"type": "string", "description": "Asunto"},
+            "body": {"type": "string", "description": "Cuerpo del mensaje"},
+        }, "required": ["to", "subject", "body"]}
+    }},
+    {"type": "function", "function": {
+        "name": "gdrive_search",
+        "description": "Busca archivos en Google Drive (texto libre o sintaxis Drive 'name contains x').",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Texto o consulta Drive"},
+            "max_results": {"type": "integer", "description": "Máx resultados (default 10)"},
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
+        "name": "gdrive_read",
+        "description": "Lee el contenido de un archivo de Drive por id (exporta Docs/Sheets a texto).",
+        "parameters": {"type": "object", "properties": {
+            "file_id": {"type": "string", "description": "ID del archivo en Drive"},
+        }, "required": ["file_id"]}
+    }},
+    {"type": "function", "function": {
+        "name": "gcalendar_events",
+        "description": "Lista los próximos eventos de tu Google Calendar (siguientes `days` días).",
+        "parameters": {"type": "object", "properties": {
+            "days": {"type": "integer", "description": "Ventana en días (default 7)"},
+            "max_results": {"type": "integer", "description": "Máx eventos (default 10)"},
+        }, "required": []}
+    }},
+    {"type": "function", "function": {
         "name": "todo_write",
         "description": "Mantiene una lista de tareas (TODOs) VISIBLE para el usuario durante tareas "
                        "largas o multi-paso. Llámala al planificar y cada vez que cambie el estado de un "
@@ -1007,7 +1055,7 @@ TOOLS_SCHEMA = [
 
 DANGEROUS_TOOLS = {"shell", "write_file", "edit_file", "multi_edit", "run_python", "install_package",
                    "uninstall_package", "kill_process", "env_vars",
-                   "run_tests", "apply_patch"} | MOBILE_DANGEROUS
+                   "run_tests", "apply_patch", "gmail_send"} | MOBILE_DANGEROUS
 
 ACTIVE_SECURITY_TOOLS = {
     "port_scan", "dir_bruteforce", "ping_sweep", "banner_grab",
@@ -1390,6 +1438,16 @@ def execute_tool(name: str, args: dict) -> dict:
             "sql_query":            lambda: _ext().sql_query(
                                         args["db_path"], args["query"],
                                         bool(args.get("allow_write", False))),
+            "gmail_search":         lambda: _gsuite().gmail_search(
+                                        args.get("query", ""), int(args.get("max_results", 10))),
+            "gmail_read":           lambda: _gsuite().gmail_read(args["message_id"]),
+            "gmail_send":           lambda: _gsuite().gmail_send(
+                                        args["to"], args["subject"], args["body"]),
+            "gdrive_search":        lambda: _gsuite().gdrive_search(
+                                        args.get("query", ""), int(args.get("max_results", 10))),
+            "gdrive_read":          lambda: _gsuite().gdrive_read(args["file_id"]),
+            "gcalendar_events":     lambda: _gsuite().gcalendar_events(
+                                        int(args.get("max_results", 10)), int(args.get("days", 7))),
             "schedule_task":        lambda: _sched().add_task(
                                         args["name"], args["trigger"], args["action"],
                                         bool(args.get("notify", True)),
@@ -1496,6 +1554,12 @@ def _sched():
     """Import perezoso del programador de tareas."""
     from app import scheduler
     return scheduler
+
+
+def _gsuite():
+    """Import perezoso de la integración con Google Workspace."""
+    from app import google_suite
+    return google_suite
 
 
 def _mistral_studio(prompt: str, connectors: list | None = None,
