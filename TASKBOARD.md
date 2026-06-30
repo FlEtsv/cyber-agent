@@ -670,11 +670,11 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 
 | ID | Estado | Zona | Descripción | Archivos |
 |----|----|----|-------------|----------|
-| SEC-001 | ⬜ | claude | Estructura `app/security/` (esqueleto de módulos, todo no-op/flag SECURITY_ENABLED=False) + arranque opcional bajo el supervisor (6º servicio, apagado por defecto) | `app/security/__init__.py`, `app/supervisor.py` |
+| SEC-001 | ⭐ 2026-06-30 20:01 70% claude | claude | Estructura `app/security/` (esqueleto de módulos, todo no-op/flag SECURITY_ENABLED=False) + arranque opcional bajo el supervisor (6º servicio, apagado por defecto) | `app/security/__init__.py`, `app/supervisor.py` |
 | SEC-002 | ⬜ | claude | Vista **Seguridad** en la web (móvil): nav-item + `view-security` con sub-apartados (Cámaras · Eventos · Alertas · Autonomía · Apps) VISIBLES pero deshabilitados (badge "próximamente") | `apps/web/index.html`, `apps/web/app.js`, `apps/web/ui.js`, `apps/web/style.css` |
 | SEC-003 | ⬜ | claude | Sección **Seguridad** en la GUI de escritorio (PC), misma estructura, desactivada | `app/widgets/*` |
-| SEC-004 | ⬜ | claude | **Gestor de secretos LOCAL** (`app/secrets_vault.py`): cifra/guarda claves (2× Mistral, Telegram, HA, EVENT_TOKEN); revela en la web tras 2FA TOTP. Endpoint + UI en Ajustes | `app/secrets_vault.py`, `app/api/server.py`, `apps/web/*` |
-| SEC-005 | ⬜ | claude | **Telegram NOTIFICACIONES (ACTIVO)**: portar el bot del proyecto; CyberAgent emite por Telegram (tarea hecha, aprobación pendiente, alerta). Reusa TELEGRAM_BOT_TOKEN/CHAT_ID del vault | `app/security/telegram/`, integración con notificaciones existentes |
+| SEC-004 | ✅ 100% claude | claude | **Gestor de secretos LOCAL** (`app/secrets_vault.py`): cifra/guarda claves (2× Mistral, Telegram, HA, EVENT_TOKEN); revela en la web tras 2FA TOTP. Endpoint + UI en Ajustes | `app/secrets_vault.py`, `app/api/server.py`, `apps/web/*` |
+| SEC-005 | ⭐ 2026-06-30 20:01 60% claude | claude | **Telegram NOTIFICACIONES (ACTIVO)**: portar el bot del proyecto; CyberAgent emite por Telegram (tarea hecha, aprobación pendiente, alerta). Reusa TELEGRAM_BOT_TOKEN/CHAT_ID del vault | `app/security/telegram/`, integración con notificaciones existentes |
 | SEC-006 | ⬜ | * | **Tools Docker** para el agente: `docker_ps/start/stop/restart/logs/stats/compose_up/compose_down/run`. En DANGEROUS_TOOLS. Categoría router "docker" | `app/tools.py`, `app/tool_router.py`, `app/docker_tools.py` |
 | SEC-007 | ⬜ | * | **brain_bridge** + endpoint `/api/ext/chat` (compatible ApiAsistente) que corre nuestro agente; análisis de cámara → Mistral NUBE (Pixtral) | `app/security/brain_bridge.py`, `app/api/server.py` |
 | SEC-008 | ⬜ | * | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |

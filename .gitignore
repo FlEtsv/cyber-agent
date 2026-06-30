@@ -99,3 +99,7 @@ logs/watchdog.log
 relay/web_temp
 relay/test_server.py
 data/deployments.json
+
+# Gestor de secretos (NUNCA versionar)
+data/vault.enc
+data/.vault_key

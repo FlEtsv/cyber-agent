@@ -688,6 +688,16 @@ TOOLS_SCHEMA = [
         }, "required": ["op"]}
     }},
     {"type": "function", "function": {
+        "name": "telegram_notify",
+        "description": "Envía una notificación a Steve por Telegram (módulo de seguridad). Úsalo "
+                       "para avisar de que terminaste una tarea larga, que necesitas su atención, "
+                       "o de un evento importante, cuando no esté mirando la app.",
+        "parameters": {"type": "object", "properties": {
+            "title": {"type": "string", "description": "Título del aviso (corto)"},
+            "body": {"type": "string", "description": "Detalle (opcional)"},
+        }, "required": ["title"]}
+    }},
+    {"type": "function", "function": {
         "name": "deploy_app",
         "description": "Despliega y sirve REMOTAMENTE una app o script creado para el usuario y devuelve "
                        "una URL pública. Autodetecta el tipo: una web estática (HTML/CSS/JS) se sirve por el "
@@ -1461,6 +1471,8 @@ def execute_tool(name: str, args: dict) -> dict:
                                         args["prompt"],
                                         args.get("connectors"),
                                         args.get("model")),
+            "telegram_notify":      lambda: __import__("app.security.notify", fromlist=["notify"]).notify(
+                                       args.get("title", "CyberAgent"), args.get("body", "")),
             "deploy_app":           lambda: _deploy_app(args),
             "apps_script":          lambda: __import__("app.apps_script", fromlist=["run"]).run(
                                         args.get("op", ""),
