@@ -8,6 +8,7 @@ NOTA: El relay está expuesto a través de Cloudflare (Proxy DNS activado).
 """
 import asyncio, inspect, json, os, threading, time, logging
 from urllib.parse import quote
+import httpx
 import websockets
 
 from app.ollama_client import OLLAMA_MODEL
@@ -150,18 +151,47 @@ class RelayConnector:
         tras un redeploy del relay: el TCP sigue vivo por el balanceador pero el
         contenedor nuevo no nos tiene registrados → 'pc_online' falso para
         siempre). La cerramos para forzar la reconexión automática."""
+        loop = asyncio.get_event_loop()
+        ticks = 0
         try:
             while True:
                 await asyncio.sleep(10)
+                # a) Sin tráfico 45s → muerto/medio-abierto.
                 if time.time() - self._last_rx > 45:
                     log.warning("[relay] sin tráfico del relay 45s → cierro para reconectar")
-                    try:
-                        await ws.close()
-                    except Exception:
-                        pass
+                    await self._safe_close(ws)
                     return
+                # b) Cada ~30s, verifica por HTTP que la REVISIÓN ACTIVA del relay
+                #    de verdad nos ve. Tras un redeploy, el WebSocket puede quedar
+                #    fijado a la revisión vieja (sigue pingeando → (a) no salta)
+                #    mientras la nueva no nos tiene → pc_online falso eterno.
+                ticks += 1
+                if ticks % 3 == 0:
+                    sees = await loop.run_in_executor(None, self._relay_sees_us)
+                    if sees is False:
+                        log.warning("[relay] la revisión activa no nos ve → reconectando")
+                        await self._safe_close(ws)
+                        return
         except asyncio.CancelledError:
             pass
+
+    async def _safe_close(self, ws):
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+    def _relay_sees_us(self):
+        """GET HTTP a la revisión activa del relay: ¿nos tiene como host? Devuelve
+        True/False, o None si no es concluyente (cold start/error) para no forzar
+        reconexiones en falso."""
+        try:
+            r = httpx.get(f"{self.http_url}/api/status", timeout=6.0)
+            if r.status_code != 200:
+                return None
+            return bool(r.json().get("pc_online", False))
+        except Exception:
+            return None
 
     async def _handle_connection(self, ws):
         """Main loop: receive messages from relay, spawn runners."""
