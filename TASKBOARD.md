@@ -1221,7 +1221,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AS-01 | ⬜ | Config de comms en Ajustes (web/PC): temas, severidades por fuente, no-molestar, digest | `apps/web/*`, `app/widgets/*` |
 | AS-02 | ⬜ | Auth: solo admin ejecuta acciones; viewers solo ven (reutiliza 2FA/vault) | `app/comms/auth.py` |
 | AS-03 | ⬜ | Registro/auditoría de notificaciones enviadas y acciones ejecutadas | `app/comms/audit.py` |
-| AS-04 | ⬜ | Plantillas de mensaje por tipo (formato/emoji/campos) editables | `app/comms/templates.py` |
+| AS-04 | OK 100% claude | Plantillas de mensaje por tipo (formato/emoji/campos) editables | `app/comms/templates.py` |
 | AS-05 | ⬜ | Test de notificación (enviar de prueba a cada tema) desde la UI | `apps/web/*` |
 
 ---
