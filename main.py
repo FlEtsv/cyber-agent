@@ -121,6 +121,20 @@ def main():
             emoji = {True: "✅", False: "❌", None: "⏳"}
             lines = [f"{emoji.get(s.get('ok'),'⏳')} {s['service']}: {s.get('detail','')[:60]}"
                      for s in st.get("services", [])]
+            # H-02: estado del módulo de seguridad en el resumen del tray.
+            try:
+                from app.security import SECURITY_ENABLED
+                from app.security import notify as _sec_notify
+                from app.security import cameras_db as _cdb
+                sec_on = "activo" if SECURITY_ENABLED else "desactivado"
+                tg = "Telegram✓" if _sec_notify.available() else "Telegram✗"
+                try:
+                    ncam = _cdb.count()
+                except Exception:
+                    ncam = 0
+                lines.append(f"🛡️ seguridad: {sec_on} · {tg} · {ncam} cámara(s)")
+            except Exception:
+                pass
             return st.get("healthy"), "\n".join(lines) or "(supervisor iniciando)"
         except Exception as e:
             return None, f"sin datos: {e}"

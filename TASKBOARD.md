@@ -794,7 +794,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | H-01 | ✅ | claude | Sección Seguridad en la GUI, desactivada | `app/widgets/security_panel.py`, `app/widgets/main_window.py` |
-| H-02 | ⬜ | claude | Indicador de estado del módulo en el tray | `main.py` |
+| H-02 | OK 100% claude | claude | Indicador de estado del módulo en el tray | `main.py` |
 
 ### I · iOS (lo siguiente a atacar)
 | ID | E | Agente | Tarea | Archivos |
@@ -914,7 +914,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### T · Modelo de visión local rápido (+ nube)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| T-01 | ⬜ | claude | Evaluar VLM local ligero/rápido (Moondream2 ~1.8B vs Qwen2.5-VL 3B) para triage continuo | `docs/VISION_MODEL.md` |
+| T-01 | OK 100% claude | claude | Evaluar VLM local ligero/rápido (Moondream2 ~1.8B vs Qwen2.5-VL 3B) para triage continuo | `docs/VISION_MODEL.md` |
 | T-02 | ⬜ | claude | Integrar el VLM de triage (presencia/movimiento/¿persona o gato?) en Ollama | `app/security/vision_local.py` |
 | T-03 | ⬜ | claude | Análisis profundo bajo demanda a Mistral NUBE (Pixtral) cuando el triage dispara | `app/security/brain_bridge.py` |
 | T-04 | ⬜ | claude | Pipeline eficiente (frame sampling, no cada frame; cola; backpressure) | `app/security/vision_pipeline.py` |
@@ -942,7 +942,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | V-02 | ✅ | claude | Árbitro de GPU (broker): estado "GPU ocupada por usuario" consultable; seguridad lo respeta | `app/security/gpu_broker.py` |
 | V-03 | ✅ | claude | Router de visión: GPU libre→VLM local; GPU ocupada→Pixtral nube; amenaza→siempre nube | `app/security/vision_router.py` |
 | V-04 | ✅ | claude | Prioridad: la inferencia del usuario NUNCA espera por seguridad (seguridad degrada a nube) | `app/security/gpu_broker.py`, `app/ollama_client.py` |
-| V-05 | ⬜ | claude | Co-residencia: cerbero 24B Q3 (~11GB) + VLM triage (~2.5GB) caben juntos; validar VRAM real | `docs/VISION_MODEL.md` |
+| V-05 | OK 100% claude | claude | Co-residencia: cerbero 24B Q3 (~11GB) + VLM triage (~2.5GB) caben juntos; validar VRAM real | `docs/VISION_MODEL.md` |
 | V-06 | ✅ | claude | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
 | V-07 | ⬜ | claude | Métricas: cuánto se usó CPU vs GPU vs nube (coste/latencia) en el dashboard | `apps/web/*`, `app/security/*` |
 | V-08 | ✅ | claude | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
