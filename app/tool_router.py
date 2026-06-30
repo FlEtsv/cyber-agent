@@ -31,6 +31,8 @@ CATEGORIES: dict[str, set[str]] = {
     "studio":    {"mistral_studio", "local_llm_consult"},
     # Generación y entrega de documentos por URL + despliegue de apps/scripts
     "documents": {"generate_document", "serve_file", "deploy_app"},
+    # Gestión de contenedores Docker (incl. Home Assistant/comunicaciones)
+    "docker": {"docker"},
     # 2.0: git, lectura de documentos del usuario, navegador headless
     "devtools":  {"git_op", "read_document", "browse_page"},
     # 2.0: programación de tareas autónomas + mensajería saliente
@@ -118,6 +120,9 @@ _KW: dict[str, set[str]] = {
                   "interprete de codigo","code interpreter","ejecuta python en la nube",
                   "grafica","gráfica","calcula","últimas noticias","ultimas noticias",
                   "actualizado","tiempo real","fuentes","cita","citaciones"},
+    "docker": {"docker","contenedor","container","compose","imagen docker","levanta el contenedor",
+               "para el contenedor","reinicia el contenedor","home assistant","homeassistant","ha ",
+               "logs del contenedor","docker ps","docker run"},
     "documents": {"documento","pdf","informe","reporte","entrega","entregable",
                   "genera un pdf","genera documento","exporta","exportar","docx",
                   "enlace","link","url","descargar","sirve","servir","comparte",
