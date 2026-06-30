@@ -611,3 +611,73 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 - `CAFont`: monospaced, body, caption
 - `StatusDot(color:)`: Circle 8pt
 - `CAButton(label:action:style:)`: style enum (primary/danger/ghost)
+
+---
+
+# 🛡️ ÉPICO: MÓDULO DE SEGURIDAD (APiComuni v2 dentro de CyberAgent LLM)
+
+> **Dirección de Steve.** NO se fusionan repos: se construye una **v2 del sistema de
+> seguridad DENTRO de CyberAgent**, cogiendo lo puntero de `FlEtsv/APiComuni`
+> (telegram_centralita, ~8000 LOC) y reescribiéndolo con el estilo cyberllm.
+> **Main = CyberAgent LLM. APiComunicaciones pasa a ser `app/security/` (el módulo
+> de seguridad de CyberAgent).** El cerebro es nuestro modelo local; la centralita
+> son los sentidos/manos. Posible reparto con **Codex** → tareas discretas + zonas.
+
+## Decisiones de arquitectura (FIJAS)
+- **Cerebro:** CyberAgent local (`cyberagent-24b`) dirige todo. La IA externa de
+  APiComuni (`ApiAsistente:8082 → /api/ext/chat`) se **reemplaza** por nuestro agente.
+- **Cámaras/eventos = Mistral NUBE** (Pixtral) para reacción INSTANTÁNEA (el local
+  tiene latencia de carga/swap). El cerebro general sigue local. → split consciente.
+- **UI (web + PC):** sección **"Seguridad"** VISIBLE pero **DESACTIVADA** (apartados
+  conectados, sin funcionalidad todavía). Solo se ve, no opera.
+- **ACTIVO desde ya:** **Telegram como canal de NOTIFICACIÓN** (el MISMO bot del
+  proyecto — solo cambia el propósito). Es lo único que se implanta inmediato.
+- **Gestor de secretos LOCAL:** 2 claves Mistral (cyberagent + apicomunicaciones) +
+  tokens (Telegram, HA, EVENT_TOKEN, dashboard). Revelables en la web tras código
+  **authenticator (2FA)**. Reutilizable por todo el sistema.
+- **Docker management:** el agente debe poder **levantar/parar/dar recursos/gestionar**
+  contenedores (incluido el de HA que ya existe en el Docker local). "Docker = bomba
+  → posibilidades infinitas." Tools dedicadas + DANGEROUS_TOOLS.
+- **Conciencia del agente:** system prompt debe saber que hay 2 claves Mistral,
+  cámaras reales, Home Assistant y Docker local gestionable.
+- **QLoRA:** más adelante. El MVP solo debe **dejar el grifo de datos abierto**
+  (instrumentar decisiones/feedback para el futuro entrenamiento en RunPod).
+
+## Lo PUNTERO de APiComuni a portar (con estilo cyberllm)
+| Módulo origen | Función | Destino (estado) |
+|---|---|---|
+| `telegram_bot.py` (3187 LOC) | Bot, 2FA, viewers, chat IA, notif, teclados cámara | `app/security/telegram/` — **notif ACTIVA**, resto desactivado |
+| `motion_tracker.py` (1417) | Loop de cámara, snapshots, seguimiento | `app/security/motion.py` — desactivado |
+| `event_handler.py` + `event_store.py` | Orquestador de eventos + ring buffer | `app/security/events.py` — desactivado |
+| `camera_client.py` | RTSP / snapshot HA / clip ffmpeg | `app/security/camera.py` — desactivado |
+| `ai_client.py` | **SWAP** → llama a nuestro agente/Mistral nube | `app/security/brain_bridge.py` |
+| `autonomy.py` | Política manual/operativa/alto-impacto | mapea a nuestro sistema de **aprobaciones** |
+| `action_executor.py` | Ejecuta acciones (HA: luz/alarma/TTS) | `app/security/actions.py` — desactivado |
+| `dashboard_router.py` + templates | alertas/events/apps/learning | vista web **Seguridad** (apartados, desactivados) |
+| `app_registry.py`, `feedback_store.py`, `property_context.py` | apps, feedback, contexto propiedad | portar; feedback → training_store |
+| `docker-compose.yml` (centralita) | contenedor | el agente lo gestiona vía tools Docker |
+
+## TAREAS (zonas + estado · para reparto con Codex)
+
+| ID | Estado | Zona | Descripción | Archivos |
+|----|----|----|-------------|----------|
+| SEC-001 | ⬜ | claude | Estructura `app/security/` (esqueleto de módulos, todo no-op/flag SECURITY_ENABLED=False) + arranque opcional bajo el supervisor (6º servicio, apagado por defecto) | `app/security/__init__.py`, `app/supervisor.py` |
+| SEC-002 | ⬜ | claude | Vista **Seguridad** en la web (móvil): nav-item + `view-security` con sub-apartados (Cámaras · Eventos · Alertas · Autonomía · Apps) VISIBLES pero deshabilitados (badge "próximamente") | `apps/web/index.html`, `apps/web/app.js`, `apps/web/ui.js`, `apps/web/style.css` |
+| SEC-003 | ⬜ | claude | Sección **Seguridad** en la GUI de escritorio (PC), misma estructura, desactivada | `app/widgets/*` |
+| SEC-004 | ⬜ | claude | **Gestor de secretos LOCAL** (`app/secrets_vault.py`): cifra/guarda claves (2× Mistral, Telegram, HA, EVENT_TOKEN); revela en la web tras 2FA TOTP. Endpoint + UI en Ajustes | `app/secrets_vault.py`, `app/api/server.py`, `apps/web/*` |
+| SEC-005 | ⬜ | claude | **Telegram NOTIFICACIONES (ACTIVO)**: portar el bot del proyecto; CyberAgent emite por Telegram (tarea hecha, aprobación pendiente, alerta). Reusa TELEGRAM_BOT_TOKEN/CHAT_ID del vault | `app/security/telegram/`, integración con notificaciones existentes |
+| SEC-006 | ⬜ | * | **Tools Docker** para el agente: `docker_ps/start/stop/restart/logs/stats/compose_up/compose_down/run`. En DANGEROUS_TOOLS. Categoría router "docker" | `app/tools.py`, `app/tool_router.py`, `app/docker_tools.py` |
+| SEC-007 | ⬜ | * | **brain_bridge** + endpoint `/api/ext/chat` (compatible ApiAsistente) que corre nuestro agente; análisis de cámara → Mistral NUBE (Pixtral) | `app/security/brain_bridge.py`, `app/api/server.py` |
+| SEC-008 | ⬜ | * | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |
+| SEC-009 | ⬜ | * | Portar `event_handler`+`event_store`+`action_executor`+`autonomy` (DESACTIVADO); autonomía → mapear a aprobaciones | `app/security/events.py`, `actions.py` |
+| SEC-010 | ⬜ | * | **Conciencia del agente**: system prompt + tools docs reflejan 2 claves Mistral, cámaras, HA, Docker | `app/ollama_client.py` (system), schemas |
+| SEC-011 | ⬜ | * | **training_store** (grifo de datos QLoRA): captura decisión→resultado, feedback 👍/👎, aprobaciones, en formato instrucción/respuesta/señal | `app/training_store.py` |
+
+> **Reglas de reparto:** Claude toma SEC-001..005 (estructura + UI + secretos +
+> Telegram). Codex puede tomar SEC-006..011 (tools Docker, brain_bridge, portado de
+> módulos, training_store). Commit por tarea con `[claude]`/`[codex] tipo: desc`.
+> NADA se activa salvo Telegram-notif y el vault; el resto entra DESACTIVADO.
+
+## Lo que NO se rompe
+Agente, relay/móvil, modos (Claude/código/imagen), supervisor, persistencia, las 120
+tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED`.
