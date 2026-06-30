@@ -165,3 +165,28 @@ def enqueue(
 
 def queue_size() -> int:
     return _queue.qsize()
+
+
+class _SimpleRateLimiter:
+    """Token-bucket simple para acquire() sincrónico en notify.py."""
+    def __init__(self, chat_id):
+        self._chat_id = chat_id
+        self._lock = threading.Lock()
+
+    def acquire(self):
+        while not _can_send(self._chat_id):
+            time.sleep(0.1)
+        _mark_sent(self._chat_id)
+
+
+_limiters: dict[str, _SimpleRateLimiter] = {}
+_limiter_lock = threading.Lock()
+
+
+def get_limiter(chat_id: str | int) -> _SimpleRateLimiter:
+    """Obtener (o crear) un rate-limiter para un chat específico."""
+    key = str(chat_id)
+    with _limiter_lock:
+        if key not in _limiters:
+            _limiters[key] = _SimpleRateLimiter(chat_id)
+        return _limiters[key]

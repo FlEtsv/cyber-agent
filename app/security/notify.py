@@ -31,11 +31,20 @@ def available() -> bool:
 
 
 def send(text: str, chat_id: str | None = None, parse_mode: str = "HTML") -> dict:
-    """Envía un mensaje por Telegram. Devuelve {ok, ...}."""
+    """AQ-03: Envía un mensaje por Telegram con rate-limiting integrado."""
     token, default_chat = _cfg()
     chat = chat_id or default_chat
     if not token or not chat:
         return {"ok": False, "error": "Telegram no configurado (faltan token/chat_id en el vault)"}
+
+    # AQ-03: Respetar límites de Telegram con rate limiter
+    try:
+        from app.comms.rate_limiter import get_limiter
+        limiter = get_limiter(chat)
+        limiter.acquire()
+    except Exception:
+        pass
+
     try:
         r = httpx.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
@@ -43,6 +52,16 @@ def send(text: str, chat_id: str | None = None, parse_mode: str = "HTML") -> dic
                   "parse_mode": parse_mode, "disable_web_page_preview": True},
             timeout=15,
         )
+        if r.status_code == 429:
+            retry_after = r.json().get("parameters", {}).get("retry_after", 5)
+            import time
+            time.sleep(retry_after)
+            r = httpx.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat, "text": text[:4096],
+                      "parse_mode": parse_mode, "disable_web_page_preview": True},
+                timeout=15,
+            )
         ok = r.status_code == 200 and r.json().get("ok", False)
         return {"ok": ok, "status": r.status_code,
                 "error": None if ok else r.text[:200]}
