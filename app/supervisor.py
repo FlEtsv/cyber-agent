@@ -30,12 +30,16 @@ except Exception:  # pragma: no cover
 
 
 # ── utilidades ────────────────────────────────────────────────────────────────
-def _port_listening(port: int, host: str = "127.0.0.1", timeout: float = 1.5) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+def _port_listening(port: int, host: str = "127.0.0.1", timeout: float = 3.0) -> bool:
+    # Reintenta antes de declarar caído: durante una inferencia larga el server
+    # puede tardar en aceptar y daba FALSOS positivos → rebinds innecesarios.
+    for _ in range(3):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            time.sleep(0.6)
+    return False
 
 
 def _no_window():
@@ -195,6 +199,7 @@ class ConnectionService(_Service):
     def __init__(self):
         super().__init__()
         self._xcheck = 0
+        self._stale_streak = 0
 
     def check(self) -> tuple[bool, str]:
         api_up = _port_listening(8765)
@@ -203,13 +208,20 @@ class ConnectionService(_Service):
         if not rs["configured"]:
             return api_up, f"api:8765={'up' if api_up else 'DOWN'} · relay=sin-config"
         # ¿El conector cree estar conectado pero la revisión ACTIVA del relay no
-        # nos ve? (WebSocket fijado a una revisión muerta tras un redeploy). Lo
-        # comprobamos por HTTP cada ~45s (no en cada tick) y lo tratamos como fallo.
+        # nos ve? (fijado a revisión muerta). Lo comprobamos por HTTP cada ~45s y
+        # exigimos 2 detecciones SEGUIDAS antes de forzar (evita falsos por lag).
         stale = False
         if rs["connected"]:
             self._xcheck += 1
-            if self._xcheck % 3 == 0 and relay_remote_sees_us() is False:
-                stale = True
+            if self._xcheck % 3 == 0:
+                if relay_remote_sees_us() is False:
+                    self._stale_streak += 1
+                else:
+                    self._stale_streak = 0
+                if self._stale_streak >= 2:
+                    stale = True
+        else:
+            self._stale_streak = 0
         relay_ok = rs["connected"] and not stale
         ok = api_up and relay_ok
         txt = ("conectado" if relay_ok
