@@ -128,24 +128,46 @@ _LEVEL_INTENT = {
 
 
 def _execute_level(cam_id: str, level: int) -> bool:
-    """Ejecuta el actuador correspondiente al nivel."""
+    """Ejecuta el actuador correspondiente al nivel (con límites legales AX-01..04)."""
     intent = _LEVEL_INTENT.get(level)
     if not intent:
         return False
+
+    # AX-01..04: verificar límites legales antes de disparar
+    try:
+        from app.security.legal_limits import check_and_record
+        check_result = check_and_record(cam_id, intent.value, level)
+        if not check_result["ok"]:
+            import logging
+            logging.getLogger(__name__).warning(
+                "deterrence: bloqueado por límites legales: %s", check_result["reason"]
+            )
+            return False
+    except Exception:
+        pass
+
+    # AX-03: incluir aviso legal en NARRATE
+    payload: dict = {}
+    if intent == Intent.NARRATE:
+        try:
+            from app.security.legal_limits import legal_notice_text
+            payload["text"] = legal_notice_text()
+        except Exception:
+            pass
 
     from app.security.actuators.registry import best_for
     actuator = best_for(cam_id, intent)
     if not actuator:
         return False
 
-    result = actuator.fire(intent)
+    result = actuator.fire(intent, payload)
     _record(cam_id, level, intent.value, result)
 
     state = get_state(cam_id)
     with _lock:
         state.level = level
-        state.active = result
-    return result
+        state.active = bool(result)
+    return bool(result)
 
 
 def _record(cam_id: str, level: int, action: str, success: bool):

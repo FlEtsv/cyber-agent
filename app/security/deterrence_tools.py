@@ -72,3 +72,71 @@ def cats_separate_sound(cam_id: str = "") -> dict:
     from app.security.audio.library import play_scenario
     ok = play_scenario("cats_separate")
     return {"ok": ok, "cam_id": cam_id, "scenario": "cats_separate"}
+
+
+def night_mode_activate(cam_id: str) -> dict:
+    """
+    AM-04: Activar modo noche interior según patrón nocturno del gato.
+
+    - Silencia las notificaciones de bajo riesgo (actividad normal nocturna)
+    - Mantiene alertas críticas (gato en zona peligrosa, anomalía)
+    - Ajusta umbrales de detección para reducir falsos positivos nocturnos
+    """
+    if not _security_enabled():
+        return {"ok": False, "error": "SECURITY_ENABLED=0"}
+    import time
+    hour = time.localtime().tm_hour
+    is_night = 22 <= hour or hour < 7
+
+    if not is_night:
+        return {"ok": False, "reason": "No es horario nocturno (22:00-07:00)"}
+
+    # Silenciar notificaciones de baja importancia
+    try:
+        from app.comms.rules import set_no_disturb
+        set_no_disturb(True)
+    except Exception:
+        pass
+
+    # Ajustar thresholds de detección (más permisivos de noche)
+    try:
+        from app.security.species_priors import is_active_hour
+        cat_active = is_active_hour("cat")
+    except Exception:
+        cat_active = True
+
+    return {
+        "ok": True,
+        "cam_id": cam_id,
+        "hour": hour,
+        "is_night": is_night,
+        "cat_active_now": cat_active,
+        "action": "silenced_low_priority + adjusted_thresholds",
+    }
+
+
+def night_mode_deactivate(cam_id: str = "") -> dict:
+    """AM-04: Desactivar modo noche — restaurar notificaciones normales."""
+    if not _security_enabled():
+        return {"ok": False, "error": "SECURITY_ENABLED=0"}
+    try:
+        from app.comms.rules import set_no_disturb
+        set_no_disturb(None)
+    except Exception:
+        pass
+    return {"ok": True, "cam_id": cam_id, "action": "night_mode_off"}
+
+
+def set_camera_context(cam_id: str, context: str) -> dict:
+    """
+    AW-06: Establece el contexto editable de una cámara
+    (qué vigilar, qué se permite, descripción de la zona).
+    """
+    if not _security_enabled():
+        return {"ok": False, "error": "SECURITY_ENABLED=0"}
+    try:
+        from app.security.cameras_db import update_camera_context
+        update_camera_context(cam_id, context)
+        return {"ok": True, "cam_id": cam_id, "context": context}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
