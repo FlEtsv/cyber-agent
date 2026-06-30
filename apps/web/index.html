@@ -273,6 +273,9 @@
         <button class="sec-tab" data-sec="autonomy">🤖 Autonomía</button>
         <button class="sec-tab" data-sec="apps">📦 Apps</button>
         <button class="sec-tab" data-sec="learning">🎓 Aprendizaje</button>
+        <button class="sec-tab" data-sec="recordings">📹 Grabaciones</button>
+        <button class="sec-tab" data-sec="heatmap">🗺️ Heatmap</button>
+        <button class="sec-tab" data-sec="comms">📨 Comms</button>
       </div>
 
       <!-- Panel: Telegram (ACTIVO) -->
@@ -440,6 +443,179 @@
             <div class="sec-stat-card"><span class="sec-stat-n" id="sl-feedback">—</span><span class="sec-stat-lbl">feedback</span></div>
           </div>
           <button class="mini-btn" id="sec-training-refresh" style="margin-top:12px">Actualizar</button>
+        </div>
+      </div>
+
+      <!-- O-01..O-06: Vista individual de cámara con IA en vivo (se muestra al hacer click en tarjeta) -->
+      <div class="sec-panel" id="sec-panel-cam-detail" style="display:none">
+        <div class="sec-panel-header">
+          <button class="mini-btn" id="cam-detail-back">← Volver</button>
+          <span class="sec-panel-ico">📷</span>
+          <div>
+            <div class="sec-panel-title" id="cam-detail-name">Cámara</div>
+            <div class="sec-panel-sub" id="cam-detail-meta">—</div>
+          </div>
+          <button class="mini-btn" id="cam-detail-record">⏺ Grabar</button>
+        </div>
+        <!-- O-01: Stream en vivo -->
+        <div class="cam-detail-stream">
+          <div class="cam-live-container">
+            <img id="cam-live-img" class="cam-live-img" src="" alt="Stream en vivo" style="display:none">
+            <div id="cam-live-placeholder" class="cam-live-placeholder">
+              <span>🎥 Conectando stream…</span>
+            </div>
+            <div class="cam-live-badge" id="cam-live-badge">● EN VIVO</div>
+          </div>
+          <!-- AJ-08: ¿Es Michi? confirmar/corregir -->
+          <div class="cam-cat-confirm" id="cam-cat-confirm" style="display:none">
+            <span class="cam-cat-question" id="cam-cat-question">¿Es Michi?</span>
+            <div class="cam-cat-actions">
+              <button class="mini-btn cam-cat-yes" id="cam-cat-yes">✓ Sí</button>
+              <button class="mini-btn cam-cat-no" id="cam-cat-no">✗ No</button>
+              <select class="settings-input cam-cat-select" id="cam-cat-select">
+                <option value="">¿Cuál es?</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <!-- O-02: Panel IA en vivo -->
+        <div class="cam-detail-ai">
+          <div class="cam-ai-header">Lo que la IA ve</div>
+          <div class="cam-ai-reasoning" id="cam-ai-reasoning">Esperando análisis…</div>
+          <div class="cam-ai-threat" id="cam-ai-threat"></div>
+        </div>
+        <!-- O-03: Lista de detecciones -->
+        <div class="cam-detail-detections">
+          <div class="cam-section-title">Detecciones recientes</div>
+          <div id="cam-detections-list" class="cam-detections-list"></div>
+        </div>
+        <!-- O-05: Línea de tiempo -->
+        <div class="cam-detail-timeline">
+          <div class="cam-section-title">Eventos de esta cámara</div>
+          <div id="cam-timeline-list" class="sec-timeline"></div>
+        </div>
+        <!-- Q-01..Q-05: Editor de zonas básico -->
+        <div class="cam-detail-zones">
+          <div class="cam-section-title">Zonas de vigilancia <button class="mini-btn" id="cam-zone-add">+ Zona</button></div>
+          <div id="cam-zones-list" class="cam-zones-list"></div>
+        </div>
+      </div>
+
+      <!-- P-03..P-08: Panel de grabaciones y reproductor -->
+      <div class="sec-panel" id="sec-panel-recordings">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">📹</span>
+          <div>
+            <div class="sec-panel-title">Grabaciones</div>
+            <div class="sec-panel-sub">Clips de video · retención 15 días · P-01+P-02 activos</div>
+          </div>
+          <select class="settings-input" id="rec-cam-filter" style="width:auto;max-width:150px">
+            <option value="">Todas las cámaras</option>
+          </select>
+        </div>
+        <div class="sec-panel-body">
+          <div id="recordings-list" class="recordings-list">
+            <div class="sec-cam-placeholder">Selecciona una cámara o activa SECURITY_ENABLED=1</div>
+          </div>
+          <!-- P-03: Reproductor de video -->
+          <div id="recording-player" class="recording-player" style="display:none">
+            <button class="mini-btn" id="rec-close-btn">✕ Cerrar</button>
+            <video id="rec-video" controls style="width:100%;border-radius:8px;background:#000"></video>
+            <div class="rec-player-meta" id="rec-player-meta"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AL-09: Heatmap de patrones de gatos -->
+      <div class="sec-panel" id="sec-panel-heatmap">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">🗺️</span>
+          <div>
+            <div class="sec-panel-title">Heatmap de patrones</div>
+            <div class="sec-panel-sub">Dónde van los gatos · rutas habituales · horarios por zona</div>
+          </div>
+          <select class="settings-input" id="heatmap-cat-select" style="width:auto;max-width:150px">
+            <option value="">Todos los gatos</option>
+          </select>
+        </div>
+        <div class="sec-panel-body">
+          <div class="heatmap-container">
+            <canvas id="heatmap-canvas" width="640" height="480" class="heatmap-canvas"></canvas>
+            <div class="heatmap-legend">
+              <div class="heatmap-legend-gradient"></div>
+              <div class="heatmap-legend-labels"><span>Poco</span><span>Mucho</span></div>
+            </div>
+          </div>
+          <!-- Horarios por zona (AL-04) -->
+          <div class="heatmap-schedules" id="heatmap-schedules">
+            <div class="cam-section-title">Horarios habituales</div>
+            <div id="heatmap-schedule-grid" class="heatmap-schedule-grid"></div>
+          </div>
+          <!-- Rutas comunes -->
+          <div class="heatmap-routes" id="heatmap-routes">
+            <div class="cam-section-title">Rutas más comunes</div>
+            <div id="heatmap-routes-list"></div>
+          </div>
+          <button class="mini-btn" id="heatmap-refresh" style="margin-top:12px">Actualizar datos</button>
+        </div>
+      </div>
+
+      <!-- AS-01..AS-05: Config de comunicaciones en Ajustes -->
+      <div class="sec-panel" id="sec-panel-comms">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">📨</span>
+          <div>
+            <div class="sec-panel-title">Comunicaciones</div>
+            <div class="sec-panel-sub">Canales · severidades · no-molestar · digest · test de notificación</div>
+          </div>
+        </div>
+        <div class="sec-panel-body">
+          <!-- AS-01: Config de temas/severidades -->
+          <div class="comms-section">
+            <div class="cam-section-title">Canales Telegram</div>
+            <div id="comms-channels-list" class="comms-channels-list">
+              <div class="comms-loading">Cargando…</div>
+            </div>
+          </div>
+          <!-- AS-02: No molestar -->
+          <div class="comms-section">
+            <div class="cam-section-title">Horario sin alertas</div>
+            <label class="comms-row">
+              Desde <input type="time" id="comms-nd-from" class="settings-input" style="width:100px" value="22:00">
+              hasta <input type="time" id="comms-nd-to" class="settings-input" style="width:100px" value="08:00">
+              <button class="mini-btn" id="comms-nd-save">Guardar</button>
+            </label>
+          </div>
+          <!-- AS-03: Digest -->
+          <div class="comms-section">
+            <div class="cam-section-title">Digest automático</div>
+            <label class="comms-row">
+              Intervalo (min): <input type="number" id="comms-digest-min" class="settings-input" style="width:80px" value="30" min="5" max="1440">
+              <button class="mini-btn" id="comms-digest-save">Guardar</button>
+              <button class="mini-btn" id="comms-digest-flush">Enviar ahora</button>
+            </label>
+          </div>
+          <!-- AS-05: Test de notificación -->
+          <div class="comms-section">
+            <div class="cam-section-title">Test de notificación</div>
+            <div class="comms-row">
+              Tema: <select id="comms-test-topic" class="settings-input" style="width:150px">
+                <option value="notifications">Notificaciones</option>
+                <option value="security">Seguridad</option>
+                <option value="cats">Gatos</option>
+                <option value="system">Sistema</option>
+              </select>
+              <button class="mini-btn" id="comms-test-send">Enviar prueba</button>
+              <span id="comms-test-result" class="sec-inline-status"></span>
+            </div>
+          </div>
+          <!-- AS-04: Plantillas -->
+          <div class="comms-section">
+            <div class="cam-section-title">Plantillas de mensaje</div>
+            <div id="comms-templates-list" class="comms-templates-list">
+              <div class="comms-loading">Cargando plantillas…</div>
+            </div>
+          </div>
         </div>
       </div>
 

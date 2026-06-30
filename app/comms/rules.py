@@ -58,3 +58,23 @@ def should_silence(severity: Severity) -> bool:
     if severity == Severity.CRITICA:
         return False
     return is_no_disturb_now()
+
+
+def set_no_disturb_schedule(from_time: str = "22:00", to_time: str = "08:00"):
+    """AS-01: Actualiza el horario sin alertas (formato HH:MM)."""
+    global _NO_DISTURB_START, _NO_DISTURB_END
+    try:
+        _NO_DISTURB_START = int(from_time.split(":")[0])
+        _NO_DISTURB_END = int(to_time.split(":")[0])
+    except Exception:
+        pass
+
+
+def get_rules() -> dict:
+    """Devuelve la config actual de reglas."""
+    return {
+        "no_disturb_start": _NO_DISTURB_START,
+        "no_disturb_end": _NO_DISTURB_END,
+        "override": _no_disturb_override,
+        "source_severity": {k: v.value for k, v in _SOURCE_SEVERITY.items()},
+    }

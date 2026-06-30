@@ -125,12 +125,14 @@ def subscribe(fn: Callable) -> None:
         _subscribers.append(fn)
 
 
-def recent(n: int = 20, event_type: str | None = None) -> list[dict]:
-    """Retorna los últimos N eventos del ring-buffer."""
+def recent(n: int = 20, event_type: str | None = None, cam_id: str | None = None) -> list[dict]:
+    """Retorna los últimos N eventos del ring-buffer, filtrando por tipo y/o cámara."""
     with _lock:
         evts = list(_ring)
     if event_type:
         evts = [e for e in evts if e.get("event_type") == event_type]
+    if cam_id:
+        evts = [e for e in evts if e.get("cam_id") == cam_id or e.get("camera_id") == cam_id]
     return evts[-n:]
 
 

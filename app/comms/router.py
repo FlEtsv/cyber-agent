@@ -149,3 +149,28 @@ def notify_approval_needed(tool_name: str, preview: str = "") -> dict:
         source="agent",
         emoji="⏳",
     )
+
+
+def send(title: str, body: str = "", severity=None, topic: str = "") -> dict:
+    """AS-05: Alias de send_message con parámetros de nivel y topic."""
+    from app.comms.levels import Severity
+    level_map = {
+        Severity.CRITICA: CRITICAL, Severity.ALTA: ERROR,
+        Severity.MEDIA: WARNING, Severity.BAJA: SUCCESS,
+        Severity.PERIODICA: INFO,
+    }
+    lvl = level_map.get(severity, INFO) if severity else INFO
+    return send_message(title, body, level=lvl, source=topic or "system")
+
+
+def get_config() -> list:
+    """AS-01: Devuelve la configuración de canales activos."""
+    channels = []
+    try:
+        from app.comms.telegram_topics import get_topics
+        topics = get_topics()
+        for name, thread_id in topics.items():
+            channels.append({"id": name, "name": name, "topic_id": str(thread_id), "severity": "TODAS"})
+    except Exception:
+        channels.append({"id": "main", "name": "Canal principal", "topic_id": "0", "severity": "TODAS"})
+    return channels

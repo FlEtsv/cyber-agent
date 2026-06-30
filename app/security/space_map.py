@@ -132,3 +132,52 @@ def normalize_position(
             pass
 
     return (max(0.0, min(1.0, cx)), max(0.0, min(1.0, cy)))
+
+
+def get_heatmap_data(pet_id: str | None = None) -> dict:
+    """
+    AL-09: Devuelve datos de heatmap para el frontend.
+
+    Returns:
+        points: list of {x, y, count} — posiciones normalizadas con peso
+        schedules: list of {hour, intensity} — actividad por hora del día
+        routes: list of {from_zone, to_zone, count} — rutas entre zonas
+    """
+    import time
+    from app.security import events as ev
+
+    # Recoger posiciones registradas en eventos de cat_detected
+    all_events = ev.recent(n=200, event_type="cat_detected")
+    if pet_id:
+        all_events = [e for e in all_events if str(e.get("pet_id", "")) == str(pet_id)]
+
+    # Puntos del heatmap
+    point_map: dict[tuple, int] = {}
+    hour_counts: dict[int, int] = {}
+    for e in all_events:
+        cx = e.get("cx") or e.get("x")
+        cy = e.get("cy") or e.get("y")
+        if cx is not None and cy is not None:
+            gx = round(float(cx), 2)
+            gy = round(float(cy), 2)
+            point_map[(gx, gy)] = point_map.get((gx, gy), 0) + 1
+        ts = e.get("ts", 0)
+        if ts:
+            hour = int(time.localtime(ts).tm_hour)
+            hour_counts[hour] = hour_counts.get(hour, 0) + 1
+
+    points = [{"x": k[0], "y": k[1], "count": v} for k, v in point_map.items()]
+    max_count = max((p["count"] for p in points), default=1)
+    for p in points:
+        p["intensity"] = round(p["count"] / max_count, 3)
+
+    max_h = max(hour_counts.values(), default=1)
+    schedules = [
+        {"hour": h, "intensity": round(c / max_h, 3)}
+        for h, c in sorted(hour_counts.items())
+    ]
+
+    # Rutas simples: zonas consecutivas
+    routes: list[dict] = []
+
+    return {"points": points, "schedules": schedules, "routes": routes}

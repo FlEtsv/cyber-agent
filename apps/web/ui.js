@@ -667,6 +667,581 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   })();
 
+  // ── O-01..O-06: Vista individual de cámara con IA en vivo ─────────────────
+  let _liveEventSource = null;
+  let _currentCamDetail = null;
+
+  function _openCamDetail(cam) {
+    _currentCamDetail = cam;
+    // Cambiar de panel cameras al panel cam-detail
+    document.querySelectorAll('.sec-panel').forEach(p => p.classList.remove('sec-panel-active'));
+    const dp = $('sec-panel-cam-detail');
+    if (dp) { dp.classList.add('sec-panel-active'); dp.style.display = ''; }
+
+    // Rellenar encabezado
+    const nameEl = $('cam-detail-name');
+    const metaEl = $('cam-detail-meta');
+    if (nameEl) nameEl.textContent = cam.name || cam.id;
+    if (metaEl) metaEl.textContent = (cam.kind || '') + ' · ' + (cam.location || cam.source_url || '—');
+
+    // Iniciar stream en vivo
+    _startLiveStream(cam);
+    _loadCamDetections(cam.id || cam.name);
+    _loadCamTimeline(cam.id || cam.name);
+    _loadCamZones(cam.id || cam.name);
+    _loadCatList();
+  }
+
+  function _closeCamDetail() {
+    _stopLiveStream();
+    _currentCamDetail = null;
+    document.querySelectorAll('.sec-panel').forEach(p => p.classList.remove('sec-panel-active'));
+    const cp = $('sec-panel-cameras');
+    if (cp) cp.classList.add('sec-panel-active');
+    const dp = $('sec-panel-cam-detail');
+    if (dp) dp.style.display = 'none';
+  }
+
+  const camDetailBack = $('cam-detail-back');
+  if (camDetailBack) camDetailBack.addEventListener('click', _closeCamDetail);
+
+  function _startLiveStream(cam) {
+    _stopLiveStream();
+    const img = $('cam-live-img');
+    const placeholder = $('cam-live-placeholder');
+    const badge = $('cam-live-badge');
+    const reasoningEl = $('cam-ai-reasoning');
+    const threatEl = $('cam-ai-threat');
+
+    const camId = cam.name || cam.id;
+    const es = new EventSource(`/security/cameras/${encodeURIComponent(camId)}/live`);
+    _liveEventSource = es;
+
+    es.addEventListener('snapshot', e => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.image_b64 && img) {
+          img.src = 'data:image/jpeg;base64,' + data.image_b64;
+          img.style.display = '';
+          if (placeholder) placeholder.style.display = 'none';
+          if (badge) badge.style.display = '';
+        }
+      } catch {}
+    });
+
+    es.addEventListener('reasoning', e => {
+      try {
+        const data = JSON.parse(e.data);
+        if (reasoningEl) reasoningEl.textContent = data.text || '';
+        if (threatEl) {
+          const score = Math.round((data.threat_score || 0) * 100);
+          const action = data.action || 'ignore';
+          const color = score > 60 ? '#f85149' : score > 30 ? '#f0883e' : '#3fb950';
+          threatEl.innerHTML = `<span style="color:${color}">Amenaza: ${score}% · ${action}</span>`;
+        }
+      } catch {}
+    });
+
+    es.addEventListener('detection', e => {
+      try {
+        const data = JSON.parse(e.data);
+        _addDetection(data);
+        // AJ-08: si detecta gato, preguntar "¿es Michi?"
+        if (data.type === 'cat' || (data.description || '').toLowerCase().includes('gat')) {
+          _showCatConfirm(data);
+        }
+      } catch {}
+    });
+
+    es.addEventListener('error', () => {
+      if (placeholder) placeholder.innerHTML = '<span>🚫 Stream no disponible (SECURITY_ENABLED=0)</span>';
+      if (badge) badge.style.display = 'none';
+    });
+  }
+
+  function _stopLiveStream() {
+    if (_liveEventSource) { _liveEventSource.close(); _liveEventSource = null; }
+    const img = $('cam-live-img');
+    const placeholder = $('cam-live-placeholder');
+    const badge = $('cam-live-badge');
+    if (img) { img.style.display = 'none'; img.src = ''; }
+    if (placeholder) { placeholder.style.display = ''; placeholder.innerHTML = '<span>🎥 Stream detenido</span>'; }
+    if (badge) badge.style.display = 'none';
+  }
+
+  function _addDetection(data) {
+    const list = $('cam-detections-list');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.className = 'cam-detection-row';
+    const score = Math.round((data.threat_score || data.confidence || 0) * 100);
+    const ts = new Date().toLocaleTimeString();
+    row.innerHTML = `<span class="cam-det-ts">${ts}</span><span class="cam-det-type">${escHtml(data.type || 'objeto')}</span><span class="cam-det-desc">${escHtml(data.description || '')}</span><span class="cam-det-score">${score}%</span>`;
+    list.insertBefore(row, list.firstChild);
+    // Mantener máximo 20 detecciones
+    while (list.children.length > 20) list.removeChild(list.lastChild);
+  }
+
+  // AJ-08: Confirmar "¿es Michi?"
+  function _showCatConfirm(detection) {
+    const panel = $('cam-cat-confirm');
+    const question = $('cam-cat-question');
+    if (!panel) return;
+    const catName = detection.pet_id || 'el gato detectado';
+    if (question) question.textContent = `¿Es ${catName}?`;
+    panel.style.display = '';
+    // Auto-ocultar en 15 s
+    setTimeout(() => { if (panel) panel.style.display = 'none'; }, 15000);
+  }
+
+  const camCatYes = $('cam-cat-yes');
+  const camCatNo = $('cam-cat-no');
+  if (camCatYes) camCatYes.addEventListener('click', async () => {
+    if (!_currentCamDetail) return;
+    const camId = _currentCamDetail.name || _currentCamDetail.id;
+    await fetch('/api/security/cat-feedback', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({cam_id: camId, confirmed: true, signal: 1.0}),
+    }).catch(() => {});
+    const panel = $('cam-cat-confirm');
+    if (panel) panel.style.display = 'none';
+  });
+  if (camCatNo) camCatNo.addEventListener('click', async () => {
+    if (!_currentCamDetail) return;
+    const camId = _currentCamDetail.name || _currentCamDetail.id;
+    const correctCat = ($('cam-cat-select') || {}).value || '';
+    await fetch('/api/security/cat-feedback', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({cam_id: camId, confirmed: false, correct_pet: correctCat, signal: -1.0}),
+    }).catch(() => {});
+    const panel = $('cam-cat-confirm');
+    if (panel) panel.style.display = 'none';
+  });
+
+  async function _loadCatList() {
+    try {
+      const r = await fetch('/api/security/pets');
+      if (!r.ok) return;
+      const d = await r.json();
+      const sel = $('cam-cat-select');
+      if (!sel || !d.pets) return;
+      sel.innerHTML = '<option value="">¿Cuál es?</option>';
+      d.pets.forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.id || p.name;
+        o.textContent = p.name;
+        sel.appendChild(o);
+      });
+    } catch {}
+  }
+
+  async function _loadCamDetections(camId) {
+    const list = $('cam-detections-list');
+    if (!list) return;
+    try {
+      const r = await fetch(`/api/security/events?cam_id=${encodeURIComponent(camId)}&n=10`);
+      if (!r.ok) { list.innerHTML = '<div class="comms-loading">Sin datos</div>'; return; }
+      const d = await r.json();
+      list.innerHTML = '';
+      (d.events || []).forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'cam-detection-row';
+        const ts = ev.ts ? new Date(ev.ts * 1000).toLocaleTimeString() : '—';
+        row.innerHTML = `<span class="cam-det-ts">${ts}</span><span class="cam-det-type">${escHtml(ev.event_type || '')}</span><span class="cam-det-desc">${escHtml(ev.description || '')}</span>`;
+        list.appendChild(row);
+      });
+    } catch {}
+  }
+
+  async function _loadCamTimeline(camId) {
+    const list = $('cam-timeline-list');
+    if (!list) return;
+    try {
+      const r = await fetch(`/api/security/events?cam_id=${encodeURIComponent(camId)}&n=20`);
+      if (!r.ok) { list.innerHTML = '<div class="comms-loading">Sin eventos</div>'; return; }
+      const d = await r.json();
+      list.innerHTML = '';
+      (d.events || []).forEach(ev => {
+        const item = document.createElement('div');
+        item.className = 'sec-tl-item';
+        const ts = ev.ts ? new Date(ev.ts * 1000).toLocaleTimeString() : '—';
+        const color = ev.event_type === 'intrusion' ? 'sec-tl-red' : ev.event_type === 'motion' ? 'sec-tl-yellow' : 'sec-tl-green';
+        item.innerHTML = `<span class="sec-tl-dot ${color}"></span><span class="sec-tl-ts">${ts}</span><span>${escHtml(ev.event_type || '')} — ${escHtml(ev.description || '')}</span>`;
+        list.appendChild(item);
+      });
+    } catch {}
+  }
+
+  async function _loadCamZones(camId) {
+    const list = $('cam-zones-list');
+    if (!list) return;
+    try {
+      const r = await fetch(`/api/security/zones?cam_id=${encodeURIComponent(camId)}`);
+      if (!r.ok) { list.innerHTML = '<div class="comms-loading">Sin zonas</div>'; return; }
+      const d = await r.json();
+      list.innerHTML = '';
+      (d.zones || []).forEach(z => {
+        const row = document.createElement('div');
+        row.className = 'cam-zone-row';
+        const typeLabel = z.zone_type === 'warning' ? '⚠️ Alerta' : '✅ Segura';
+        row.innerHTML = `<span class="cam-zone-type">${typeLabel}</span><span class="cam-zone-name">${escHtml(z.name || 'Zona ' + z.id)}</span><button class="mini-btn cam-zone-del" data-id="${z.id}">🗑️</button>`;
+        row.querySelector('.cam-zone-del').addEventListener('click', async () => {
+          await fetch(`/api/security/zones/${z.id}`, {method:'DELETE'}).catch(() => {});
+          _loadCamZones(camId);
+        });
+        list.appendChild(row);
+      });
+      if (!d.zones || d.zones.length === 0) list.innerHTML = '<div class="comms-loading">Sin zonas definidas</div>';
+    } catch {}
+  }
+
+  const camZoneAdd = $('cam-zone-add');
+  if (camZoneAdd) camZoneAdd.addEventListener('click', async () => {
+    if (!_currentCamDetail) return;
+    const name = prompt('Nombre de la zona:');
+    if (!name) return;
+    const type = confirm('¿Es zona de ALERTA (OK=Alerta, Cancel=Segura)?') ? 'warning' : 'safe';
+    const camId = _currentCamDetail.name || _currentCamDetail.id;
+    await fetch('/api/security/zones', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({cam_id: camId, name, zone_type: type, polygon: [[0.1,0.1],[0.9,0.1],[0.9,0.9],[0.1,0.9]]}),
+    }).catch(() => {});
+    _loadCamZones(camId);
+  });
+
+  // Conectar el click en tarjeta de cámara para abrir detalle
+  const origCamCard = typeof _camCard !== 'undefined' ? _camCard : null;
+  document.addEventListener('click', e => {
+    const card = e.target.closest('.sec-cam-card');
+    if (card && card._camData) _openCamDetail(card._camData);
+  });
+
+  // Grabar desde la vista de detalle
+  const camDetailRecord = $('cam-detail-record');
+  if (camDetailRecord) camDetailRecord.addEventListener('click', async () => {
+    if (!_currentCamDetail) return;
+    const camId = _currentCamDetail.name || _currentCamDetail.id;
+    const duration = parseInt(prompt('Duración (segundos, máx 300):', '60') || '60', 10);
+    try {
+      const r = await fetch(`/security/cameras/${encodeURIComponent(camId)}/record`, {
+        method: 'POST', headers: {'Content-Type':'application/json', 'X-Event-Token': 'local'},
+        body: JSON.stringify({duration}),
+      });
+      const d = await r.json();
+      camDetailRecord.textContent = d.ok ? '⏺ Grabando' : '✗ Error';
+      setTimeout(() => { camDetailRecord.textContent = '⏺ Grabar'; }, 5000);
+    } catch {}
+  });
+
+  // ── P-03..P-08: Panel de grabaciones ──────────────────────────────────────
+  const secPanelRecordings = $('sec-panel-recordings');
+  async function _loadRecordings(camId) {
+    const list = $('recordings-list');
+    if (!list) return;
+    list.innerHTML = '<div class="comms-loading">Cargando…</div>';
+    try {
+      const url = camId
+        ? `/security/cameras/${encodeURIComponent(camId)}/recordings`
+        : '/api/security/recordings';
+      const r = await fetch(url);
+      if (!r.ok) { list.innerHTML = '<div class="comms-loading">Error o módulo desactivado</div>'; return; }
+      const d = await r.json();
+      const recs = d.recordings || [];
+      if (recs.length === 0) { list.innerHTML = '<div class="comms-loading">Sin grabaciones</div>'; return; }
+      list.innerHTML = '';
+      recs.forEach(rec => {
+        const row = document.createElement('div');
+        row.className = 'recording-row';
+        const ts = rec.started_at ? new Date(rec.started_at * 1000).toLocaleString() : '—';
+        const size = rec.size_bytes ? Math.round(rec.size_bytes / 1024) + ' KB' : '—';
+        const dur = rec.duration ? rec.duration + 's' : '—';
+        row.innerHTML = `
+          <div class="rec-thumb">${rec.thumb_b64 ? '<img src="data:image/jpeg;base64,' + rec.thumb_b64 + '" class="rec-thumb-img">' : '🎬'}</div>
+          <div class="rec-info">
+            <div class="rec-cam">${escHtml(rec.cam_id || '—')}</div>
+            <div class="rec-ts">${ts} · ${dur} · ${size}</div>
+            <div class="rec-trigger">${escHtml(rec.trigger || 'manual')}</div>
+          </div>
+          <div class="rec-actions">
+            <button class="mini-btn rec-play-btn" data-path="${escHtml(rec.path || '')}">▶</button>
+            <a class="mini-btn" href="/download/${encodeURIComponent(rec.path || '')}" download>⬇</a>
+          </div>`;
+        row.querySelector('.rec-play-btn').addEventListener('click', (e) => {
+          const path = e.target.dataset.path;
+          _playRecording(path, rec);
+        });
+        list.appendChild(row);
+      });
+    } catch (err) {
+      list.innerHTML = '<div class="comms-loading">Error: ' + escHtml(String(err)) + '</div>';
+    }
+  }
+
+  function _playRecording(path, rec) {
+    const player = $('recording-player');
+    const video = $('rec-video');
+    const meta = $('rec-player-meta');
+    if (!player || !video) return;
+    player.style.display = '';
+    video.src = '/served/' + encodeURIComponent(path);
+    video.play().catch(() => {});
+    if (meta) {
+      const ts = rec.started_at ? new Date(rec.started_at * 1000).toLocaleString() : '—';
+      meta.textContent = `${rec.cam_id || '—'} · ${ts} · ${rec.trigger || '—'}`;
+    }
+  }
+
+  const recCloseBtn = $('rec-close-btn');
+  if (recCloseBtn) recCloseBtn.addEventListener('click', () => {
+    const player = $('recording-player');
+    const video = $('rec-video');
+    if (video) video.pause();
+    if (player) player.style.display = 'none';
+  });
+
+  const recCamFilter = $('rec-cam-filter');
+  if (recCamFilter) recCamFilter.addEventListener('change', () => {
+    _loadRecordings(recCamFilter.value);
+  });
+
+  // ── AL-09: Heatmap de patrones ─────────────────────────────────────────────
+  async function _renderHeatmap(catId) {
+    const canvas = $('heatmap-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    try {
+      const url = catId
+        ? `/api/security/heatmap?cat_id=${encodeURIComponent(catId)}`
+        : '/api/security/heatmap';
+      const r = await fetch(url);
+      if (!r.ok) { _drawHeatmapNoData(ctx, canvas); return; }
+      const d = await r.json();
+      if (!d.points || d.points.length === 0) { _drawHeatmapNoData(ctx, canvas); return; }
+      _drawHeatmapPoints(ctx, canvas, d.points);
+      _loadHeatmapSchedules(d.schedules || []);
+      _loadHeatmapRoutes(d.routes || []);
+    } catch {
+      _drawHeatmapNoData(ctx, canvas);
+    }
+  }
+
+  function _drawHeatmapPoints(ctx, canvas, points) {
+    const W = canvas.width, H = canvas.height;
+    const maxCount = Math.max(...points.map(p => p.count || 1), 1);
+    points.forEach(p => {
+      const x = (p.x || 0) * W;
+      const y = (p.y || 0) * H;
+      const r = 30 * Math.sqrt((p.count || 1) / maxCount) + 5;
+      const alpha = 0.15 + 0.6 * (p.count || 1) / maxCount;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, `rgba(88,166,255,${alpha})`);
+      grad.addColorStop(1, 'rgba(88,166,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function _drawHeatmapNoData(ctx, canvas) {
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Sin datos — SECURITY_ENABLED=0 o sin tracking activo', canvas.width / 2, canvas.height / 2);
+  }
+
+  function _loadHeatmapSchedules(schedules) {
+    const grid = $('heatmap-schedule-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (!schedules.length) { grid.innerHTML = '<div class="comms-loading">Sin datos de horario</div>'; return; }
+    schedules.forEach(s => {
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-schedule-cell';
+      const intensity = Math.round((s.intensity || 0) * 100);
+      cell.style.opacity = 0.3 + (s.intensity || 0) * 0.7;
+      cell.innerHTML = `<span class="hms-hour">${s.hour}h</span><span class="hms-int">${intensity}%</span>`;
+      grid.appendChild(cell);
+    });
+  }
+
+  function _loadHeatmapRoutes(routes) {
+    const list = $('heatmap-routes-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!routes.length) { list.innerHTML = '<div class="comms-loading">Sin rutas registradas</div>'; return; }
+    routes.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'heatmap-route-row';
+      row.innerHTML = `<span>${escHtml(r.from_zone || '—')} → ${escHtml(r.to_zone || '—')}</span><span class="heatmap-route-freq">${r.count || 0}x</span>`;
+      list.appendChild(row);
+    });
+  }
+
+  const heatmapRefresh = $('heatmap-refresh');
+  if (heatmapRefresh) heatmapRefresh.addEventListener('click', () => {
+    const catSel = $('heatmap-cat-select');
+    _renderHeatmap(catSel ? catSel.value : '');
+  });
+
+  const heatmapCatSelect = $('heatmap-cat-select');
+  if (heatmapCatSelect) heatmapCatSelect.addEventListener('change', () => {
+    _renderHeatmap(heatmapCatSelect.value);
+  });
+
+  // ── AS-01..AS-05: Config de comms ─────────────────────────────────────────
+  async function _loadCommsChannels() {
+    const list = $('comms-channels-list');
+    if (!list) return;
+    try {
+      const r = await fetch('/api/comms/config');
+      if (!r.ok) { list.innerHTML = '<div class="comms-loading">Módulo desactivado o sin config</div>'; return; }
+      const d = await r.json();
+      const channels = d.channels || [];
+      list.innerHTML = '';
+      if (!channels.length) { list.innerHTML = '<div class="comms-loading">Sin canales configurados</div>'; return; }
+      channels.forEach(ch => {
+        const row = document.createElement('div');
+        row.className = 'comms-channel-row';
+        row.innerHTML = `<span class="comms-ch-name">${escHtml(ch.name || ch.id)}</span><span class="comms-ch-topic">${escHtml(ch.topic_id || 'principal')}</span><span class="comms-ch-severity">${escHtml(ch.severity || 'TODAS')}</span>`;
+        list.appendChild(row);
+      });
+    } catch {
+      list.innerHTML = '<div class="comms-loading">Error cargando canales</div>';
+    }
+  }
+
+  async function _loadCommsTemplates() {
+    const list = $('comms-templates-list');
+    if (!list) return;
+    try {
+      const r = await fetch('/api/comms/templates');
+      if (!r.ok) { list.innerHTML = '<div class="comms-loading">Sin plantillas</div>'; return; }
+      const d = await r.json();
+      list.innerHTML = '';
+      (d.templates || []).forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'comms-template-row';
+        row.innerHTML = `<span class="comms-tpl-type">${escHtml(t.type || t.id)}</span><span class="comms-tpl-preview">${escHtml((t.template || '').substring(0, 80))}${(t.template || '').length > 80 ? '…' : ''}</span>`;
+        list.appendChild(row);
+      });
+      if (!d.templates || !d.templates.length) list.innerHTML = '<div class="comms-loading">Sin plantillas personalizadas</div>';
+    } catch {
+      list.innerHTML = '<div class="comms-loading">Error cargando plantillas</div>';
+    }
+  }
+
+  const commsNdSave = $('comms-nd-save');
+  if (commsNdSave) commsNdSave.addEventListener('click', async () => {
+    const from = ($('comms-nd-from') || {}).value || '22:00';
+    const to = ($('comms-nd-to') || {}).value || '08:00';
+    await fetch('/api/comms/no-disturb', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({from, to}),
+    }).catch(() => {});
+    commsNdSave.textContent = '✓ Guardado';
+    setTimeout(() => { commsNdSave.textContent = 'Guardar'; }, 2000);
+  });
+
+  const commsDigestSave = $('comms-digest-save');
+  if (commsDigestSave) commsDigestSave.addEventListener('click', async () => {
+    const min = parseInt(($('comms-digest-min') || {}).value || '30', 10);
+    await fetch('/api/comms/digest-config', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({interval_minutes: min}),
+    }).catch(() => {});
+    commsDigestSave.textContent = '✓ Guardado';
+    setTimeout(() => { commsDigestSave.textContent = 'Guardar'; }, 2000);
+  });
+
+  const commsDigestFlush = $('comms-digest-flush');
+  if (commsDigestFlush) commsDigestFlush.addEventListener('click', async () => {
+    const r = await fetch('/api/comms/digest-flush', {method: 'POST'}).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    commsDigestFlush.textContent = d.ok ? '✓ Enviado' : '✗ Error';
+    setTimeout(() => { commsDigestFlush.textContent = 'Enviar ahora'; }, 3000);
+  });
+
+  const commsTestSend = $('comms-test-send');
+  const commsTestResult = $('comms-test-result');
+  if (commsTestSend) commsTestSend.addEventListener('click', async () => {
+    const topic = ($('comms-test-topic') || {}).value || 'notifications';
+    try {
+      const r = await fetch('/api/comms/test', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({topic}),
+      });
+      const d = await r.json();
+      if (commsTestResult) commsTestResult.textContent = d.ok ? '✓ Enviado' : '✗ ' + (d.error || 'Error');
+    } catch (e) {
+      if (commsTestResult) commsTestResult.textContent = '✗ ' + e.message;
+    }
+  });
+
+  // Cargar datos al cambiar al sub-panel comms/heatmap/recordings
+  const origSecTabHandler = document.querySelector('#sec-tabs');
+  if (origSecTabHandler) {
+    origSecTabHandler.addEventListener('click', e => {
+      const btn = e.target.closest('.sec-tab');
+      if (!btn) return;
+      const sec = btn.dataset.sec;
+      if (sec === 'heatmap') {
+        const catSel = $('heatmap-cat-select');
+        _renderHeatmap(catSel ? catSel.value : '');
+        _loadCatListForHeatmap();
+      } else if (sec === 'recordings') {
+        const camSel = $('rec-cam-filter');
+        _loadRecordings(camSel ? camSel.value : '');
+        _loadCamsForRecFilter();
+      } else if (sec === 'comms') {
+        _loadCommsChannels();
+        _loadCommsTemplates();
+      }
+    });
+  }
+
+  async function _loadCatListForHeatmap() {
+    try {
+      const r = await fetch('/api/security/pets');
+      if (!r.ok) return;
+      const d = await r.json();
+      const sel = $('heatmap-cat-select');
+      if (!sel || !d.pets) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Todos los gatos</option>';
+      d.pets.forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.id || p.name;
+        o.textContent = p.name;
+        sel.appendChild(o);
+      });
+      sel.value = cur;
+    } catch {}
+  }
+
+  async function _loadCamsForRecFilter() {
+    try {
+      const r = await fetch('/api/cameras');
+      if (!r.ok) return;
+      const d = await r.json();
+      const sel = $('rec-cam-filter');
+      if (!sel || !d.cameras) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Todas las cámaras</option>';
+      d.cameras.forEach(cam => {
+        const o = document.createElement('option');
+        o.value = cam.name || cam.id;
+        o.textContent = cam.name;
+        sel.appendChild(o);
+      });
+      sel.value = cur;
+    } catch {}
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   setTTS(state.ttsOn);
   updateBrainBadge();

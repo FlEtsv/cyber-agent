@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 router = APIRouter(prefix="/security", tags=["security"])
 
@@ -153,6 +153,97 @@ async def set_autonomy(request: Request, app_name: str = Depends(_require_auth))
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── N-02 + O-06: Stream en vivo ────────────────────────────────────────────────
+
+@router.get("/cameras/{cam_id}/live")
+async def camera_live_stream(cam_id: str) -> StreamingResponse:
+    """
+    O-06: Stream SSE de análisis IA en vivo para una cámara.
+    No requiere auth (el token se gestiona en la sesión web).
+    """
+    from app.security.live_brain import live_analysis_stream
+    return StreamingResponse(
+        live_analysis_stream(cam_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/cameras/{cam_id}/snapshot-live")
+async def camera_snapshot(cam_id: str) -> JSONResponse:
+    """Snapshot en vivo de una cámara (JSON con image_b64)."""
+    if not os.environ.get("SECURITY_ENABLED", "0") == "1":
+        return JSONResponse({"ok": False, "error": "SECURITY_ENABLED=0"})
+    try:
+        from app.security.camera import snapshot_by_name
+        image_b64 = snapshot_by_name(cam_id)
+        return JSONResponse({"ok": True, "cam_id": cam_id, "image_b64": image_b64 or ""})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/cameras/{cam_id}/stream-url")
+async def camera_stream_url(cam_id: str, protocol: str = "hls") -> JSONResponse:
+    """Devuelve la URL del stream para el protocolo solicitado (hls|webrtc|mjpeg)."""
+    try:
+        from app.security.cameras_db import get_camera
+        from app.security.stream import stream_url, is_available
+        cam = get_camera(name=cam_id)
+        source_url = cam.get("source_url", "") if cam else ""
+        url = stream_url(cam_id, source_url, protocol)
+        return JSONResponse({
+            "ok": True,
+            "cam_id": cam_id,
+            "protocol": protocol,
+            "url": url,
+            "available": is_available(),
+        })
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/cameras/{cam_id}/recordings")
+async def camera_recordings(
+    cam_id: str,
+    limit: int = 50,
+    app_name: str = Depends(_require_auth),
+) -> JSONResponse:
+    """P-02: Lista grabaciones de una cámara."""
+    try:
+        from app.security.recorder import list_recordings
+        recs = list_recordings(cam_id=cam_id, limit=limit)
+        return JSONResponse({"ok": True, "cam_id": cam_id, "recordings": recs})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/cameras/{cam_id}/record")
+async def start_camera_recording(
+    cam_id: str,
+    request: Request,
+    app_name: str = Depends(_require_auth),
+) -> JSONResponse:
+    """P-01: Inicia grabación manual."""
+    data = await request.json()
+    duration = min(int(data.get("duration", 60)), 300)
+    try:
+        from app.security.cameras_db import get_camera
+        cam = get_camera(name=cam_id)
+        if not cam:
+            return JSONResponse({"ok": False, "error": "Cámara no encontrada"}, status_code=404)
+        rtsp_url = cam.get("source_url", "")
+        if not rtsp_url:
+            return JSONResponse({"ok": False, "error": "Sin URL RTSP configurada"}, status_code=422)
+        from app.security.recorder import start_recording
+        result = start_recording(cam_id=cam_id, rtsp_url=rtsp_url, duration=duration, trigger="manual")
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 # ── HA Webhook (sin auth para HA que llama directo) ───────────────────────────

@@ -106,3 +106,21 @@ def maybe_auto_flush() -> bool:
         return True
     except Exception:
         return False
+
+
+def set_interval(minutes: int) -> None:
+    """AS-03: Actualiza el intervalo del digest."""
+    _buffer._flush_interval = max(5, min(1440, minutes)) * 60
+
+
+def flush() -> dict:
+    """AS-03: Fuerza el envío del digest ahora."""
+    text = get_digest_text()
+    if not text:
+        return {"ok": True, "sent": False, "reason": "vacío"}
+    try:
+        from app.comms.router import send_message
+        send_message("📊 Digest", text, level=1, source="digest")
+    except Exception:
+        pass
+    return {"ok": True, "sent": True}
