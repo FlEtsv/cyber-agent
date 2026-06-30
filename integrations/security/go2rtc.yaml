@@ -1,0 +1,18 @@
+# go2rtc configuración de ejemplo
+# Añadir cámaras RTSP aquí o vía API REST (POST /api/streams)
+#
+# Ejemplo:
+# streams:
+#   cam_salon:
+#     - rtsp://admin:password@192.168.1.100:554/stream1
+#   cam_entrada:
+#     - rtsp://192.168.1.101:554/h264
+
+streams: {}
+
+api:
+  listen: ":1984"
+  base_path: ""
+
+rtsp:
+  listen: ":8554"

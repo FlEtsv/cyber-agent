@@ -1513,6 +1513,241 @@ async def terminal_ws(ws: WebSocket):
             pass
 
 
+# ── Actuadores + HA Discovery (AT-05, BA-01..06) ─────────────────────────────
+
+@app.get("/api/actuators")
+def api_actuators_list():
+    """AT-04: Lista todos los actuadores y su estado."""
+    try:
+        from app.security.actuators.registry import list_actuators
+        return {"actuators": list_actuators()}
+    except Exception as e:
+        return {"actuators": [], "error": str(e)}
+
+
+@app.post("/api/actuators/{name}/test")
+def api_actuator_test(name: str, cam_id: str = ""):
+    """AZ-02: Ejecutar auto-test de un actuador."""
+    try:
+        from app.security.actuators.selftest import run_selftest
+        return run_selftest(name, cam_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/actuators/wire")
+def api_wire_list(cam_id: str | None = None):
+    """AZ: Lista estados de cableado."""
+    try:
+        from app.security.actuators.wire import list_wired
+        return {"items": list_wired(cam_id)}
+    except Exception as e:
+        return {"items": [], "error": str(e)}
+
+
+@app.post("/api/actuators/assign")
+async def api_actuator_assign(req: Request):
+    """AT-05: Asignar actuadores a una cámara."""
+    body = await req.json()
+    cam_id = body.get("cam_id", "")
+    actuator_names = body.get("actuators", [])
+    try:
+        from app.security.actuators.registry import assign_to_camera
+        assign_to_camera(cam_id, actuator_names)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/ha/entities")
+def api_ha_entities(domain: str | None = None):
+    """BA-01: Descubrir entidades HA disponibles."""
+    try:
+        from app.security.ha_discovery import discover_entities
+        return {"entities": discover_entities(domain)}
+    except Exception as e:
+        return {"entities": [], "error": str(e)}
+
+
+@app.post("/api/ha/add-device")
+async def api_ha_add_device(req: Request):
+    """BA-02: Vincular entidad HA como actuador."""
+    body = await req.json()
+    entity_id = body.get("entity_id", "")
+    label = body.get("label", "")
+    try:
+        from app.security.ha_discovery import add_device_as_actuator
+        return add_device_as_actuator(entity_id, label)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/ha/test-device")
+async def api_ha_test_device(req: Request):
+    """BA-04: Probar dispositivo HA (on/off/toggle)."""
+    body = await req.json()
+    entity_id = body.get("entity_id", "")
+    action = body.get("action", "toggle")
+    try:
+        from app.security.ha_discovery import test_entity
+        ok = test_entity(entity_id, action)
+        return {"ok": ok}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── Training progress/history/AB (AE-05..07) ─────────────────────────────────
+
+@app.get("/api/training/progress/{job_id}")
+def api_training_progress(job_id: str):
+    """AE-05: Estado en vivo de un trabajo de entrenamiento."""
+    try:
+        from app.training.auto_train import get_job
+        job = get_job(job_id)
+        return job if job else {"error": "job no encontrado"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/training/versions/{model_id}")
+def api_training_versions(model_id: str):
+    """AE-06: Historial de versiones de un modelo."""
+    try:
+        from app.training.versioning import get_versions
+        return {"versions": get_versions(model_id)}
+    except Exception as e:
+        return {"versions": [], "error": str(e)}
+
+
+@app.post("/api/training/promote/{model_id}")
+def api_training_promote(model_id: str):
+    """AE-07: Promover la última versión de un modelo."""
+    try:
+        from app.training.versioning import promote
+        return promote(model_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/rollback/{model_id}")
+def api_training_rollback(model_id: str):
+    """AE-07: Rollback al modelo anterior."""
+    try:
+        from app.training.versioning import rollback
+        return rollback(model_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── Comms avanzados (AR-06/07, AS-02/03) ─────────────────────────────────────
+
+@app.post("/api/comms/chat")
+async def api_comms_chat(req: Request):
+    """AR-06: Chat libre con el agente vía la UI."""
+    body = await req.json()
+    chat_id = body.get("chat_id", 0)
+    text = body.get("text", "")
+    try:
+        from app.comms.chat import handle_message
+        reply = handle_message(chat_id, text)
+        return {"ok": True, "reply": reply}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/comms/audit")
+def api_comms_audit(n: int = 50):
+    """AS-03: Registro/auditoría de notificaciones."""
+    try:
+        from app.comms.audit import recent_notifications, recent_actions, stats
+        return {
+            "notifications": recent_notifications(n),
+            "actions": recent_actions(n),
+            "stats": stats(),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/push/register")
+async def api_push_register(req: Request):
+    """I-02: Registrar token APNs de dispositivo iOS."""
+    body = await req.json()
+    token = body.get("device_token", "")
+    platform = body.get("platform", "ios")
+    if not token:
+        return {"ok": False, "error": "token requerido"}
+    # Guardar token en datos locales para envío futuro
+    try:
+        import json
+        from pathlib import Path
+        push_file = Path("data/push_tokens.json")
+        push_file.parent.mkdir(exist_ok=True)
+        tokens = json.loads(push_file.read_text()) if push_file.exists() else {}
+        tokens[token] = {"platform": platform}
+        push_file.write_text(json.dumps(tokens, indent=2))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── Deterrence menu (AY) ──────────────────────────────────────────────────────
+
+@app.get("/api/security/deterrence/{cam_id}")
+def api_deterrence_state(cam_id: str):
+    """AY-01: Estado de disuasión de una cámara."""
+    try:
+        from app.security.deterrence import get_state
+        from app.security.actuators.registry import list_actuators
+        state = get_state(cam_id)
+        return {
+            "cam_id": cam_id,
+            "level": state.level,
+            "active": state.active,
+            "mode": state.mode,
+            "actuators": list_actuators(),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/security/deterrence/{cam_id}/mode")
+async def api_deterrence_mode(cam_id: str, req: Request):
+    """AW-07: Cambiar modo de disuasión (auto/manual/off)."""
+    body = await req.json()
+    mode = body.get("mode", "auto")
+    try:
+        from app.security.deterrence import set_mode
+        set_mode(cam_id, mode)
+        return {"ok": True, "mode": mode}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/security/deterrence/{cam_id}/trigger")
+async def api_deterrence_trigger(cam_id: str, req: Request):
+    """AY-05: Disparar disuasión manual (test)."""
+    body = await req.json()
+    level = int(body.get("level", 1))
+    try:
+        from app.security.deterrence import trigger
+        ok = trigger(cam_id, threat_score=0.9, force_level=level)
+        return {"ok": ok}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/security/deterrence/{cam_id}/deescalate")
+async def api_deterrence_deescalate(cam_id: str, req: Request):
+    """AW-04: Cancelar disuasión."""
+    try:
+        from app.security.deterrence import deescalate
+        deescalate(cam_id)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ── Start ─────────────────────────────────────────────────────────────────────
 
 def start_server(port: int = 8765):

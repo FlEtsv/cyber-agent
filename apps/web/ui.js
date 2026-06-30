@@ -1247,3 +1247,232 @@
   updateBrainBadge();
   setInterval(updateBrainBadge, 2000);
 })();
+// BATCH 4 EXTENSIONS — Deterrence / Actuators / HA Devices / Training Adv
+// AY-01..08 / AT-05 / BA-01..06 / AE-05..10
+(function() {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  function initDeterrence() {
+    const loadBtn = $('deterr-load-btn');
+    const camSel = $('deterr-cam-select');
+    if (!loadBtn) return;
+
+    fetch('/api/cameras').then(r => r.json()).then(d => {
+      if (!camSel || !d.cameras) return;
+      d.cameras.forEach(cam => {
+        const o = document.createElement('option');
+        o.value = cam.id || cam.name;
+        o.textContent = cam.name || cam.id;
+        camSel.appendChild(o);
+      });
+    }).catch(() => {});
+
+    loadBtn.onclick = async () => {
+      const camId = camSel.value;
+      if (!camId) return;
+      const r = await fetch('/api/security/deterrence/' + encodeURIComponent(camId));
+      const d = await r.json();
+      $('deterr-panel').style.display = '';
+      const modeSel = $('deterr-mode-select');
+      if (d.mode && modeSel) modeSel.value = d.mode;
+      const info = $('deterr-state-info');
+      if (info) info.textContent = 'Nivel: ' + d.level + ' | Activo: ' + (d.active ? 'Si' : 'No') + ' | Modo: ' + d.mode;
+    };
+
+    const modeBtn = $('deterr-mode-save');
+    if (modeBtn) modeBtn.onclick = async () => {
+      const camId = camSel.value;
+      const mode = $('deterr-mode-select').value;
+      await fetch('/api/security/deterrence/' + encodeURIComponent(camId) + '/mode', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ mode }),
+      });
+      const res = $('deterr-result');
+      if (res) res.textContent = 'Modo guardado: ' + mode;
+    };
+
+    const fireBtn = $('deterr-fire-btn');
+    if (fireBtn) fireBtn.onclick = async () => {
+      const camId = camSel.value;
+      const level = parseInt($('deterr-level-select').value);
+      const r = await fetch('/api/security/deterrence/' + encodeURIComponent(camId) + '/trigger', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ level }),
+      });
+      const d = await r.json();
+      const res = $('deterr-result');
+      if (res) res.textContent = d.ok ? ('Nivel ' + level + ' disparado') : ('Error: ' + d.error);
+    };
+
+    const stopBtn = $('deterr-stop-btn');
+    if (stopBtn) stopBtn.onclick = async () => {
+      const camId = camSel.value;
+      await fetch('/api/security/deterrence/' + encodeURIComponent(camId) + '/deescalate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
+      });
+      const res = $('deterr-result');
+      if (res) res.textContent = 'Disuasion detenida';
+    };
+  }
+
+  function initActuators() {
+    const refreshBtn = $('actuators-refresh');
+    if (!refreshBtn) return;
+
+    async function loadActuators() {
+      const r = await fetch('/api/actuators');
+      const d = await r.json();
+      const list = $('actuators-list');
+      if (!list) return;
+      if (!d.actuators || !d.actuators.length) {
+        list.innerHTML = '<div class="comms-loading">Sin actuadores registrados</div>';
+        return;
+      }
+      list.innerHTML = d.actuators.map(function(a) {
+        return '<div class="actuator-row"><span class="actuator-name">' + a.name + '</span>' +
+          '<span class="actuator-status ' + (a.available ? 'status-green' : 'status-red') + '">' +
+          (a.available ? 'OK' : 'OFF') + '</span>' +
+          '<button class="mini-btn" onclick="testActuator(\'' + a.name + '\')">Test</button></div>';
+      }).join('');
+    }
+
+    refreshBtn.onclick = loadActuators;
+
+    window.testActuator = async function(name) {
+      const r = await fetch('/api/actuators/' + encodeURIComponent(name) + '/test', { method: 'POST' });
+      const d = await r.json();
+      alert('Test ' + name + ': ' + d.status + ' - ' + (d.evidence || ''));
+    };
+
+    const saveBtn = $('actuators-assign-save');
+    if (saveBtn) saveBtn.onclick = async () => {
+      const camId = $('actuators-cam-select').value;
+      const checked = Array.from(document.querySelectorAll('.actuator-assign-check:checked')).map(c => c.value);
+      await fetch('/api/actuators/assign', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ cam_id: camId, actuators: checked }),
+      });
+      const res = $('actuators-assign-result');
+      if (res) res.textContent = 'Guardado';
+    };
+
+    loadActuators();
+  }
+
+  function initHADevices() {
+    const discoverBtn = $('ha-discover-btn');
+    if (!discoverBtn) return;
+
+    discoverBtn.onclick = async () => {
+      const domain = $('ha-domain-filter').value;
+      const url = '/api/ha/entities' + (domain ? '?domain=' + domain : '');
+      const r = await fetch(url);
+      const d = await r.json();
+      const list = $('ha-entities-list');
+      if (!list) return;
+      if (!d.entities || !d.entities.length) {
+        list.innerHTML = '<div class="comms-loading">No se encontraron entidades HA</div>';
+        return;
+      }
+      list.innerHTML = d.entities.map(function(e) {
+        return '<div class="ha-entity-row">' +
+          '<span class="ha-entity-id">' + e.entity_id + '</span>' +
+          '<span class="ha-entity-name">' + e.name + '</span>' +
+          '<span class="ha-entity-state">' + e.state + '</span>' +
+          '<button class="mini-btn" onclick="addHAActuator(\'' + e.entity_id + '\',\'' + e.name + '\')">+ Anadir</button>' +
+          '<button class="mini-btn" onclick="testHADevice(\'' + e.entity_id + '\')">Test</button>' +
+          '</div>';
+      }).join('');
+    };
+
+    window.addHAActuator = async function(entityId, name) {
+      const r = await fetch('/api/ha/add-device', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ entity_id: entityId, label: name }),
+      });
+      const d = await r.json();
+      alert(d.ok ? ('Anadido: ' + d.actuator) : ('Error: ' + d.error));
+    };
+
+    window.testHADevice = async function(entityId) {
+      const r = await fetch('/api/ha/test-device', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ entity_id: entityId, action: 'toggle' }),
+      });
+      const d = await r.json();
+      alert(d.ok ? (entityId + ' toggle OK') : ('Error: ' + d.error));
+    };
+  }
+
+  function initTrainingAdv() {
+    const versionsBtn = $('train-versions-load');
+    const refreshJobBtn = $('train-refresh-job');
+    if (!versionsBtn) return;
+
+    versionsBtn.onclick = async () => {
+      const modelId = $('train-model-select').value;
+      const r = await fetch('/api/training/versions/' + encodeURIComponent(modelId));
+      const d = await r.json();
+      const list = $('train-versions-list');
+      if (!list) return;
+      if (!d.versions || !d.versions.length) {
+        list.innerHTML = '<div class="comms-loading">Sin versiones registradas</div>';
+        return;
+      }
+      list.innerHTML = d.versions.map(function(v) {
+        return '<div class="train-version-row ' + (v.active ? 'train-version-active' : '') + '">' +
+          '<span class="train-version-num">v' + v.version + '</span>' +
+          '<span class="train-version-ts">' + new Date(v.ts).toLocaleString() + '</span>' +
+          (v.active ? '<span class="train-badge-active">activa</span>' : '') +
+          '<button class="mini-btn" onclick="promoteVersion(\'' + modelId + '\',' + v.version + ')">Promover</button>' +
+          '</div>';
+      }).join('') +
+        '<div class="comms-row" style="margin-top:8px">' +
+        '<button class="mini-btn" onclick="rollbackModel(\'' + modelId + '\')">Rollback</button></div>';
+    };
+
+    window.promoteVersion = async function(modelId, version) {
+      const r = await fetch('/api/training/promote/' + encodeURIComponent(modelId), { method: 'POST' });
+      const d = await r.json();
+      alert(d.ok ? ('v' + version + ' promovida') : ('Error: ' + d.error));
+      versionsBtn.click();
+    };
+
+    window.rollbackModel = async function(modelId) {
+      const r = await fetch('/api/training/rollback/' + encodeURIComponent(modelId), { method: 'POST' });
+      const d = await r.json();
+      alert(d.ok ? ('Rollback a v' + d.rolled_back_to) : ('Error: ' + d.error));
+      versionsBtn.click();
+    };
+
+    if (refreshJobBtn) refreshJobBtn.onclick = async () => {
+      const r = await fetch('/api/training/stats');
+      const stats = await r.json();
+      const el = $('train-active-job');
+      if (!el) return;
+      if (stats.active_jobs && stats.active_jobs.length) {
+        el.innerHTML = stats.active_jobs.map(function(j) {
+          return '<div class="train-job-row"><span>' + j.job_id + '</span><span>' +
+            j.model_id + '</span><span class="train-job-status">' + j.status + '</span></div>';
+        }).join('');
+      } else {
+        el.innerHTML = '<div class="comms-loading">Sin trabajo activo</div>';
+      }
+    };
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initDeterrence();
+      initActuators();
+      initHADevices();
+      initTrainingAdv();
+    });
+  } else {
+    initDeterrence();
+    initActuators();
+    initHADevices();
+    initTrainingAdv();
+  }
+})();

@@ -1525,3 +1525,38 @@ html { touch-action: manipulation; }
 .comms-tpl-preview { color: #8b949e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .comms-loading { color: #8b949e; font-size: 13px; padding: 8px 0; }
 .comms-channels-list, .comms-templates-list { min-height: 40px; }
+
+/* ── Batch 4: Deterrence / Actuators / HA Devices / Training Adv ────────── */
+
+/* Deterrence panel */
+.deterr-fire-btn { background: rgba(248,81,73,.15); color: #f85149; }
+.deterr-fire-btn:hover { background: rgba(248,81,73,.3); }
+#deterr-state-info { background: #161b22; padding: 8px 12px; border-radius: 6px; font-size: 13px; color: #8b949e; margin: 6px 0; }
+
+/* Actuators panel */
+.actuators-list { min-height: 40px; }
+.actuator-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #21262d; font-size: 13px; }
+.actuator-name { font-weight: 600; flex: 1; }
+.actuator-status { font-size: 12px; padding: 1px 6px; border-radius: 4px; }
+.status-green { color: #3fb950; }
+.status-red { color: #f85149; }
+.actuators-assign-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+/* HA Devices panel */
+.ha-entities-list { min-height: 40px; }
+.ha-entity-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #21262d; font-size: 12px; flex-wrap: wrap; }
+.ha-entity-id { font-family: monospace; color: #58a6ff; min-width: 200px; font-size: 11px; }
+.ha-entity-name { flex: 1; color: #e6edf3; }
+.ha-entity-state { color: #8b949e; min-width: 50px; }
+
+/* Training advanced panel */
+.train-versions-list { min-height: 40px; }
+.train-version-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #21262d; font-size: 13px; }
+.train-version-row.train-version-active { background: rgba(63,185,80,.07); border-left: 2px solid #3fb950; padding-left: 6px; }
+.train-version-num { font-weight: 700; color: #58a6ff; min-width: 40px; }
+.train-version-ts { color: #8b949e; font-size: 11px; min-width: 150px; }
+.train-version-metrics { font-size: 11px; color: #8b949e; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.train-badge-active { background: rgba(63,185,80,.15); color: #3fb950; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.train-active-job, .train-job-row { font-size: 13px; }
+.train-job-row { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid #21262d; }
+.train-job-status { color: #f0883e; }

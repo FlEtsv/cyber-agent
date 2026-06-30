@@ -276,6 +276,10 @@
         <button class="sec-tab" data-sec="recordings">📹 Grabaciones</button>
         <button class="sec-tab" data-sec="heatmap">🗺️ Heatmap</button>
         <button class="sec-tab" data-sec="comms">📨 Comms</button>
+        <button class="sec-tab" data-sec="deterrence">🔊 Disuasión</button>
+        <button class="sec-tab" data-sec="actuators">⚡ Actuadores</button>
+        <button class="sec-tab" data-sec="ha-devices">🏠 Disp. HA</button>
+        <button class="sec-tab" data-sec="training-adv">🧠 Entrenamiento</button>
       </div>
 
       <!-- Panel: Telegram (ACTIVO) -->
@@ -615,6 +619,140 @@
             <div id="comms-templates-list" class="comms-templates-list">
               <div class="comms-loading">Cargando plantillas…</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Disuasión (AY-01..AY-08) -->
+      <div class="sec-panel" id="sec-panel-deterrence">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">🔊</span>
+          <div>
+            <div class="sec-panel-title">Disuasión</div>
+            <div class="sec-panel-sub">Menú de disuasión por cámara — niveles, actuadores y control en tiempo real</div>
+          </div>
+        </div>
+        <div class="sec-panel-body">
+          <div class="cam-section-title">Cámara</div>
+          <div class="comms-row">
+            <select id="deterr-cam-select" class="settings-input">
+              <option value="">— Seleccionar cámara —</option>
+            </select>
+            <button class="mini-btn" id="deterr-load-btn">Cargar</button>
+          </div>
+          <div id="deterr-panel" style="display:none">
+            <div class="cam-section-title">Modo</div>
+            <div class="comms-row">
+              <select id="deterr-mode-select" class="settings-input">
+                <option value="auto">Auto</option>
+                <option value="manual">Manual</option>
+                <option value="off">Desactivado</option>
+              </select>
+              <button class="mini-btn" id="deterr-mode-save">Guardar modo</button>
+            </div>
+            <div class="cam-section-title">Estado actual</div>
+            <div id="deterr-state-info" class="sec-info-block">—</div>
+            <div class="cam-section-title">Disparar nivel manual</div>
+            <div class="comms-row">
+              <select id="deterr-level-select" class="settings-input">
+                <option value="1">1 — Presencia (luz suave)</option>
+                <option value="2">2 — Audio aviso</option>
+                <option value="3">3 — Narración IA</option>
+                <option value="4">4 — Luz potente</option>
+                <option value="5">5 — Sirena</option>
+              </select>
+              <button class="mini-btn deterr-fire-btn" id="deterr-fire-btn">🔊 Disparar</button>
+              <button class="mini-btn" id="deterr-stop-btn">⛔ Parar</button>
+            </div>
+            <div id="deterr-result" class="sec-inline-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Actuadores (AT-05, AZ) -->
+      <div class="sec-panel" id="sec-panel-actuators">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">⚡</span>
+          <div>
+            <div class="sec-panel-title">Actuadores</div>
+            <div class="sec-panel-sub">Lista de actuadores del sistema · auto-test · asignación por cámara</div>
+          </div>
+        </div>
+        <div class="sec-panel-body">
+          <div class="comms-row">
+            <button class="mini-btn" id="actuators-refresh">↺ Actualizar</button>
+          </div>
+          <div id="actuators-list" class="actuators-list">
+            <div class="comms-loading">Cargando actuadores…</div>
+          </div>
+          <div class="cam-section-title">Asignar a cámara</div>
+          <div class="comms-row">
+            <select id="actuators-cam-select" class="settings-input">
+              <option value="">— Cámara —</option>
+            </select>
+          </div>
+          <div id="actuators-assign-list" class="actuators-assign-list"></div>
+          <button class="mini-btn" id="actuators-assign-save">Guardar asignación</button>
+          <span id="actuators-assign-result" class="sec-inline-status"></span>
+        </div>
+      </div>
+
+      <!-- Panel: Dispositivos HA (BA-01..06) -->
+      <div class="sec-panel" id="sec-panel-ha-devices">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">🏠</span>
+          <div>
+            <div class="sec-panel-title">Dispositivos HA</div>
+            <div class="sec-panel-sub">Descubrir entidades HA · vincular como actuadores · probar dispositivos</div>
+          </div>
+        </div>
+        <div class="sec-panel-body">
+          <div class="comms-row">
+            <select id="ha-domain-filter" class="settings-input">
+              <option value="">Todos los dominios</option>
+              <option value="light">Luces</option>
+              <option value="switch">Enchufes</option>
+              <option value="media_player">Altavoces</option>
+              <option value="siren">Sirenas</option>
+            </select>
+            <button class="mini-btn" id="ha-discover-btn">🔍 Descubrir</button>
+          </div>
+          <div id="ha-entities-list" class="ha-entities-list">
+            <div class="comms-loading">Pulsa Descubrir para ver entidades HA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Entrenamiento avanzado (AE-05..10) -->
+      <div class="sec-panel" id="sec-panel-training-adv">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">🧠</span>
+          <div>
+            <div class="sec-panel-title">Entrenamiento avanzado</div>
+            <div class="sec-panel-sub">Progreso en vivo · historial de versiones · comparativa A/B · promover/rollback</div>
+          </div>
+        </div>
+        <div class="sec-panel-body">
+          <div class="comms-row">
+            <select id="train-model-select" class="settings-input">
+              <option value="cyberagent-24b">cyberagent-24b</option>
+              <option value="codestral">codestral</option>
+              <option value="vision-security">vision-security</option>
+            </select>
+            <button class="mini-btn" id="train-versions-load">Ver versiones</button>
+          </div>
+          <!-- AE-06: Historial versiones -->
+          <div class="cam-section-title">Versiones</div>
+          <div id="train-versions-list" class="train-versions-list">
+            <div class="comms-loading">Selecciona un modelo y pulsa "Ver versiones"</div>
+          </div>
+          <!-- AE-05: Progreso en vivo -->
+          <div class="cam-section-title">Trabajo activo</div>
+          <div id="train-active-job" class="train-active-job">
+            <div class="comms-loading">Sin trabajo activo</div>
+          </div>
+          <div class="comms-row">
+            <button class="mini-btn" id="train-refresh-job">↺ Actualizar</button>
           </div>
         </div>
       </div>
