@@ -694,3 +694,130 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 ## Lo que NO se rompe
 Agente, relay/móvil, modos (Claude/código/imagen), supervisor, persistencia, las 120
 tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED`.
+
+---
+
+## 🧱 DESGLOSE GRANULAR (cola larga · Claude + Codex) — integrar 2 sistemas
+> Marca con estrella al empezar (`* progress QUIEN · fecha hora · NN%`), 100% al terminar.
+> Todo DESACTIVADO (gateado por `SECURITY_ENABLED`) salvo lo marcado [ACTIVO].
+> Estilo CyberAgent. Secretos SIEMPRE vía `app.secrets_vault` (prefijo `SEC_`).
+
+### A · Cerebro / brain_bridge (la IA de la centralita = nuestro agente)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| A-01 | ⬜ | Endpoint `/api/ext/chat` compatible con el formato ApiAsistente (request/response idénticos) | `app/api/server.py` |
+| A-02 | ⬜ | Mapear sesión ApiAsistente a conversación CyberAgent (session_id) | `app/security/brain_bridge.py` |
+| A-03 | ⬜ | Ruta de VISIÓN de cámara a Mistral NUBE (Pixtral, `SEC_MISTRAL_*`) para reacción instantánea | `app/security/brain_bridge.py`, `app/vision.py` |
+| A-04 | ⬜ | Ruta de CHAT (Telegram a agente) al modelo local cyberagent-24b con tools | `app/security/brain_bridge.py` |
+| A-05 | ⬜ | Cliente Mistral con la 2a clave + rate-limit separado del de CyberAgent | `app/security/mistral_sec.py` |
+| A-06 | ⬜ | Prompts de evento/visual (portar `_build_event_prompt`/`_build_visual_prompt`) | `app/security/prompts.py` |
+| A-07 | ⬜ | Parser de decisión (accion/confianza/motivo) | `app/security/decision.py` |
+| A-08 | ⬜ | Tests del brain_bridge (mock Mistral + local) | `tests/test_brain_bridge.py` |
+
+### B · Telegram completo (más allá de notif [ya ACTIVO])
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| B-01 | ⬜ | Bot con polling (python-telegram-bot) bajo el supervisor, gateado | `app/security/telegram/bot.py` |
+| B-02 | ⬜ | Comandos `/start /help /status /pending` | `app/security/telegram/commands.py` |
+| B-03 | ⬜ | 2FA / auth (admin + viewers) reutilizando TOTP del vault | `app/security/telegram/auth.py` |
+| B-04 | ⬜ | viewer_store (registro dinámico de viewers) | `app/security/telegram/viewers.py` |
+| B-05 | ⬜ | Chat-con-el-agente desde Telegram (chat_session a brain_bridge) | `app/security/telegram/chat.py` |
+| B-06 | ⬜ | Teclados inline (confirmar acción / ver cámara) | `app/security/telegram/keyboards.py` |
+| B-07 | ⬜ | Sanitizado HTML Telegram (quitar think, markdown a HTML) | `app/security/telegram/format.py` |
+| B-08 | ⬜ | Notif a chat principal + extras + viewers | `app/security/telegram/notify.py` |
+| B-09 | ⬜ | Comando activar/desactivar autonomía en caliente | `app/security/telegram/commands.py` |
+
+### C · Cámaras + motion
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| C-01 | ⬜ | camera_client: snapshot vía HA | `app/security/camera.py` |
+| C-02 | ⬜ | camera_client: RTSP frame con ffmpeg | `app/security/camera.py` |
+| C-03 | ⬜ | camera_client: clip corto (ffmpeg) | `app/security/camera.py` |
+| C-04 | ⬜ | motion_tracker: loop de seguimiento (snapshots cada N s) | `app/security/motion.py` |
+| C-05 | ⬜ | Cooldown + duración máx | `app/security/motion.py` |
+| C-06 | ⬜ | Notif inteligente durante seguimiento (followup snapshots) | `app/security/motion.py` |
+| C-07 | ⬜ | Registro de cámaras (property.json a DB) | `app/security/property_context.py` |
+
+### D · Eventos + autonomía + acciones
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| D-01 | ⬜ | event_store ring-buffer (portar) | `app/security/events.py` |
+| D-02 | ⬜ | event_handler: normaliza a CameraEvent/IncomingEvent | `app/security/events.py` |
+| D-03 | ⬜ | Routers `/security/events/*` `/security/cameras/*` montados en :8765 | `app/api/security_routes.py` |
+| D-04 | ⬜ | Auth apps externas (X-Event-Token = SEC_EVENT_TOKEN) | `app/api/security_routes.py` |
+| D-05 | ⬜ | autonomy: manual/operativa/alto-impacto a aprobaciones de CyberAgent | `app/security/autonomy.py` |
+| D-06 | ⬜ | action_executor: ejecutar decisión (timeout confirmación) | `app/security/actions.py` |
+| D-07 | ⬜ | app_registry (apps externas) | `app/security/app_registry.py` |
+| D-08 | ⬜ | alert_history + feedback_store (mas/menos) a training_store | `app/security/feedback.py` |
+| D-09 | ⬜ | schedule_store (tareas programadas de seguridad) | `app/security/schedule.py` |
+
+### E · Home Assistant (cada acción = tool del agente)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| E-01 | ⬜ | Tool `ha_control` (luz IR on/off, autofoco on/off) | `app/security/ha_tools.py` |
+| E-02 | ⬜ | Tool `ha_speak` (TTS por altavoz) | `app/security/ha_tools.py` |
+| E-03 | ⬜ | Tool `ha_camera` (snapshot/stream) | `app/security/ha_tools.py` |
+| E-04 | ⬜ | Tool `ha_script` (reboot, sync_clock, genérico) | `app/security/ha_tools.py` |
+| E-05 | ⬜ | Registrar tools HA en tools.py + router + DANGEROUS | `app/tools.py`, `app/tool_router.py` |
+
+### F · UI Web Seguridad (cada sub-vista, desactivada)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| F-01 | ⬜ | Sub-vista Cámaras (grid + placeholder) | `apps/web/*` |
+| F-02 | ⬜ | Sub-vista Eventos (timeline) | `apps/web/*` |
+| F-03 | ⬜ | Sub-vista Alertas (historial + feedback) | `apps/web/*` |
+| F-04 | ⬜ | Sub-vista Autonomía (toggle modos) | `apps/web/*` |
+| F-05 | ⬜ | Sub-vista Apps (registro externas) | `apps/web/*` |
+| F-06 | ⬜ | Sub-vista Aprendizaje (training_store stats) | `apps/web/*` |
+| F-07 | ⬜ | Badge "próximamente" consistente | `apps/web/style.css` |
+
+### G · Vault web UI + 2FA
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| G-01 | ⬜ | Endpoint `/api/vault/list` (enmascarado) + `/api/vault/reveal` (TOTP) | `app/api/server.py` |
+| G-02 | ⬜ | UI en Ajustes: lista de secretos + input authenticator a revelar | `apps/web/*` |
+| G-03 | ⬜ | UI: añadir/editar/borrar secreto | `apps/web/*` |
+| G-04 | ⬜ | Vault por el conector del relay (móvil) | `app/api/relay_connector.py` |
+
+### H · UI PC (GUI escritorio)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| H-01 | ⬜ | Sección Seguridad en la GUI, desactivada | `app/widgets/*` |
+| H-02 | ⬜ | Indicador de estado del módulo en el tray | `main.py` |
+
+### I · iOS (lo siguiente a atacar)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| I-01 | ⬜ | Vista Seguridad (SwiftUI) theme cyberagent, desactivada | `ios/CyberAgent/*` |
+| I-02 | ⬜ | Cliente de notificaciones push (recibir alertas) | `ios/CyberAgent/*` |
+
+### J · Docker (más granular)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| J-01 | ⬜ | Compose del stack de seguridad (HA/comunicaciones) gestionable por el agente | `integrations/security/docker-compose.yml` |
+| J-02 | ⬜ | Tool docker op update/resources (límites cpu/mem) | `app/docker_tools.py` |
+| J-03 | ⬜ | Health/auto-arranque del contenedor HA bajo el supervisor (gateado) | `app/supervisor.py` |
+
+### K · training_store + QLoRA
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| K-01 | ⬜ | Esquema training_store (instrucción/respuesta/señal) | `app/training_store.py` |
+| K-02 | ⬜ | Hook: capturar decisión a resultado de eventos | `app/security/events.py` |
+| K-03 | ⬜ | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
+| K-04 | ⬜ | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
+| K-05 | ⬜ | Export a formato QLoRA (jsonl chat) | `app/training_store.py` |
+| K-06 | ⬜ | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
+
+### L · Conciencia del agente
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| L-01 | ⬜ | System prompt: 2 claves Mistral, cámaras, HA, Docker, módulo seguridad | `app/ollama_client.py` |
+| L-02 | ⬜ | Doc de tools nuevas clara para el modelo | schemas |
+
+### M · Limpieza / estilo + tests + docs + wiring
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| M-01 | ⬜ | Adaptar nombres/estilo APiComuni a cyberllm | `app/security/*` |
+| M-02 | ⬜ | Tests por módulo de seguridad | `tests/test_security_*.py` |
+| M-03 | ⬜ | Doc docs/SECURITY_MODULE.md (arquitectura final) | `docs/` |
+| M-04 | ⬜ | Wiring notif: tarea-hecha / aprobación-pendiente a Telegram [ACTIVO al final] | `app/api/agent_runner.py`, `app/api/relay_connector.py` |
