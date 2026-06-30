@@ -788,7 +788,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | G-01 | ✅ | claude | Endpoint `/api/vault/list` (enmascarado) + `/api/vault/reveal` (TOTP) | `app/api/server.py` |
 | G-02 | ✅ | claude | UI en Ajustes: lista de secretos + input authenticator a revelar | `apps/web/index.html`, `apps/web/ui.js`, `apps/web/style.css` |
 | G-03 | ✅ | claude | UI: añadir/editar/borrar secreto | `apps/web/index.html`, `apps/web/ui.js` |
-| G-04 | ⬜ | claude | Vault por el conector del relay (móvil) | `app/api/relay_connector.py` |
+| G-04 | OK 100% claude | claude | Vault por el conector del relay (móvil) | `app/api/relay_connector.py` |
 
 ### H · UI PC (GUI escritorio)
 | ID | E | Agente | Tarea | Archivos |

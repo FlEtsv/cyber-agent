@@ -21,6 +21,27 @@ def handle_sync(action: str, msg: dict) -> dict:
             return {"files": db.get_files(
                 conversation_id=msg.get("conversation_id", "__all__"),
                 favorites_only=bool(msg.get("favorites_only", False)))}
+        # G-04: gestor de secretos por el relay (móvil). reveal exige TOTP.
+        if action == "vault_list":
+            from app.secrets_vault import list_secrets_masked
+            return {"secrets": [{**s, "key": s.get("name")} for s in list_secrets_masked()]}
+        if action == "vault_reveal":
+            from app.secrets_vault import _verify_totp, get_secret
+            key = (msg.get("key") or "").strip()
+            code = str(msg.get("totp") or "").strip()
+            if not key:
+                return {"ok": False, "error": "key requerida"}
+            if not _verify_totp(code):
+                return {"ok": False, "error": "Código TOTP inválido"}
+            val = get_secret(key)
+            return {"ok": val is not None, "key": key, "value": val}
+        if action == "vault_set":
+            from app.secrets_vault import set_secret
+            key = (msg.get("key") or "").strip()
+            if not key:
+                return {"ok": False, "error": "key requerida"}
+            set_secret(key, msg.get("value") or "")
+            return {"ok": True}
         if action == "deployments":
             from app.deployer import registered_deployments
             return registered_deployments()

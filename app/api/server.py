@@ -574,7 +574,9 @@ async def api_vault_list(request: Request):
         return g
     try:
         from app.secrets_vault import list_secrets_masked
-        return {"ok": True, "secrets": list_secrets_masked()}
+        # alias 'key' (= name) para compatibilidad con la UI del vault
+        secrets = [{**s, "key": s.get("name")} for s in list_secrets_masked()]
+        return {"ok": True, "secrets": secrets}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
