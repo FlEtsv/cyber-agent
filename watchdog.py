@@ -66,13 +66,14 @@ def app_pids() -> list[int]:
 
 
 def is_healthy() -> bool:
+    """El watchdog SOLO detecta una app COLGADA (endpoint que no responde). Si
+    /api/health contesta 200, la app está viva y sirviendo → NO reiniciamos,
+    aunque un servicio reporte 'healthy:false': de eso ya se ocupa el supervisor
+    in-process (curarlo sin tumbar la app). Reiniciar aquí por un fallo temporal
+    de un servicio haría que PAREZCA que todo falla."""
     try:
         with urllib.request.urlopen(HEALTH, timeout=8) as r:
-            if r.status != 200:
-                return False
-            d = json.loads(r.read().decode("utf-8"))
-            # None (arrancando) cuenta como vivo; solo False persistente es malo.
-            return d.get("healthy") is not False
+            return r.status == 200
     except Exception:
         return False
 
