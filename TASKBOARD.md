@@ -935,14 +935,14 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| V-01 | ⬜ | claude | Capa 0: detección de MOVIMIENTO en CPU (OpenCV/ffmpeg) por cámara, sin GPU | `app/security/motion_cpu.py` |
-| V-02 | ⬜ | claude | Árbitro de GPU (broker): estado "GPU ocupada por usuario" consultable; seguridad lo respeta | `app/security/gpu_broker.py` |
-| V-03 | ⬜ | claude | Router de visión: GPU libre→VLM local; GPU ocupada→Pixtral nube; amenaza→siempre nube | `app/security/vision_router.py` |
-| V-04 | ⬜ | claude | Prioridad: la inferencia del usuario NUNCA espera por seguridad (seguridad degrada a nube) | `app/security/gpu_broker.py`, `app/ollama_client.py` |
+| V-01 | ✅ | claude | Capa 0: detección de MOVIMIENTO en CPU (OpenCV/ffmpeg) por cámara, sin GPU | `app/security/motion_cpu.py` |
+| V-02 | ✅ | claude | Árbitro de GPU (broker): estado "GPU ocupada por usuario" consultable; seguridad lo respeta | `app/security/gpu_broker.py` |
+| V-03 | ✅ | claude | Router de visión: GPU libre→VLM local; GPU ocupada→Pixtral nube; amenaza→siempre nube | `app/security/vision_router.py` |
+| V-04 | ✅ | claude | Prioridad: la inferencia del usuario NUNCA espera por seguridad (seguridad degrada a nube) | `app/security/gpu_broker.py`, `app/ollama_client.py` |
 | V-05 | ⬜ | claude | Co-residencia: cerbero 24B Q3 (~11GB) + VLM triage (~2.5GB) caben juntos; validar VRAM real | `docs/VISION_MODEL.md` |
-| V-06 | ⬜ | claude | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
+| V-06 | ✅ | claude | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
 | V-07 | ⬜ | claude | Métricas: cuánto se usó CPU vs GPU vs nube (coste/latencia) en el dashboard | `apps/web/*`, `app/security/*` |
-| V-08 | ⬜ | claude | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
+| V-08 | ✅ | claude | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
 
 ---
 
@@ -994,22 +994,22 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### Z · Cómputo CPU/RAM (64 GB RAM + núcleos de sobra)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| Z-01 | ⬜ | claude | Perfil de recursos (RAM 64 GB, N núcleos) + presupuesto por subsistema | `app/compute/profile.py` |
-| Z-02 | ⬜ | claude | Cargas en CPU: movimiento (OpenCV), transcripción (whisper.cpp), embeddings RAG | `app/compute/cpu_pool.py` |
-| Z-03 | ⬜ | claude | Mover lo NO urgente a CPU/RAM cuando la GPU está ocupada (batch, embeddings) | `app/compute/scheduler.py` |
-| Z-04 | ⬜ | claude | Caché en RAM de frames/embeddings (aprovechar los 64 GB) | `app/compute/ram_cache.py` |
-| Z-05 | ⬜ | claude | Pool de workers CPU para visión/audio de respaldo | `app/compute/cpu_pool.py` |
-| Z-06 | ⬜ | claude | VLM tiny en CPU como último recurso si GPU+nube no disponibles | `app/security/vision_local.py` |
+| Z-01 | ✅ | claude | Perfil de recursos (RAM 64 GB, N núcleos) + presupuesto por subsistema | `app/compute/profile.py` |
+| Z-02 | ✅ | claude | Cargas en CPU: movimiento (OpenCV), transcripción (whisper.cpp), embeddings RAG | `app/compute/cpu_pool.py` |
+| Z-03 | ✅ | claude | Mover lo NO urgente a CPU/RAM cuando la GPU está ocupada (batch, embeddings) | `app/compute/scheduler.py` |
+| Z-04 | ✅ | claude | Caché en RAM de frames/embeddings (aprovechar los 64 GB) | `app/compute/ram_cache.py` |
+| Z-05 | ✅ | claude | Pool de workers CPU para visión/audio de respaldo | `app/compute/cpu_pool.py` |
+| Z-06 | ✅ | claude | VLM tiny en CPU como último recurso si GPU+nube no disponibles | `app/security/vision_local.py` |
 
 ### AA · Modo JUEGO / minimización de recursos
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AA-01 | ⬜ | claude | Detectar "modo juego" (fullscreen / GPU intensiva) y entrar en modo mínimo | `app/compute/game_mode.py` |
-| AA-02 | ⬜ | claude | Liberar el 24B de VRAM (free_vram) al entrar en juego | `app/compute/game_mode.py` |
-| AA-03 | ⬜ | claude | Seguridad en juego: solo ojo local mínimo o degradar a nube/CPU | `app/security/gpu_broker.py` |
-| AA-04 | ⬜ | claude | Si no cabe nada local → Mistral NUBE para todo lo crítico | `app/security/vision_router.py` |
-| AA-05 | ⬜ | claude | Restaurar al salir del juego (recargar modelos, reanudar vigilancia local) | `app/compute/game_mode.py` |
-| AA-06 | ⬜ | claude | Pausar entrenamiento si arranca un juego (libera VRAM) | `app/training/scheduler.py` |
+| AA-01 | ✅ | claude | Detectar "modo juego" (fullscreen / GPU intensiva) y entrar en modo mínimo | `app/compute/game_mode.py` |
+| AA-02 | ✅ | claude | Liberar el 24B de VRAM (free_vram) al entrar en juego | `app/compute/game_mode.py` |
+| AA-03 | ✅ | claude | Seguridad en juego: solo ojo local mínimo o degradar a nube/CPU | `app/security/gpu_broker.py` |
+| AA-04 | ✅ | claude | Si no cabe nada local → Mistral NUBE para todo lo crítico | `app/security/vision_router.py` |
+| AA-05 | ✅ | claude | Restaurar al salir del juego (recargar modelos, reanudar vigilancia local) | `app/compute/game_mode.py` |
+| AA-06 | ✅ | claude | Pausar entrenamiento si arranca un juego (libera VRAM) | `app/training/scheduler.py` |
 
 ---
 
