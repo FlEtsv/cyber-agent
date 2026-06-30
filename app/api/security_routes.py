@@ -246,6 +246,120 @@ async def start_camera_recording(
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+# ── P-06: Descarga de clip ────────────────────────────────────────────────────
+
+@router.get("/recordings/{recording_id}/download")
+async def download_recording(
+    recording_id: int,
+    app_name: str = Depends(_require_auth),
+):
+    """P-06: Descarga un clip de video grabado."""
+    from fastapi.responses import FileResponse
+    try:
+        from app.security.recorder import get_recording
+        rec = get_recording(recording_id)
+        if not rec:
+            return JSONResponse({"ok": False, "error": "Grabación no encontrada"}, status_code=404)
+        path = rec.get("path", "")
+        import os as _os
+        if not path or not _os.path.exists(path):
+            return JSONResponse({"ok": False, "error": "Fichero no disponible"}, status_code=404)
+        filename = _os.path.basename(path)
+        return FileResponse(path, media_type="video/mp4", filename=filename)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# ── P-07: Exportar razonamiento IA de una grabación ──────────────────────────
+
+@router.get("/recordings/{recording_id}/report")
+async def recording_report(
+    recording_id: int,
+    app_name: str = Depends(_require_auth),
+) -> JSONResponse:
+    """P-07: Exporta el razonamiento de la IA (por qué se grabó, detecciones) en JSON."""
+    try:
+        from app.security.recorder import get_recording
+        rec = get_recording(recording_id)
+        if not rec:
+            return JSONResponse({"ok": False, "error": "Grabación no encontrada"}, status_code=404)
+        from app.security.events import recent as recent_events
+        events = [
+            e for e in recent_events(50)
+            if e.get("cam_id") == rec.get("cam_id")
+            and abs((e.get("ts") or 0) - (rec.get("started_at") or 0)) < rec.get("duration", 60) + 10
+        ]
+        report = {
+            "recording": rec,
+            "events": events,
+            "summary": (
+                f"Clip de {rec.get('duration', 0)}s en cámara {rec.get('cam_id')} "
+                f"disparado por {rec.get('trigger', 'desconocido')}. "
+                f"{len(events)} evento(s) detectado(s) durante la grabación."
+            ),
+        }
+        return JSONResponse({"ok": True, "report": report})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# ── Q-01..Q-02: Zone editor endpoints ────────────────────────────────────────
+
+@router.get("/cameras/{cam_id}/zones")
+async def get_camera_zones(
+    cam_id: str,
+    app_name: str = Depends(_require_auth),
+) -> JSONResponse:
+    """Q-01/Q-06: Lista zonas de vigilancia de una cámara."""
+    try:
+        from app.security.zones import list_zones
+        zones = [
+            {"id": z.id, "cam_id": z.cam_id, "name": z.name,
+             "type": z.type, "points": z.points, "color": z.color}
+            for z in list_zones(cam_id)
+        ]
+        return JSONResponse({"ok": True, "cam_id": cam_id, "zones": zones})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/cameras/{cam_id}/zones")
+async def create_camera_zone(
+    cam_id: str,
+    request: Request,
+    app_name: str = Depends(_require_auth),
+) -> JSONResponse:
+    """Q-01/Q-06: Crea una zona de vigilancia (polígono dibujado)."""
+    data = await request.json()
+    try:
+        from app.security.zones import add_zone
+        result = add_zone(
+            cam_id=cam_id,
+            name=data.get("name", "Zona"),
+            zone_type=data.get("type", "warning"),
+            points=data.get("points", []),
+            color=data.get("color", "#f85149"),
+        )
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.delete("/cameras/{cam_id}/zones/{zone_id}")
+async def delete_camera_zone(
+    cam_id: str,
+    zone_id: int,
+    app_name: str = Depends(_require_auth),
+) -> JSONResponse:
+    """Q-01/Q-06: Elimina una zona de vigilancia."""
+    try:
+        from app.security.zones import delete_zone
+        result = delete_zone(zone_id)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 # ── HA Webhook (sin auth para HA que llama directo) ───────────────────────────
 
 @router.post("/ha/webhook")

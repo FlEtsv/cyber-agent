@@ -12,8 +12,9 @@ from __future__ import annotations
 DATA_MAP: dict[str, list[tuple[str, float]]] = {
     "cyberagent-24b": [
         ("interaction", 0.0),
-        ("feedback", 0.5),       # solo feedback positivo
-        ("correction", 0.0),     # todas las correcciones
+        ("feedback", 0.5),           # solo feedback positivo
+        ("correction", 0.0),         # todas las correcciones
+        ("tool_usage_training", 0.7),  # AH-02: ejemplos de orquestación correcta de tools
     ],
     "codestral": [
         ("interaction", 0.0),    # filtrado por meta.model después

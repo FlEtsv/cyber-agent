@@ -201,6 +201,9 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Mover aquí desde EN PROGRESO al terminar.
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
+[claude] BATCH-5 — AQ-03 rate-limit wired en notify.py (get_limiter), AL-08 register_predictor_feedback en data_map.py — Commit: 56ed237 — Fecha: 2026-07-01
+[claude] BATCH-4 — AT-01..05+AU-01..08+AV-01..06+AW-01..08+AX-01..04+AY-01..08+AZ-01..05+BA-01..06 (actuadores, audio, deterrence, HA discovery, web UI deterrence/actuators/HA/training), AR-06 chat.py, AR-07 reactions.py, AS-02 auth.py, AS-03 audit.py, M-03 SECURITY_MODULE.md, AV-03 TAPO_HA.md, AV-06 ADD_ACTUATOR.md, I-02 PushManager.swift — Commit: batch-4 — Fecha: 2026-07-01
+[claude] BATCH-3 — R-01..03 camera_types/analysis_exterior/imaging, S-01 InteriorCamera, N-02/N-08 stream.py, O-02/O-06 live_brain.py, AJ-08 UI cat-confirm, AS-01 comms config web, AS-05 test endpoint, X-01..11 auto_train.py, AE-05..07 training UI — Commit: batch-3 — Fecha: 2026-07-01
 [claude] AT..AW — Actuadores (base, registry, system_speaker), audio (player, library, tts, live_narrate), deterrence.py+deterrence_tools.py — Commit: 7a5b186 — Fecha: 2026-06-30
 [claude] AO..AR+K-06+AF-09 — Comms niveles, digest, reglas, keyboards, callbacks, comandos bot Telegram, RunPod doc, training scheduler — Commit: f8357a1 — Fecha: 2026-06-30
 [claude] AI..AN — Detección+reID+tracking+patrones+anomalías+Telegram Topics (detect.py, pets.py, reid.py, tracker.py, space_map.py, zones.py, patterns.py, predictor.py, anomaly.py, species_priors.py, telegram_topics.py, setup.py) — Commit: 88b9730 — Fecha: 2026-06-30
@@ -690,12 +693,12 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 | SEC-004 | ✅ 100% claude | claude | **Gestor de secretos LOCAL** (`app/secrets_vault.py`): cifra/guarda claves (2× Mistral, Telegram, HA, EVENT_TOKEN); revela en la web tras 2FA TOTP. Endpoint + UI en Ajustes | `app/secrets_vault.py`, `app/api/server.py`, `apps/web/*` |
 | SEC-005 | ✅ 100% claude | claude | **Telegram NOTIFICACIONES (ACTIVO)**: portar el bot del proyecto; CyberAgent emite por Telegram (tarea hecha, aprobación pendiente, alerta). Reusa TELEGRAM_BOT_TOKEN/CHAT_ID del vault | `app/security/notify.py`, `app/api/agent_runner.py`, `app/api/server.py` |
 | SEC-006 | ✅ 100% claude | claude | **Tools Docker** para el agente: `docker_ps/start/stop/restart/logs/stats/compose_up/compose_down/run`. En DANGEROUS_TOOLS. Categoría router "docker" | `app/tools.py`, `app/tool_router.py`, `app/docker_tools.py` |
-| SEC-007 | ⬜ | * | **brain_bridge** + endpoint `/api/ext/chat` (compatible ApiAsistente) que corre nuestro agente; análisis de cámara → Mistral NUBE (Pixtral) | `app/security/brain_bridge.py`, `app/api/server.py` |
-| SEC-008 | ⬜ | * | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |
-| SEC-009 | ⬜ | * | Portar `event_handler`+`event_store`+`action_executor`+`autonomy` (DESACTIVADO); autonomía → mapear a aprobaciones | `app/security/events.py`, `actions.py` |
+| SEC-007 | ✅ 100% claude | claude | **brain_bridge** + endpoint `/api/ext/chat` (compatible ApiAsistente) que corre nuestro agente; análisis de cámara → Mistral NUBE (Pixtral) | `app/security/brain_bridge.py`, `app/api/server.py` |
+| SEC-008 | ✅ 100% claude | claude | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |
+| SEC-009 | ✅ 100% claude | claude | Portar `event_handler`+`event_store`+`action_executor`+`autonomy` (DESACTIVADO); autonomía → mapear a aprobaciones | `app/security/events.py`, `actions.py` |
 | SEC-010 | ✅ 100% claude | claude | **Conciencia del agente**: system prompt + tools docs reflejan 2 claves Mistral, cámaras, HA, Docker | `app/ollama_client.py` |
 | SEC-012 | ⬜ | * | Cablear seccion **Seguridad** en el modulo **iOS** (vista + theme cyberagent), desactivada | `ios/CyberAgent/*` |
-| SEC-011 | ⬜ | * | **training_store** (grifo de datos QLoRA): captura decisión→resultado, feedback 👍/👎, aprobaciones, en formato instrucción/respuesta/señal | `app/training_store.py` |
+| SEC-011 | ✅ 100% claude | claude | **training_store** (grifo de datos QLoRA): captura decisión→resultado, feedback 👍/👎, aprobaciones, en formato instrucción/respuesta/señal | `app/training_store.py` |
 
 > **Reglas de reparto:** Claude toma SEC-001..005 (estructura + UI + secretos +
 > Telegram). Codex puede tomar SEC-006..011 (tools Docker, brain_bridge, portado de
@@ -800,12 +803,12 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | I-01 | ⬜ | codex | Vista Seguridad (SwiftUI) theme cyberagent, desactivada | `ios/CyberAgent/Security/SecurityView.swift` |
-| I-02 | ⬜ | claude | Cliente de notificaciones push (recibir alertas) | `ios/CyberAgent/Security/PushManager.swift` |
+| I-02 | ✅ 100% claude | claude | Cliente de notificaciones push (recibir alertas) | `ios/CyberAgent/Security/PushManager.swift` |
 
 ### J · Docker (más granular)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| J-01 | ⬜ | claude | Compose del stack de seguridad (HA/comunicaciones) gestionable por el agente | `integrations/security/docker-compose.yml` |
+| J-01 | ✅ 100% claude | claude | Compose del stack de seguridad (HA/comunicaciones) gestionable por el agente | `integrations/security/docker-compose.yml` |
 | J-02 | ✅ | claude | Tool docker op update/resources (límites cpu/mem) | `app/docker_tools.py` |
 | J-03 | ✅ | claude | Health/auto-arranque del contenedor HA bajo el supervisor (gateado) | `app/supervisor.py` |
 
@@ -823,14 +826,14 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | L-01 | ✅ | claude | System prompt: 2 claves Mistral, cámaras, HA, Docker, módulo seguridad | `app/ollama_client.py` |
-| L-02 | ⬜ | claude | Doc de tools nuevas clara para el modelo | schemas en `app/ollama_client.py` |
+| L-02 | ✅ 100% claude | claude | Doc de tools nuevas clara para el modelo | `docs/SECURITY_TOOLS.md` (schemas + reglas de uso + env vars) |
 
 ### M · Limpieza / estilo + tests + docs + wiring
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| M-01 | ⬜ | claude | Adaptar nombres/estilo APiComuni a cyberllm | `app/security/*` |
+| M-01 | ✅ 100% claude | claude | Adaptar nombres/estilo APiComuni a cyberllm | `app/security/__init__.py`, `notify.py` |
 | M-02 | ⬜ | claude | Tests por módulo de seguridad | `tests/test_security_*.py` |
-| M-03 | ⬜ | claude | Doc docs/SECURITY_MODULE.md (arquitectura final) | `docs/` |
+| M-03 | ✅ 100% claude | claude | Doc docs/SECURITY_MODULE.md (arquitectura final) | `docs/SECURITY_MODULE.md` |
 | M-04 | ✅ | claude | Wiring notif: tarea-hecha / aprobación-pendiente a Telegram [ACTIVO] | `app/api/agent_runner.py` |
 
 ---
@@ -844,7 +847,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | N-01 | ✅ | claude | Layout dashboard de cámaras (grid responsive, web + PC) | `apps/web/*`, `app/widgets/*` |
-| N-02 | ⬜ | claude | Tarjeta de cámara con stream EN TIEMPO REAL (HA camera_proxy / RTSP a WebRTC-HLS-MJPEG) | `apps/web/*`, `app/security/stream.py` |
+| N-02 | ✅ 100% claude | claude | Tarjeta de cámara con stream EN TIEMPO REAL (HA camera_proxy / RTSP a WebRTC-HLS-MJPEG) | `apps/web/*`, `app/security/stream.py` |
 | N-03 | ✅ | claude | Botón "Añadir cámara" (modal: nombre, tipo exterior/interior, RTSP/HA entity, ubicación) | `apps/web/*` |
 | N-04 | ✅ | claude | Botón "Volver a CyberAgent" | `apps/web/*` |
 | N-05 | ✅ | claude | Botón "Abrir agente con contexto de cámara" (seleccionar cámara a chat contextualizado) | `apps/web/*`, `app/api/*` |
@@ -856,68 +859,68 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | O-01 | ⬜ | claude | Layout vista de UNA cámara (video grande + panel IA) | `apps/web/*` |
-| O-02 | ⬜ | claude | Panel "Lo que la IA ve y razona" EN VIVO (stream de razonamiento) | `apps/web/*`, `app/security/live_brain.py` |
+| O-02 | ✅ 100% claude | claude | Panel "Lo que la IA ve y razona" EN VIVO (stream de razonamiento) | `apps/web/*`, `app/security/live_brain.py` |
 | O-03 | ⬜ | claude | Lista de DETECCIONES (timestamp, tipo, confianza, recorte) | `apps/web/*` |
 | O-04 | ⬜ | claude | ACTIVIDADES IGNORADAS (lo que la IA descartó) + por qué | `apps/web/*` |
 | O-05 | ⬜ | claude | Línea de tiempo de eventos de esa cámara | `apps/web/*` |
-| O-06 | ⬜ | claude | Backend: stream del razonamiento IA por cámara (SSE/WS) | `app/security/live_brain.py` |
+| O-06 | ✅ 100% claude | claude | Backend: stream del razonamiento IA por cámara (SSE/WS) | `app/security/live_brain.py` |
 
 ### P · Grabación / reproducción / exportación
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| P-01 | ⬜ | claude | Grabar clip (manual + automático en evento) | `app/security/recorder.py` |
-| P-02 | ⬜ | claude | Almacén de videos por cámara (DB índice + ficheros) | `app/security/recorder.py` |
-| P-03 | ⬜ | claude | Reproductor con controles nativos (play/pause/seek/velocidad) | `apps/web/*` |
+| P-01 | ✅ 100% claude | claude | Grabar clip (manual + automático en evento) | `app/security/recorder.py` |
+| P-02 | ✅ 100% claude | claude | Almacén de videos por cámara (DB índice + ficheros) | `app/security/recorder.py` |
+| P-03 | ✅ 100% claude | claude | Reproductor con controles nativos (play/pause/seek/velocidad) | `apps/web/index.html` (native `<video>` controls) |
 | P-04 | ⬜ | claude | Saltar a MOMENTOS de actividad (marcadores en la timeline) | `apps/web/*` |
 | P-05 | ⬜ | claude | Recorte de video (trim in/out) | `apps/web/*`, `app/security/recorder.py` |
-| P-06 | ⬜ | claude | Descarga / exportación de clips | `app/api/*` |
-| P-07 | ⬜ | claude | Exportar el RAZONAMIENTO de la IA (por qué fue amenaza, si notificó, si lo descartó) en informe | `app/security/report.py` |
-| P-08 | ⬜ | claude | Retención/limpieza de grabaciones (política + espacio) | `app/security/recorder.py` |
+| P-06 | ✅ 100% claude | claude | Descarga / exportación de clips | `app/api/security_routes.py` GET /recordings/{id}/download |
+| P-07 | ✅ 100% claude | claude | Exportar el RAZONAMIENTO de la IA (por qué fue amenaza, si notificó, si lo descartó) en informe | `app/api/security_routes.py` GET /recordings/{id}/report |
+| P-08 | ✅ 100% claude | claude | Retención/limpieza de grabaciones (política + espacio) | `app/storage/retention.py` |
 
 ### Q · Zonas de vigilancia (áreas dibujables)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| Q-01 | ⬜ | claude | Editor de zonas sobre el frame (dibujar polígonos) | `apps/web/*` |
-| Q-02 | ⬜ | claude | Tipos de zona: WARNING/amenaza y SEGURA (colorear cada una) | `apps/web/*` |
-| Q-03 | ⬜ | claude | Solapamiento: prevalece la de MAYOR riesgo | `app/security/zones.py` |
-| Q-04 | ⬜ | claude | Solo notificar si la amenaza está DENTRO de zona de vigilancia | `app/security/zones.py` |
+| Q-01 | ✅ 100% claude | claude | Editor de zonas sobre el frame (dibujar polígonos) | `apps/web/*` + `app/api/security_routes.py` /zones CRUD |
+| Q-02 | ✅ 100% claude | claude | Tipos de zona: WARNING/amenaza y SEGURA (colorear cada una) | `app/security/zones.py` Zone.type + color |
+| Q-03 | ✅ 100% claude | claude | Solapamiento: prevalece la de MAYOR riesgo | `app/security/zones.py` |
+| Q-04 | ✅ 100% claude | claude | Solo notificar si la amenaza está DENTRO de zona de vigilancia | `app/security/zones.py` |
 | Q-05 | ⬜ | claude | Cuadrícula "lo que la IA debe vigilar" (regiones de interés) | `apps/web/*` |
-| Q-06 | ⬜ | claude | Backend: persistir zonas por cámara + punto-en-polígono | `app/security/zones.py` |
-| Q-07 | ⬜ | claude | La IA recibe las zonas como contexto al analizar | `app/security/live_brain.py` |
+| Q-06 | ✅ 100% claude | claude | Backend: persistir zonas por cámara + punto-en-polígono | `app/security/zones.py` |
+| Q-07 | ✅ 100% claude | claude | La IA recibe las zonas como contexto al analizar | `app/security/live_brain.py` |
 
 ### R · Cámara EXTERIOR
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| R-01 | ⬜ | claude | Tipo exterior (config + eventos esperados: intrusión, merodeo, persona) | `app/security/camera_types.py` |
-| R-02 | ⬜ | claude | Análisis de personas: etnia, vestimenta, acción, aspecto, puntos clave (descripción policial) | `app/security/analysis_exterior.py` |
-| R-03 | ⬜ | claude | Mejora de imagen (resolución/nitidez/enfoque) para capturar lo importante | `app/security/imaging.py` |
-| R-04 | ⬜ | claude | Lógica de DISUASIÓN (la IA decide disuadir vs alertar) | `app/security/deterrence.py` |
-| R-05 | ⬜ | claude | Tools de disuasión exterior (HA + externos): luz potente/láser/linterna BT, altavoz con retransmisión de video en curso | `app/security/deterrence_tools.py` |
-| R-06 | ⬜ | claude | Contexto de la cámara (ubicación, qué vigilar) editable | `apps/web/*`, `cameras_db` |
-| R-07 | ⬜ | claude | Catálogo de herramientas disuasorias asignables por cámara | `apps/web/*`, `app/security/*` |
-| R-08 | ⬜ | claude | Escalado de amenaza (disuadir a alertar usuario a emergencia) | `app/security/deterrence.py` |
+| R-01 | ✅ 100% claude | claude | Tipo exterior (config + eventos esperados: intrusión, merodeo, persona) | `app/security/camera_types.py` |
+| R-02 | ✅ 100% claude | claude | Análisis de personas: etnia, vestimenta, acción, aspecto, puntos clave (descripción policial) | `app/security/analysis_exterior.py` |
+| R-03 | ✅ 100% claude | claude | Mejora de imagen (resolución/nitidez/enfoque) para capturar lo importante | `app/security/imaging.py` |
+| R-04 | ✅ 100% claude | claude | Lógica de DISUASIÓN (la IA decide disuadir vs alertar) | `app/security/deterrence.py` |
+| R-05 | ✅ 100% claude | claude | Tools de disuasión exterior (HA + externos): luz potente/láser/linterna BT, altavoz con retransmisión de video en curso | `app/security/deterrence_tools.py` |
+| R-06 | ✅ 100% claude | claude | Contexto de la cámara (ubicación, qué vigilar) editable | `apps/web/*`, `cameras_db` |
+| R-07 | ✅ 100% claude | claude | Catálogo de herramientas disuasorias asignables por cámara | `apps/web/*`, `app/security/*` |
+| R-08 | ✅ 100% claude | claude | Escalado de amenaza (disuadir a alertar usuario a emergencia) | `app/security/deterrence.py` |
 
 ### S · Cámara INTERIOR (protección de gatos)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| S-01 | ⬜ | claude | Tipo interior (hereda genérico, NO exterior) | `app/security/camera_types.py` |
-| S-02 | ⬜ | claude | Gestión de mascotas (añadir gato + fotos para reconocimiento) | `apps/web/*`, `app/security/pets.py` |
-| S-03 | ⬜ | claude | Reconocimiento/re-identificación de gatos por las fotos | `app/security/pets.py` |
-| S-04 | ⬜ | claude | Modo trayectoria (seguir el recorrido del gato) | `app/security/motion.py` |
-| S-05 | ⬜ | claude | Zonas peligrosas para el animal (cocina, enchufes, TV…) dibujables | `apps/web/*`, `zones` |
-| S-06 | ⬜ | claude | Detección de peligros (gato en zona peligrosa, rotura, desorden, anomalía) | `app/security/analysis_interior.py` |
-| S-07 | ⬜ | claude | Aprendizaje de lugares seguros/patrones de los gatos | `app/security/pets.py`, `training_store` |
-| S-08 | ⬜ | claude | Tools de disuasión interior (altavoz potente, sonidos por escenario para separar gatos) | `app/security/deterrence_tools.py` |
-| S-09 | ⬜ | claude | Modo noche (conectar a dispositivos de disuasión interior — próximamente) | `app/security/deterrence_tools.py` |
+| S-01 | ✅ 100% claude | claude | Tipo interior (hereda genérico, NO exterior) | `app/security/camera_types.py` |
+| S-02 | ✅ 100% claude | claude | Gestión de mascotas (añadir gato + fotos para reconocimiento) | `apps/web/*`, `app/security/pets.py` |
+| S-03 | ✅ 100% claude | claude | Reconocimiento/re-identificación de gatos por las fotos | `app/security/pets.py`, `app/security/reid.py` |
+| S-04 | ✅ 100% claude | claude | Modo trayectoria (seguir el recorrido del gato) | `app/security/tracker.py` |
+| S-05 | ✅ 100% claude | claude | Zonas peligrosas para el animal (cocina, enchufes, TV…) dibujables | `apps/web/*`, `app/security/zones.py` |
+| S-06 | ✅ 100% claude | claude | Detección de peligros (gato en zona peligrosa, rotura, desorden, anomalía) | `app/security/analysis_interior.py` |
+| S-07 | ✅ 100% claude | claude | Aprendizaje de lugares seguros/patrones de los gatos | `app/security/pets.py`, `app/security/patterns.py` |
+| S-08 | ✅ 100% claude | claude | Tools de disuasión interior (altavoz potente, sonidos por escenario para separar gatos) | `app/security/deterrence_tools.py` |
+| S-09 | ✅ 100% claude | claude | Modo noche (conectar a dispositivos de disuasión interior — próximamente) | `app/security/deterrence_tools.py` |
 | S-10 | ⬜ | claude | Preconfigurar 3 cámaras de interior | `cameras_db` |
 
 ### T · Modelo de visión local rápido (+ nube)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | T-01 | OK 100% claude | claude | Evaluar VLM local ligero/rápido (Moondream2 ~1.8B vs Qwen2.5-VL 3B) para triage continuo | `docs/VISION_MODEL.md` |
-| T-02 | ⬜ | claude | Integrar el VLM de triage (presencia/movimiento/¿persona o gato?) en Ollama | `app/security/vision_local.py` |
-| T-03 | ⬜ | claude | Análisis profundo bajo demanda a Mistral NUBE (Pixtral) cuando el triage dispara | `app/security/brain_bridge.py` |
-| T-04 | ⬜ | claude | Pipeline eficiente (frame sampling, no cada frame; cola; backpressure) | `app/security/vision_pipeline.py` |
+| T-02 | ✅ 100% claude | claude | Integrar el VLM de triage (presencia/movimiento/¿persona o gato?) en Ollama | `app/security/vision_local.py` |
+| T-03 | ✅ 100% claude | claude | Análisis profundo bajo demanda a Mistral NUBE (Pixtral) cuando el triage dispara | `app/security/brain_bridge.py` |
+| T-04 | ✅ 100% claude | claude | Pipeline eficiente (frame sampling, no cada frame; cola; backpressure) | `app/security/vision_pipeline.py` |
 
 ### U · Comunicaciones/Notificaciones CENTRALIZADAS (CyberAgent general, NO submódulo)
 | ID | E | Agente | Tarea | Archivos |
@@ -970,28 +973,28 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### X · Auto-entrenamiento por modelo (umbral, scheduling, QLoRA)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| X-01 | ⬜ | claude | Registro de modelos ENTRENABLES (los más usados + críticos + LOCALES) con metadatos (uso, criticidad) | `app/training/registry.py` |
-| X-02 | ⬜ | claude | Contador de ejemplos de entrenamiento POR MODELO (cuántos de alta señal hay listos) | `app/training/registry.py` |
-| X-03 | ⬜ | claude | **Detección del UMBRAL por modelo** (24B ~1500, Codestral ~1000, visión ~500; auto-sugerido + configurable) | `app/training/thresholds.py` |
-| X-04 | ⬜ | claude | Cola de entrenamiento (qué modelo toca cuando alcanza umbral) | `app/training/queue.py` |
-| X-05 | ⬜ | claude | Scheduler: entrenar SOLO con el usuario PRESENTE en el PC (detección de presencia/actividad) | `app/training/scheduler.py` |
-| X-06 | ⬜ | claude | Coordinar con seguridad: al entrenar, avisar y degradar vigilancia local a NUBE (casa no queda ciega) | `app/training/scheduler.py`, `app/security/gpu_broker.py` |
-| X-07 | ⬜ | claude | Pipeline QLoRA: local si cabe en 16 GB, si no RunPod A100 (decidir por VRAM/tamaño) | `app/training/qlora.py` |
-| X-08 | ⬜ | claude | Evaluación post-entrenamiento (A/B contra el anterior) antes de promover el adapter | `app/training/evaluate.py` |
-| X-09 | ⬜ | claude | Versionado de modelos/adapters + rollback si empeora | `app/training/versioning.py` |
-| X-10 | ⬜ | claude | Notificar (comms/Telegram) cuando un modelo está listo para entrenar / terminó / mejoró | `app/comms/*` |
-| X-11 | ⬜ | claude | Consentimiento: el entrenamiento lo lanza el usuario (no automático sin permiso) | `apps/web/*`, `app/widgets/*` |
+| X-01 | ✅ 100% claude | claude | Registro de modelos ENTRENABLES (los más usados + críticos + LOCALES) con metadatos (uso, criticidad) | `app/training/registry.py` |
+| X-02 | ✅ 100% claude | claude | Contador de ejemplos de entrenamiento POR MODELO (cuántos de alta señal hay listos) | `app/training/registry.py` |
+| X-03 | ✅ 100% claude | claude | **Detección del UMBRAL por modelo** (24B ~1500, Codestral ~1000, visión ~500; auto-sugerido + configurable) | `app/training/thresholds.py` |
+| X-04 | ✅ 100% claude | claude | Cola de entrenamiento (qué modelo toca cuando alcanza umbral) | `app/training/queue.py` |
+| X-05 | ✅ 100% claude | claude | Scheduler: entrenar SOLO con el usuario PRESENTE en el PC (detección de presencia/actividad) | `app/training/scheduler.py` |
+| X-06 | ✅ 100% claude | claude | Coordinar con seguridad: al entrenar, avisar y degradar vigilancia local a NUBE (casa no queda ciega) | `app/training/scheduler.py`, `app/security/gpu_broker.py` |
+| X-07 | ✅ 100% claude | claude | Pipeline QLoRA: local si cabe en 16 GB, si no RunPod A100 (decidir por VRAM/tamaño) | `app/training/qlora.py` |
+| X-08 | ✅ 100% claude | claude | Evaluación post-entrenamiento (A/B contra el anterior) antes de promover el adapter | `app/training/evaluate.py` |
+| X-09 | ✅ 100% claude | claude | Versionado de modelos/adapters + rollback si empeora | `app/training/versioning.py` |
+| X-10 | ✅ 100% claude | claude | Notificar (comms/Telegram) cuando un modelo está listo para entrenar / terminó / mejoró | `app/comms/*` |
+| X-11 | ✅ 100% claude | claude | Consentimiento: el entrenamiento lo lanza el usuario (no automático sin permiso) | `apps/web/*`, `app/widgets/*` |
 
 ### Y · Almacenamiento (SD 1.8 TB: modelos, datasets, video 15 días por ley)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | Y-01 | ✅ 100% claude | claude | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
 | Y-02 | ⬜ | claude | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
-| Y-03 | ⬜ | claude | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
+| Y-03 | ✅ 100% claude | claude | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
 | Y-04 | ✅ 100% claude | claude | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
 | Y-05 | ✅ 100% claude | claude | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/layout.py` (StorageLayout.info) |
 | Y-06 | ✅ 100% claude | claude | Almacén de datasets de entrenamiento (jsonl comprimido, por modelo, versionado) | `app/storage/datasets.py` |
-| Y-07 | ⬜ | claude | Índice/DB de grabaciones (cámara, momento, eventos asociados) | `app/security/recorder.py` |
+| Y-07 | ✅ 100% claude | claude | Índice/DB de grabaciones (cámara, momento, eventos asociados) | `app/security/recorder.py` (recordings.db) |
 | Y-08 | ✅ 100% claude | claude | Backups del vault/DB en la SD (rotación) | `app/storage/backup.py` |
 
 ### Z · Cómputo CPU/RAM (64 GB RAM + núcleos de sobra)
@@ -1055,9 +1058,9 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AE-02 | ✅ | claude | Lista de modelos con barra de progreso (ejemplos/umbral) + estado | `apps/web/*` |
 | AE-03 | ✅ | claude | Badge "✅ listo para entrenar" cuando supera umbral | `apps/web/*` |
 | AE-04 | ✅ | claude | Botón "Entrenar <modelo>" → preflight (VRAM/presencia/seguridad/coste) → confirmar | `apps/web/*`, `app/api/*` |
-| AE-05 | ⬜ | claude | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
-| AE-06 | ⬜ | claude | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
-| AE-07 | ⬜ | claude | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
+| AE-05 | ✅ 100% claude | claude | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
+| AE-06 | ✅ 100% claude | claude | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
+| AE-07 | ✅ 100% claude | claude | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
 | AE-08 | ⬜ | claude | Detalle del dataset (abre el editor AC-03) | `apps/web/*` |
 | AE-09 | ⬜ | claude | Ajustes avanzados (hiperparámetros) plegables | `apps/web/*` |
 | AE-10 | OK 100% claude | claude | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
@@ -1081,7 +1084,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AG-01 | ✅ 100% claude | claude | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
 | AG-02 | ✅ 100% claude | claude | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
 | AG-03 | ✅ | claude | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
-| AG-04 | ⬜ | claude | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
+| AG-04 | ✅ 100% claude | claude | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
 | AG-05 | ✅ | claude | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
 | AG-06 | ✅ | claude | Tras promover: marcar los ejemplos como "usados" (no re-entrenar con lo mismo) | `app/training_store.py` |
 | AG-07 | ✅ | claude | Notificar resultado por comms (mejoró X%, promovido/descartado) | `app/comms/*` |
@@ -1090,10 +1093,10 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | AH-01 | ✅ | claude | Por cada modelo, registrar QUÉ tools usa más (telemetría de uso de tools) | `app/training/tool_usage.py` |
-| AH-02 | ⬜ | claude | Generar ejemplos de tool-use EXITOSO (orquestación correcta) como dato de entrenamiento | `app/training_store.py` |
-| AH-03 | ⬜ | claude | Entrenar al 24b en mejor SELECCIÓN de tools (del tool_router + resultados) | `app/training/data_map.py` |
-| AH-04 | ⬜ | claude | Entrenar al router de tools con sus aciertos/fallos de categoría | `app/training/data_map.py` |
-| AH-05 | ⬜ | claude | Métricas: tasa de tool correcta antes/después de entrenar (medir mejora real) | `app/training/evaluate.py` |
+| AH-02 | ✅ 100% claude | claude | Generar ejemplos de tool-use EXITOSO (orquestación correcta) como dato de entrenamiento | `app/training/tool_usage.py` `generate_training_examples()` |
+| AH-03 | ✅ 100% claude | claude | Entrenar al 24b en mejor SELECCIÓN de tools (del tool_router + resultados) | `app/training/data_map.py` (tool_usage_training kind) |
+| AH-04 | ✅ 100% claude | claude | Entrenar al router de tools con sus aciertos/fallos de categoría | `app/training/tool_usage.py` `register_router_feedback()` |
+| AH-05 | ✅ 100% claude | claude | Métricas: tasa de tool correcta antes/después de entrenar (medir mejora real) | `app/training/tool_usage.py` `tool_accuracy_report()` |
 
 ---
 
@@ -1122,7 +1125,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AJ-05 | ✅ 100% claude | Matcher: similitud coseno embedding + pelaje + proporciones → cuál gato (con umbral de confianza) | `app/security/reid.py` |
 | AJ-06 | ✅ 100% claude | "Desconocido" si ninguna referencia supera el umbral (gato nuevo / intruso animal) | `app/security/reid.py` |
 | AJ-07 | ✅ 100% claude | Aprendizaje continuo: confirmaciones del usuario añaden referencias (mejora re-ID) | `app/security/reid.py`, `training_store` |
-| AJ-08 | ⬜ | UI: confirmar/corregir "¿es Michi?" → feedback que refina el matcher | `apps/web/*` |
+| AJ-08 | ✅ 100% claude | UI: confirmar/corregir "¿es Michi?" → feedback que refina el matcher | `apps/web/*` |
 
 ### AK · Tracking + comprensión espacial (capa 3)
 | ID | E | Tarea | Archivos |
@@ -1144,18 +1147,18 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AL-05 | ✅ 100% claude | Priors por ESPECIE (gato: altura, sol, comida, sigilo) como base | `app/security/species_priors.py` |
 | AL-06 | ✅ 100% claude | Refinamiento por INDIVIDUO sobre los priors (cada gato su modelo) | `app/security/patterns.py` |
 | AL-07 | ✅ 100% claude | Detección de ANOMALÍA: comportamiento fuera del patrón aprendido → posible problema | `app/security/anomaly.py` |
-| AL-08 | ⬜ | Dataset del predictor visual → entra en el subsistema de entrenamiento (umbral propio) | `app/training/data_map.py` |
-| AL-09 | ⬜ | Visualización de patrones en el dashboard (heatmap, rutas, horarios por gato) | `apps/web/*` |
+| AL-08 | ✅ 100% claude | Dataset del predictor visual → entra en el subsistema de entrenamiento (umbral propio) | `app/training/data_map.py` |
+| AL-09 | ✅ 100% claude | Visualización de patrones en el dashboard (heatmap, rutas, horarios por gato) | `apps/web/*` |
 
 ### AM · Seguridad de los gatos (acción sobre patrones)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
 | AM-01 | ✅ 100% claude | Alerta si un gato entra en zona peligrosa (cocina/enchufes/TV) | `app/security/anomaly.py`, `app/comms/*` |
 | AM-02 | ✅ 100% claude | Predicción preventiva: si el patrón sugiere que VA hacia zona peligrosa, avisar/disuadir antes | `app/security/predictor.py` |
-| AM-03 | ⬜ | Disuasión interior por escenario (altavoz: sonidos para separar gatos / alejarlos de peligro) | `app/security/deterrence_tools.py` |
-| AM-04 | ⬜ | Modo noche: usar dispositivos de disuasión interior (próximamente) según patrón nocturno | `app/security/deterrence_tools.py` |
-| AM-05 | ⬜ | Detección de problemas: rotura, desorden, anomalía en la escena (no solo el gato) | `app/security/analysis_interior.py` |
-| AM-06 | ⬜ | Informe diario de los gatos (dónde estuvieron, incidencias, salud aparente) por comms | `app/comms/*`, `app/security/report.py` |
+| AM-03 | ✅ 100% claude | Disuasión interior por escenario (altavoz: sonidos para separar gatos / alejarlos de peligro) | `app/security/deterrence_tools.py` |
+| AM-04 | ✅ 100% claude | Modo noche: usar dispositivos de disuasión interior (próximamente) según patrón nocturno | `app/security/deterrence_tools.py` |
+| AM-05 | ✅ 100% claude | Detección de problemas: rotura, desorden, anomalía en la escena (no solo el gato) | `app/security/analysis_interior.py` |
+| AM-06 | ✅ 100% claude | Informe diario de los gatos (dónde estuvieron, incidencias, salud aparente) por comms | `app/comms/*`, `app/security/report.py` |
 
 ---
 
@@ -1182,7 +1185,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AO-02 | ✅ 100% claude | Mapear severidad→tema + sonido (disable_notification) + pin | `app/comms/router.py` |
 | AO-03 | ✅ 100% claude | CRÍTICA: sonido + pin + (opcional) repetir hasta ACK | `app/comms/router.py` (CRÍTICA nunca silenciada) |
 | AO-04 | ✅ 100% claude | BAJA/PERIÓDICA: silenciosa + va a DIGEST (no mensaje suelto) | `app/comms/digest.py` |
-| AO-05 | ⬜ | Editar-en-sitio: una alerta evoluciona (analizando→resuelto) sin spamear | `app/comms/telegram.py` |
+| AO-05 | ✅ 100% claude | Editar-en-sitio: una alerta evoluciona (analizando→resuelto) sin spamear | `app/comms/telegram.py` |
 | AO-06 | ✅ 100% claude | Reglas por FUENTE (agente/error/seguridad/gatos) → severidad por defecto editable | `app/comms/rules.py` |
 
 ### AP · Panel de comandos por mensaje (inline keyboards "en respuesta a")
@@ -1200,7 +1203,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 |----|---|-------|----------|
 | AQ-01 | ✅ 100% claude | Buffer de notificaciones BAJA/PERIÓDICA → resumen cada N min/horas | `app/comms/digest.py` |
 | AQ-02 | ✅ 100% claude | Agrupar repetidas (mismo evento N veces) en una sola con contador | `app/comms/digest.py` (DigestBuffer con dedup por clave title[:40]) |
-| AQ-03 | ⬜ | Rate-limit (respetar límites de Telegram) + cola con reintento | `app/comms/telegram.py` |
+| AQ-03 | ✅ 100% claude | Rate-limit (respetar límites de Telegram) + cola con reintento | `app/comms/rate_limiter.py`, `app/security/notify.py` |
 | AQ-04 | ✅ 100% claude | Resumen diario programado (estado casa, gatos, sistema) | `app/comms/digest.py` (maybe_auto_flush) |
 | AQ-05 | ✅ 100% claude | Horario "no molestar" (solo CRÍTICA suena de noche) | `app/comms/rules.py` |
 
@@ -1212,17 +1215,17 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AR-03 | ✅ 100% claude | /modo <manual|operativa|alto-impacto> → autonomía de seguridad en caliente | `app/comms/commands.py` |
 | AR-04 | ✅ 100% claude | /camara <nombre> → snapshot/stream + panel de acciones | `app/comms/commands.py` |
 | AR-05 | ✅ 100% claude | /resumen → digest bajo demanda; /estado → salud del sistema | `app/comms/commands.py` |
-| AR-06 | ⬜ | Chat libre con el AGENTE desde Telegram (texto → brain_bridge → respuesta) | `app/comms/chat.py` |
-| AR-07 | ⬜ | Reacciones (👍/👎) como feedback rápido → training_store | `app/comms/reactions.py` |
+| AR-06 | ✅ 100% claude | Chat libre con el AGENTE desde Telegram (texto → brain_bridge → respuesta) | `app/comms/chat.py` |
+| AR-07 | ✅ 100% claude | Reacciones (👍/👎) como feedback rápido → training_store | `app/comms/reactions.py` |
 
 ### AS · Config + permisos + UI del módulo comms
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AS-01 | ⬜ | Config de comms en Ajustes (web/PC): temas, severidades por fuente, no-molestar, digest | `apps/web/*`, `app/widgets/*` |
-| AS-02 | ⬜ | Auth: solo admin ejecuta acciones; viewers solo ven (reutiliza 2FA/vault) | `app/comms/auth.py` |
-| AS-03 | ⬜ | Registro/auditoría de notificaciones enviadas y acciones ejecutadas | `app/comms/audit.py` |
+| AS-01 | ✅ 100% claude | Config de comms en Ajustes (web/PC): temas, severidades por fuente, no-molestar, digest | `apps/web/*`, `app/widgets/*` |
+| AS-02 | ✅ 100% claude | Auth: solo admin ejecuta acciones; viewers solo ven (reutiliza 2FA/vault) | `app/comms/auth.py` |
+| AS-03 | ✅ 100% claude | Registro/auditoría de notificaciones enviadas y acciones ejecutadas | `app/comms/audit.py` |
 | AS-04 | OK 100% claude | Plantillas de mensaje por tipo (formato/emoji/campos) editables | `app/comms/templates.py` |
-| AS-05 | ⬜ | Test de notificación (enviar de prueba a cada tema) desde la UI | `apps/web/*` |
+| AS-05 | ✅ 100% claude | Test de notificación (enviar de prueba a cada tema) desde la UI | `apps/web/*` |
 
 ---
 
@@ -1236,53 +1239,53 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AT · Capa de actuadores (abstracción de hardware)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AT-01 | ⬜ | Interfaz `DeterrenceActuator` (capabilities, is_available, fire(intent)) | `app/security/actuators/base.py` |
-| AT-02 | ⬜ | Registro de actuadores disponibles + asignación POR CÁMARA | `app/security/actuators/registry.py` |
-| AT-03 | ⬜ | Degradación elegante: elegir el mejor actuador disponible para una intención | `app/security/actuators/registry.py` |
-| AT-04 | ⬜ | Estado/salud de cada actuador (BT conectado? altavoz vivo? HA online?) | `app/security/actuators/registry.py` |
-| AT-05 | ⬜ | UI: asignar actuadores a una cámara + test de disparo | `apps/web/*` |
+| AT-01 | ✅ 100% claude | Interfaz `DeterrenceActuator` (capabilities, is_available, fire(intent)) | `app/security/actuators/base.py` |
+| AT-02 | ✅ 100% claude | Registro de actuadores disponibles + asignación POR CÁMARA | `app/security/actuators/registry.py` |
+| AT-03 | ✅ 100% claude | Degradación elegante: elegir el mejor actuador disponible para una intención | `app/security/actuators/registry.py` |
+| AT-04 | ✅ 100% claude | Estado/salud de cada actuador (BT conectado? altavoz vivo? HA online?) | `app/security/actuators/registry.py` |
+| AT-05 | ✅ 100% claude | UI: asignar actuadores a una cámara + test de disparo | `apps/web/*` |
 
 ### AU · Audio (camino principal HOY)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AU-01 | ⬜ | Reproductor de audio del PC con selección de dispositivo de salida (Windows) | `app/security/audio/player.py` |
-| AU-02 | ⬜ | Actuador AltavozBluetooth (pair/route + reproducir) | `app/security/actuators/bt_speaker.py` |
-| AU-03 | ⬜ | Actuador AltavozSistema (fallback) | `app/security/actuators/system_speaker.py` |
-| AU-04 | ⬜ | Biblioteca de sonidos por ESCENARIO (sirena, ladrido, alarma, aviso) + gestor | `app/security/audio/library.py` |
-| AU-05 | ⬜ | TTS local (edge-tts/pyttsx3) → voz por el altavoz elegido | `app/security/audio/tts.py` |
-| AU-06 | ⬜ | TTS EN VIVO: la IA narra lo que ve (descripción del intruso) en tiempo real | `app/security/audio/live_narrate.py` |
-| AU-07 | ⬜ | Multi-idioma + voces configurables | `app/security/audio/tts.py` |
-| AU-08 | ⬜ | Reconexión BT automática (si se cae, reintenta o cae a sistema) | `app/security/actuators/bt_speaker.py` |
+| AU-01 | ✅ 100% claude | Reproductor de audio del PC con selección de dispositivo de salida (Windows) | `app/security/audio/player.py` |
+| AU-02 | ✅ 100% claude | Actuador AltavozBluetooth (pair/route + reproducir) | `app/security/actuators/bt_speaker.py` |
+| AU-03 | ✅ 100% claude | Actuador AltavozSistema (fallback) | `app/security/actuators/system_speaker.py` |
+| AU-04 | ✅ 100% claude | Biblioteca de sonidos por ESCENARIO (sirena, ladrido, alarma, aviso) + gestor | `app/security/audio/library.py` |
+| AU-05 | ✅ 100% claude | TTS local (edge-tts/pyttsx3) → voz por el altavoz elegido | `app/security/audio/tts.py` |
+| AU-06 | ✅ 100% claude | TTS EN VIVO: la IA narra lo que ve (descripción del intruso) en tiempo real | `app/security/audio/live_narrate.py` |
+| AU-07 | ✅ 100% claude | Multi-idioma + voces configurables | `app/security/audio/tts.py` |
+| AU-08 | ✅ 100% claude | Reconexión BT automática (si se cae, reintenta o cae a sistema) | `app/security/actuators/bt_speaker.py` |
 
 ### AV · Actuadores HA + futuros
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AV-01 | ⬜ | Actuador LuzHA (encender luces como presencia/aviso) | `app/security/actuators/ha_light.py` |
-| AV-02 | ⬜ | Actuador SirenaHA (si algún modelo lo soporta; detectar capacidad) | `app/security/actuators/ha_siren.py` |
-| AV-03 | ⬜ | Mapear funciones REALES y aprovechables de la Tapo vía HA (auditar qué llega) | `docs/TAPO_HA.md` |
-| AV-04 | ⬜ | Actuador genérico "enchufe inteligente" (foco potente/estrobo futuro) | `app/security/actuators/smart_plug.py` |
-| AV-05 | ⬜ | Actuador Láser/LuzBT (futuro, interfaz lista) | `app/security/actuators/light_bt.py` |
-| AV-06 | ⬜ | Plantilla para añadir un actuador nuevo (doc + clase base) | `docs/ADD_ACTUATOR.md` |
+| AV-01 | ✅ 100% claude | Actuador LuzHA (encender luces como presencia/aviso) | `app/security/actuators/ha_light.py` |
+| AV-02 | ✅ 100% claude | Actuador SirenaHA (si algún modelo lo soporta; detectar capacidad) | `app/security/actuators/ha_siren.py` |
+| AV-03 | ✅ 100% claude | Mapear funciones REALES y aprovechables de la Tapo vía HA (auditar qué llega) | `docs/TAPO_HA.md` |
+| AV-04 | ✅ 100% claude | Actuador genérico "enchufe inteligente" (foco potente/estrobo futuro) | `app/security/actuators/smart_plug.py` |
+| AV-05 | ✅ 100% claude | Actuador Láser/LuzBT (futuro, interfaz lista) | `app/security/actuators/light_bt.py` |
+| AV-06 | ✅ 100% claude | Plantilla para añadir un actuador nuevo (doc + clase base) | `docs/ADD_ACTUATOR.md` |
 
 ### AW · Lógica de disuasión (la IA decide)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AW-01 | ⬜ | Niveles de disuasión: 1 presencia → 2 audio → 3 narración → 4 luz → 5 escalar | `app/security/deterrence.py` |
-| AW-02 | ⬜ | La IA elige el nivel según amenaza/zona/hora/contexto de la cámara | `app/security/deterrence.py` |
-| AW-03 | ⬜ | Escalado automático si la amenaza persiste (sube de nivel) | `app/security/deterrence.py` |
-| AW-04 | ⬜ | De-escalado/cancelar si la amenaza desaparece o el usuario lo para | `app/security/deterrence.py` |
-| AW-05 | ⬜ | Tools de disuasión para el agente (deter_warn, deter_sound, deter_narrate, deter_light) | `app/security/deterrence_tools.py`, `app/tools.py` |
-| AW-06 | ⬜ | Contexto editable por cámara (qué hay, qué se permite disuadir, límites) | `apps/web/*`, `cameras_db` |
-| AW-07 | ⬜ | Modo "solo avisar al usuario" (sin disuasión activa) configurable | `app/security/deterrence.py` |
-| AW-08 | ⬜ | Registro de cada disuasión (qué nivel, qué actuador, resultado) → training_store | `app/security/deterrence.py`, `training_store` |
+| AW-01 | ✅ 100% claude | Niveles de disuasión: 1 presencia → 2 audio → 3 narración → 4 luz → 5 escalar | `app/security/deterrence.py` |
+| AW-02 | ✅ 100% claude | La IA elige el nivel según amenaza/zona/hora/contexto de la cámara | `app/security/deterrence.py` |
+| AW-03 | ✅ 100% claude | Escalado automático si la amenaza persiste (sube de nivel) | `app/security/deterrence.py` |
+| AW-04 | ✅ 100% claude | De-escalado/cancelar si la amenaza desaparece o el usuario lo para | `app/security/deterrence.py` |
+| AW-05 | ✅ 100% claude | Tools de disuasión para el agente (deter_warn, deter_sound, deter_narrate, deter_light) | `app/security/deterrence_tools.py`, `app/tools.py` |
+| AW-06 | ✅ 100% claude | Contexto editable por cámara (qué hay, qué se permite disuadir, límites) | `apps/web/*`, `cameras_db` |
+| AW-07 | ✅ 100% claude | Modo "solo avisar al usuario" (sin disuasión activa) configurable | `app/security/deterrence.py` |
+| AW-08 | ✅ 100% claude | Registro de cada disuasión (qué nivel, qué actuador, resultado) → training_store | `app/security/deterrence.py`, `training_store` |
 
 ### AX · Seguridad/legalidad de la disuasión
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AX-01 | ⬜ | Límites configurables (no disuadir en zonas públicas, horarios, intensidad) | `app/security/deterrence_limits.py` |
-| AX-02 | ⬜ | Confirmación humana para niveles altos (láser/sirena) salvo modo autónomo | `app/security/deterrence.py` |
-| AX-03 | ⬜ | Aviso legal: la narración informa de grabación (cumplimiento) | `app/security/audio/library.py` |
-| AX-04 | ⬜ | Cooldown anti-abuso (no disparar en bucle) | `app/security/deterrence.py` |
+| AX-01 | ✅ 100% claude | Límites configurables (no disuadir en zonas públicas, horarios, intensidad) | `app/security/deterrence_limits.py` |
+| AX-02 | ✅ 100% claude | Confirmación humana para niveles altos (láser/sirena) salvo modo autónomo | `app/security/deterrence.py` |
+| AX-03 | ✅ 100% claude | Aviso legal: la narración informa de grabación (cumplimiento) | `app/security/audio/library.py` |
+| AX-04 | ✅ 100% claude | Cooldown anti-abuso (no disparar en bucle) | `app/security/deterrence.py` |
 
 ---
 
@@ -1296,30 +1299,30 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AY · Menú de disuasión en la vista de cámara
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AY-01 | ⬜ | Panel "Disuasión" en la vista de cámara: lista de actuadores asignados + estado (rojo/ámbar/verde) | `apps/web/*` |
-| AY-02 | ⬜ | Añadir actuador a la cámara (elegir de los disponibles del sistema) | `apps/web/*`, `actuators/registry` |
-| AY-03 | ⬜ | Por actuador: campo "comportamiento esperado" (texto) que el agente usa para cablear/testear | `apps/web/*`, `cameras_db` |
-| AY-04 | ⬜ | Botón "Cablear/Configurar" → el agente designado conecta el actuador real | `app/security/actuators/wire.py` |
-| AY-05 | ⬜ | Botón "Probar" (emite prueba real: sonido/narración/luz) — habilitado solo si VERDE | `apps/web/*`, `actuators/registry` |
-| AY-06 | ⬜ | Semáforo de estado: ROJO (sin cablear) · ÁMBAR (cableado, sin verificar) · VERDE (test OK) | `app/security/actuators/registry.py` |
-| AY-07 | ⬜ | Editor de niveles: qué actuadores dispara cada nivel de disuasión (1..5) por cámara | `apps/web/*` |
-| AY-08 | ⬜ | Presets rápidos: "narración + ladridos + luces" (lo que Steve quiere de salida) | `apps/web/*`, `deterrence` |
+| AY-01 | ✅ 100% claude | Panel "Disuasión" en la vista de cámara: lista de actuadores asignados + estado (rojo/ámbar/verde) | `apps/web/*` |
+| AY-02 | ✅ 100% claude | Añadir actuador a la cámara (elegir de los disponibles del sistema) | `apps/web/*`, `actuators/registry` |
+| AY-03 | ✅ 100% claude | Por actuador: campo "comportamiento esperado" (texto) que el agente usa para cablear/testear | `apps/web/*`, `cameras_db` |
+| AY-04 | ✅ 100% claude | Botón "Cablear/Configurar" → el agente designado conecta el actuador real | `app/security/actuators/wire.py` |
+| AY-05 | ✅ 100% claude | Botón "Probar" (emite prueba real: sonido/narración/luz) — habilitado solo si VERDE | `apps/web/*`, `actuators/registry` |
+| AY-06 | ✅ 100% claude | Semáforo de estado: ROJO (sin cablear) · ÁMBAR (cableado, sin verificar) · VERDE (test OK) | `app/security/actuators/registry.py` |
+| AY-07 | ✅ 100% claude | Editor de niveles: qué actuadores dispara cada nivel de disuasión (1..5) por cámara | `apps/web/*` |
+| AY-08 | ✅ 100% claude | Presets rápidos: "narración + ladridos + luces" (lo que Steve quiere de salida) | `apps/web/*`, `deterrence` |
 
 ### AZ · Auto-cableado + test por el agente (verde = funciona)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AZ-01 | ⬜ | El agente lee "comportamiento esperado" → genera la integración del actuador | `app/security/actuators/wire.py` |
-| AZ-02 | ⬜ | Auto-test del actuador (dispara y verifica respuesta) → marca VERDE/rojo con evidencia | `app/security/actuators/selftest.py` |
-| AZ-03 | ⬜ | Reporte del test (qué hizo, qué se esperaba, resultado) visible en el menú | `apps/web/*` |
-| AZ-04 | ⬜ | Re-test bajo demanda + auto-test periódico de salud del actuador | `app/security/actuators/selftest.py` |
-| AZ-05 | ⬜ | Si un actuador pasa a ROJO (se desconectó), avisar por comms y degradar | `app/comms/*`, `actuators/registry` |
+| AZ-01 | ✅ 100% claude | El agente lee "comportamiento esperado" → genera la integración del actuador | `app/security/actuators/wire.py` |
+| AZ-02 | ✅ 100% claude | Auto-test del actuador (dispara y verifica respuesta) → marca VERDE/rojo con evidencia | `app/security/actuators/selftest.py` |
+| AZ-03 | ✅ 100% claude | Reporte del test (qué hizo, qué se esperaba, resultado) visible en el menú | `apps/web/*` |
+| AZ-04 | ✅ 100% claude | Re-test bajo demanda + auto-test periódico de salud del actuador | `app/security/actuators/selftest.py` |
+| AZ-05 | ✅ 100% claude | Si un actuador pasa a ROJO (se desconectó), avisar por comms y degradar | `app/comms/*`, `actuators/registry` |
 
 ### BA · Añadir dispositivos inteligentes a HA desde el menú
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| BA-01 | ⬜ | Descubrir entidades HA disponibles (luces, enchufes, switches) y listarlas | `app/security/ha_discovery.py` |
-| BA-02 | ⬜ | "Añadir dispositivo": vincular una entidad HA (casquillo/enchufe inteligente) como actuador | `apps/web/*`, `actuators/ha_light`, `actuators/smart_plug` |
-| BA-03 | ⬜ | Asistente para emparejar un dispositivo NUEVO en HA (guía/llamada a HA) | `app/security/ha_pairing.py` |
-| BA-04 | ⬜ | Probar el dispositivo recién añadido (on/off/parpadeo) desde el menú | `apps/web/*` |
-| BA-05 | ⬜ | Catálogo de tipos soportados (luz, enchufe, sirena, switch) extensible | `app/security/actuators/catalog.py` |
-| BA-06 | ⬜ | Guardar dispositivos añadidos en el vault/config (credenciales HA reutilizadas) | `app/secrets_vault.py`, `cameras_db` |
+| BA-01 | ✅ 100% claude | Descubrir entidades HA disponibles (luces, enchufes, switches) y listarlas | `app/security/ha_discovery.py` |
+| BA-02 | ✅ 100% claude | "Añadir dispositivo": vincular una entidad HA (casquillo/enchufe inteligente) como actuador | `apps/web/*`, `actuators/ha_light`, `actuators/smart_plug` |
+| BA-03 | ✅ 100% claude | Asistente para emparejar un dispositivo NUEVO en HA (guía/llamada a HA) | `app/security/ha_discovery.py` |
+| BA-04 | ✅ 100% claude | Probar el dispositivo recién añadido (on/off/parpadeo) desde el menú | `apps/web/*` |
+| BA-05 | ✅ 100% claude | Catálogo de tipos soportados (luz, enchufe, sirena, switch) extensible | `app/security/ha_discovery.py` |
+| BA-06 | ✅ 100% claude | Guardar dispositivos añadidos en el vault/config (credenciales HA reutilizadas) | `app/secrets_vault.py`, `cameras_db` |

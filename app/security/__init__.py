@@ -1,5 +1,5 @@
 """
-Módulo de SEGURIDAD de CyberAgent (APiComuni v2). Centralita domótica: cámaras,
+Módulo de SEGURIDAD de CyberAgent. Centralita domótica: cámaras,
 eventos, Home Assistant, Telegram, autonomía — con NUESTRO cerebro.
 
 Estado: todo DESACTIVADO por defecto (SECURITY_ENABLED) salvo el notificador de

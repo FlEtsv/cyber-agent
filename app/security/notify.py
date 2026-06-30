@@ -2,7 +2,7 @@
 Notificador de Telegram de CyberAgent (ACTIVO).
 
 Canal de notificación saliente: CyberAgent avisa por Telegram (tarea terminada,
-aprobación pendiente, alerta de seguridad…). Usa el MISMO bot de APiComuni
+aprobación pendiente, alerta de seguridad…). Usa el bot de Telegram
 (SEC_TELEGRAM_BOT_TOKEN / SEC_TELEGRAM_CHAT_ID en el gestor de secretos) — solo
 cambia el propósito. Solo API HTTP de Telegram (sin dependencia pesada).
 """
