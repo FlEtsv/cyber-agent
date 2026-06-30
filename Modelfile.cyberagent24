@@ -1,0 +1,12 @@
+FROM huihui_ai/mistral-small-abliterated:24b-instruct-2501-q3_K_M
+
+# Mistral Small 24B abliterado (sin censura) en Q3_K_M (~11 GB) → cabe entero en
+# 16 GB con margen y corre fluido. El system prompt de CyberAgent lo inyecta la
+# app en runtime. num_ctx 16384 aprovecha el margen que deja el Q3.
+PARAMETER num_ctx 16384
+PARAMETER num_gpu 99
+PARAMETER temperature 0.2
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.05
+PARAMETER num_batch 512

@@ -557,8 +557,11 @@ class CyberAgent {
         text: redactReportValue(text),
         images: imageSrcs.length,
       });
-      this._persistHistoryMessage({ role: 'user', text, images: imageSrcs, ts: Date.now() });
+      // Fija/crea el id de la conversación ANTES de persistir, si no el primer
+      // mensaje de un chat nuevo se guardaba bajo "default" y al recargar
+      // desaparecía (la conversación recibía otro id).
       this._touchConversation(text);
+      this._persistHistoryMessage({ role: 'user', text, images: imageSrcs, ts: Date.now() });
     }
     const wrap = document.createElement('div');
     wrap.className = `msg user${opts.restored ? ' restored' : ''}`;
@@ -857,14 +860,17 @@ class CyberAgent {
       role: 'assistant',
       text: redactReportValue(this.currentBubble._raw),
     });
-    this._persistHistoryMessage({ role: 'assistant', text: this.currentBubble._raw, ts: Date.now() });
+    // Persistimos también el coste de esta respuesta para que el botón $ siga
+    // disponible tras recargar (antes el coste vivía solo en memoria).
+    this._persistHistoryMessage({ role: 'assistant', text: this.currentBubble._raw,
+                                  cost: this._pendingCost || null, ts: Date.now() });
     this._touchConversation(this.currentBubble._raw, 'assistant');
     // Footer de feedback/escalada solo en respuestas reales con texto.
     if ((this.currentBubble._raw || '').trim()) this._appendFeedbackFooter(this.currentBubble);
     this.currentBubble = null;
   }
 
-  _addRestoredAIBubble(text) {
+  _addRestoredAIBubble(text, cost = null) {
     if (!text) return;
     const wrap = document.createElement('div');
     wrap.className = 'msg ai restored';
@@ -880,6 +886,20 @@ class CyberAgent {
     contentEl.className = 'msg-content';
     contentEl.innerHTML = renderMd(text);
     body.appendChild(contentEl);
+
+    // Restaura el botón $ de gasto si esta respuesta lo tenía persistido.
+    if (cost) {
+      const footer = document.createElement('div');
+      footer.className = 'msg-feedback';
+      const dollar = document.createElement('button');
+      dollar.className = 'fb-btn fb-cost';
+      dollar.type = 'button';
+      dollar.innerHTML = '$';
+      dollar.title = 'Ver gasto de esta respuesta y del mes';
+      dollar.addEventListener('click', () => this._showCostModal(cost));
+      footer.appendChild(dollar);
+      body.appendChild(footer);
+    }
 
     wrap.appendChild(avatar);
     wrap.appendChild(body);
@@ -1010,13 +1030,13 @@ class CyberAgent {
   _modelOptions() {
     const opts = [
       { value: '',                      label: '(heredar / auto)' },
-      { value: 'cyberagent-24b',        label: 'Modelo local — Mistral 24B' },
-      { value: 'cyberagent-codestral:latest', label: 'Codestral 22B — local (código)' },
+      { value: 'cyberagent-24b',        label: 'Mistral 24B — general (~45 tok/s)' },
+      { value: 'cyberagent-codestral:latest', label: 'Codestral 22B — código (~20 tok/s)' },
       { value: 'codestral-latest',      label: 'Codestral (nube)' },
       { value: 'mistral-medium-latest', label: 'Mistral Medium (nube)' },
       { value: 'mistral-large-latest',  label: 'Mistral Large (nube)' },
     ];
-    (this.availableModels || []).forEach(m => {
+    if (false) (this.availableModels || []).forEach(m => {
       if (m && m !== 'auto' && !opts.find(o => o.value === m)
           && !/^(mistral|magistral|pixtral|codestral)-/i.test(m)) {
         opts.push({ value: m, label: this._modelLabel(m) });
@@ -1390,7 +1410,7 @@ class CyberAgent {
         restored++;
       } else if (role === 'assistant') {
         flushAssistant();
-        this._addRestoredAIBubble(item.text || item.content || '');
+        this._addRestoredAIBubble(item.text || item.content || '', item.cost || null);
         restored++;
       } else if (type === 'token') {
         assistantText += item.data || '';
@@ -2037,8 +2057,8 @@ class CyberAgent {
         { value: 'fused', label: '🤝 Fusionado (local + Mistral)' },
       ]},
       { label: '🟢 Local · gratis (tu GPU)', items: [
-        { value: 'cyberagent-24b',  label: '🟢 Modelo local — Mistral 24B' },
-        { value: LOCAL_CODESTRAL,   label: '🟢 Codestral 22B — local (código)' },
+        { value: 'cyberagent-24b',  label: '🟢 Mistral 24B — general (~45 tok/s · 16k ctx)' },
+        { value: LOCAL_CODESTRAL,   label: '🟢 Codestral 22B — código (~20 tok/s · 16k ctx)' },
       ]},
       { label: '☁️ Nube · de pago', items: [
         { value: 'codestral-latest',      label: '☁️ Codestral (nube · código)' },
@@ -2047,13 +2067,9 @@ class CyberAgent {
         { value: 'mistral-large-latest',  label: '☁️ Mistral Large (caro)' },
       ]},
     ];
-    // Añade cualquier modelo local REAL del host que no esté ya en el catálogo.
-    const known = new Set(groups.flatMap(g => g.items.map(i => i.value)));
-    const extraLocal = (this.availableModels || [])
-      .filter(m => m && m !== 'auto' && !known.has(m)
-                   && !/^(mistral|magistral|pixtral|codestral)-/i.test(m))
-      .map(m => ({ value: m, label: '🟢 ' + this._modelLabel(m) }));
-    if (extraLocal.length) groups[1].items.push(...extraLocal);
+    // Solo mostramos los modelos locales IDEALES (24B general + Codestral código).
+    // No volcamos toda la lista de Ollama para no llenar el selector de modelos
+    // sueltos (dolphin, hermes, qwen…) que confunden.
 
     const seen = new Set();
     select.innerHTML = '';
