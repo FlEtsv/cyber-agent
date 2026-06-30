@@ -439,12 +439,11 @@ class AgentRunner:
                         _emit_status(f"`{name}` necesita aprobación porque puede cambiar el sistema.")
                         self._q.put({"type": "need_approval", "data": event_payload})
                         try:
-                            from app.security.notify import notify as _tg_notify, available as _tg_avail
+                            from app.comms.router import notify_approval_needed as _tg_notify, available as _tg_avail
                             if _tg_avail():
-                                _tg_notify(
-                                    title=f"⚠️ Aprobación pendiente: {name}",
-                                    body=f"Herramienta peligrosa esperando tu respuesta (60 s timeout). Args: {str(args)[:200]}",
-                                    emoji="🔐",
+                                _tg_notify(  # U-05: via comms router
+                                    tool_name=name,
+                                    preview=f"Args: {str(args)[:200]}",
                                 )
                         except Exception:
                             pass
@@ -589,16 +588,15 @@ class AgentRunner:
                 # Telegram: notifica si la tarea duró >30 s o usó muchas herramientas
                 if _task_elapsed > 30 or tool_execution_count >= 3:
                     try:
-                        from app.security.notify import notify as _tg_notify, available as _tg_avail
+                        from app.comms.router import notify_agent_done, available as _tg_avail
                         if _tg_avail():
                             mins = int(_task_elapsed // 60)
                             secs = int(_task_elapsed % 60)
                             dur  = f"{mins}m {secs}s" if mins else f"{secs}s"
                             preview = " ".join((full or "").split())[:300] or "Respuesta lista."
-                            _tg_notify(
+                            notify_agent_done(  # U-02: via comms router
                                 title=f"Tarea completada ({dur}, {tool_execution_count} herramientas)",
                                 body=preview,
-                                emoji="✅",
                             )
                     except Exception:
                         pass

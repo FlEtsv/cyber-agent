@@ -919,11 +919,11 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### U · Comunicaciones/Notificaciones CENTRALIZADAS (CyberAgent general, NO submódulo)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| U-01 | ⬜ | claude | Módulo `app/comms/` central (Telegram canal); seguridad solo lo USA | `app/comms/__init__.py`, `app/comms/telegram.py` |
-| U-02 | ⬜ | claude | Fuentes unificadas: respuestas de agentes, ERRORES del sistema, amenazas ext/int | `app/comms/router.py` |
-| U-03 | ⬜ | claude | Niveles de IMPORTANCIA + filtros de mensajes | `app/comms/router.py` |
-| U-04 | ⬜ | claude | (futuro) múltiples chats/canales por tipo; de momento un solo chat | `app/comms/*` |
-| U-05 | ⬜ | claude | Comandos del módulo de comunicación (config, silenciar, filtrar) | `app/comms/commands.py` |
+| U-01 | ✅ | claude | Módulo `app/comms/` central (Telegram canal); seguridad solo lo USA | `app/comms/__init__.py`, `app/comms/telegram.py` |
+| U-02 | ✅ | claude | Fuentes unificadas: respuestas de agentes, ERRORES del sistema, amenazas ext/int | `app/comms/router.py` |
+| U-03 | ✅ | claude | Niveles de IMPORTANCIA + filtros de mensajes | `app/comms/router.py` |
+| U-04 | ✅ | claude | (futuro) múltiples chats/canales por tipo; de momento un solo chat | `app/comms/*` |
+| U-05 | ✅ | claude | Comandos del módulo de comunicación (config, silenciar, filtrar) | `app/comms/commands.py` |
 | U-06 | ⬜ | claude | Plan de presentación de mensajes (formato por tipo/importancia) | `docs/COMMS_PLAN.md` |
 
 ---
