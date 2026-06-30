@@ -152,14 +152,23 @@ def main():
             window.activateWindow()
 
     def _free_vram_tray():
-        import subprocess
-        subprocess.run(
-            ["powershell", "-NonInteractive", "-Command",
-             "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue"],
-            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        tray_notify("CyberAgent", "VRAM liberada — GPU lista para jugar",
-                    QSystemTrayIcon.Information, 3000)
+        # Descarga los modelos vía la API de Ollama (keep_alive=0) — funciona en
+        # Ollama actual; el viejo 'Stop-Process llama-server' ya no aplicaba.
+        # En un hilo para no congelar la UI; Ollama sigue vivo (el supervisor no
+        # lo reinicia), así la GPU queda libre para jugar.
+        import threading as _th
+
+        def _do():
+            try:
+                from app.ollama_client import free_vram
+                n = free_vram()
+                msg = (f"VRAM liberada ({n} modelo(s)) — GPU lista para jugar"
+                       if n else "No había modelos cargados — GPU ya libre")
+            except Exception as e:
+                msg = f"No se pudo liberar VRAM: {e}"
+            tray_notify("CyberAgent", msg, QSystemTrayIcon.Information, 3000)
+
+        _th.Thread(target=_do, daemon=True, name="free-vram").start()
 
     show_action.triggered.connect(_toggle_window)
     vram_action.triggered.connect(_free_vram_tray)

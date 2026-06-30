@@ -135,10 +135,33 @@ def ensure_single_local_model(target: str) -> None:
         if name and _norm_model(name) != tgt:
             try:
                 unload_model(name)
+                from app.agent_log import log
                 log("INFO", "ollama", "Modelo descargado para liberar VRAM",
                     {"unloaded": name, "loading": target})
             except Exception:
                 pass
+
+
+def free_vram() -> int:
+    """Libera la VRAM descargando TODOS los modelos cargados vía la API de Ollama
+    (keep_alive=0). Funciona en Ollama actual (el viejo 'Stop-Process llama-server'
+    ya no aplica). Deja Ollama vivo: el supervisor NO lo reinicia (solo vigila que
+    la API responda), así la GPU queda libre para jugar. Devuelve nº descargados."""
+    try:
+        r = httpx.get("http://localhost:11434/api/ps", timeout=4.0)
+        loaded = [m.get("name", "") for m in r.json().get("models", []) if m.get("name")]
+    except Exception:
+        return 0
+    n = 0
+    for name in loaded:
+        if unload_model(name):
+            n += 1
+    try:
+        from app.agent_log import log
+        log("INFO", "ollama", "VRAM liberada (modelos descargados)", {"count": n})
+    except Exception:
+        pass
+    return n
 
 
 def _build_base_prompt() -> str:
