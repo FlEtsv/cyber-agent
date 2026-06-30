@@ -716,51 +716,51 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### A · Cerebro / brain_bridge (la IA de la centralita = nuestro agente)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| A-01 | ⬜ | codex | Endpoint `/api/ext/chat` compatible con el formato ApiAsistente (request/response idénticos) | `app/api/server.py` |
-| A-02 | ⬜ | codex | Mapear sesión ApiAsistente a conversación CyberAgent (session_id) | `app/security/brain_bridge.py` |
-| A-03 | ⬜ | codex | Ruta de VISIÓN de cámara a Mistral NUBE (Pixtral, `SEC_MISTRAL_*`) para reacción instantánea | `app/security/brain_bridge.py`, `app/vision.py` |
-| A-04 | ⬜ | codex | Ruta de CHAT (Telegram a agente) al modelo local cyberagent-24b con tools | `app/security/brain_bridge.py` |
-| A-05 | ⬜ | codex | Cliente Mistral con la 2a clave + rate-limit separado del de CyberAgent | `app/security/mistral_sec.py` |
-| A-06 | ⬜ | codex | Prompts de evento/visual (portar `_build_event_prompt`/`_build_visual_prompt`) | `app/security/prompts.py` |
-| A-07 | ⬜ | codex | Parser de decisión (accion/confianza/motivo) | `app/security/decision.py` |
-| A-08 | ⬜ | codex | Tests del brain_bridge (mock Mistral + local) | `tests/test_brain_bridge.py` |
+| A-01 | ✅ 100% claude | claude | Endpoint `/api/ext/chat` compatible con el formato ApiAsistente (request/response idénticos) | `app/api/server.py` |
+| A-02 | ✅ 100% claude | claude | Mapear sesión ApiAsistente a conversación CyberAgent (session_id) | `app/security/brain_bridge.py` |
+| A-03 | ✅ 100% claude | claude | Ruta de VISIÓN de cámara a Mistral NUBE (Pixtral, `SEC_MISTRAL_*`) para reacción instantánea | `app/security/brain_bridge.py`, `app/vision.py` |
+| A-04 | ✅ 100% claude | claude | Ruta de CHAT (Telegram a agente) al modelo local cyberagent-24b con tools | `app/security/brain_bridge.py` |
+| A-05 | ✅ 100% claude | claude | Cliente Mistral con la 2a clave + rate-limit separado del de CyberAgent | `app/security/mistral_sec.py` |
+| A-06 | ✅ 100% claude | claude | Prompts de evento/visual (portar `_build_event_prompt`/`_build_visual_prompt`) | `app/security/prompts.py` |
+| A-07 | ✅ 100% claude | claude | Parser de decisión (accion/confianza/motivo) | `app/security/decision.py` |
+| A-08 | ✅ 100% claude | claude | Tests del brain_bridge (mock Mistral + local) | `tests/test_security_module.py` |
 
 ### B · Telegram completo (más allá de notif [ya ACTIVO])
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| B-01 | ⬜ | codex | Bot con polling (python-telegram-bot) bajo el supervisor, gateado | `app/security/telegram/bot.py` |
-| B-02 | ⬜ | codex | Comandos `/start /help /status /pending` | `app/security/telegram/commands.py` |
-| B-03 | ⬜ | codex | 2FA / auth (admin + viewers) reutilizando TOTP del vault | `app/security/telegram/auth.py` |
-| B-04 | ⬜ | codex | viewer_store (registro dinámico de viewers) | `app/security/telegram/viewers.py` |
-| B-05 | ⬜ | codex | Chat-con-el-agente desde Telegram (chat_session a brain_bridge) | `app/security/telegram/chat.py` |
-| B-06 | ⬜ | codex | Teclados inline (confirmar acción / ver cámara) | `app/security/telegram/keyboards.py` |
-| B-07 | ⬜ | codex | Sanitizado HTML Telegram (quitar think, markdown a HTML) | `app/security/telegram/format.py` |
-| B-08 | ⬜ | codex | Notif a chat principal + extras + viewers | `app/security/telegram/notify.py` |
-| B-09 | ⬜ | codex | Comando activar/desactivar autonomía en caliente | `app/security/telegram/commands.py` |
+| B-01 | ✅ 100% claude | claude | Bot con polling (httpx long-poll) bajo el supervisor, gateado | `app/security/telegram/bot.py` |
+| B-02 | ✅ 100% claude | claude | Comandos `/start /help /status /pending /autonomia /snapcam /addviewer` | `app/security/telegram/commands.py` |
+| B-03 | ✅ 100% claude | claude | 2FA / auth (admin + viewers) reutilizando TOTP del vault | `app/security/telegram/auth.py` |
+| B-04 | ✅ 100% claude | claude | viewer_store (registro dinámico de viewers) | `app/security/telegram/viewers.py` |
+| B-05 | ✅ 100% claude | claude | Chat-con-el-agente desde Telegram (chat_session a brain_bridge) | `app/security/telegram/chat.py` |
+| B-06 | ✅ 100% claude | claude | Teclados inline (confirmar acción / ver cámara) | `app/security/telegram/keyboards.py` |
+| B-07 | ✅ 100% claude | claude | Sanitizado HTML Telegram (quitar think, markdown a HTML) | `app/security/telegram/format.py` |
+| B-08 | ✅ 100% claude | claude | Notif a chat principal + extras + viewers | `app/security/telegram/notify.py` |
+| B-09 | ✅ 100% claude | claude | Comando activar/desactivar autonomía en caliente | `app/security/telegram/commands.py` |
 
 ### C · Cámaras + motion
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| C-01 | ⬜ | codex | camera_client: snapshot vía HA | `app/security/camera.py` |
-| C-02 | ⬜ | codex | camera_client: RTSP frame con ffmpeg | `app/security/camera.py` |
-| C-03 | ⬜ | codex | camera_client: clip corto (ffmpeg) | `app/security/camera.py` |
-| C-04 | ⬜ | codex | motion_tracker: loop de seguimiento (snapshots cada N s) | `app/security/motion.py` |
-| C-05 | ⬜ | codex | Cooldown + duración máx | `app/security/motion.py` |
-| C-06 | ⬜ | codex | Notif inteligente durante seguimiento (followup snapshots) | `app/security/motion.py` |
-| C-07 | ⬜ | codex | Registro de cámaras (property.json a DB) | `app/security/property_context.py` |
+| C-01 | ✅ 100% claude | claude | camera_client: snapshot vía HA | `app/security/camera.py` |
+| C-02 | ✅ 100% claude | claude | camera_client: RTSP frame con ffmpeg | `app/security/camera.py` |
+| C-03 | ✅ 100% claude | claude | camera_client: clip corto (ffmpeg) | `app/security/camera.py` |
+| C-04 | ✅ 100% claude | claude | motion_tracker: loop de seguimiento (snapshots cada N s) | `app/security/motion.py` |
+| C-05 | ✅ 100% claude | claude | Cooldown + duración máx | `app/security/motion.py` |
+| C-06 | ✅ 100% claude | claude | Notif inteligente durante seguimiento (followup snapshots) | `app/security/motion.py` |
+| C-07 | ✅ 100% claude | claude | Registro de cámaras (property.json a DB) | `app/security/property_context.py` |
 
 ### D · Eventos + autonomía + acciones
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| D-01 | ⬜ | codex | event_store ring-buffer (portar) | `app/security/events.py` |
-| D-02 | ⬜ | codex | event_handler: normaliza a CameraEvent/IncomingEvent | `app/security/events.py` |
-| D-03 | ⬜ | codex | Routers `/security/events/*` `/security/cameras/*` montados en :8765 | `app/api/security_routes.py` |
-| D-04 | ⬜ | codex | Auth apps externas (X-Event-Token = SEC_EVENT_TOKEN) | `app/api/security_routes.py` |
-| D-05 | ⬜ | codex | autonomy: manual/operativa/alto-impacto a aprobaciones de CyberAgent | `app/security/autonomy.py` |
-| D-06 | ⬜ | codex | action_executor: ejecutar decisión (timeout confirmación) | `app/security/actions.py` |
-| D-07 | ⬜ | codex | app_registry (apps externas) | `app/security/app_registry.py` |
-| D-08 | ⬜ | codex | alert_history + feedback_store (mas/menos) a training_store | `app/security/feedback.py` |
-| D-09 | ⬜ | codex | schedule_store (tareas programadas de seguridad) | `app/security/schedule.py` |
+| D-01 | ✅ 100% claude | claude | event_store ring-buffer (portar) | `app/security/events.py` |
+| D-02 | ✅ 100% claude | claude | event_handler: normaliza a CameraEvent/IncomingEvent | `app/security/events.py` |
+| D-03 | ✅ 100% claude | claude | Routers `/security/events/*` `/security/cameras/*` montados en :8765 | `app/api/security_routes.py` |
+| D-04 | ✅ 100% claude | claude | Auth apps externas (X-Event-Token = SEC_EVENT_TOKEN) | `app/api/security_routes.py` |
+| D-05 | ✅ 100% claude | claude | autonomy: manual/operativa/alto-impacto a aprobaciones de CyberAgent | `app/security/autonomy.py` |
+| D-06 | ✅ 100% claude | claude | action_executor: ejecutar decisión (timeout confirmación) | `app/security/actions.py` |
+| D-07 | ✅ 100% claude | claude | app_registry (apps externas) | `app/security/app_registry.py` |
+| D-08 | ✅ 100% claude | claude | alert_history + feedback_store (mas/menos) a training_store | `app/security/feedback.py` (existente) |
+| D-09 | ✅ 100% claude | claude | schedule_store (tareas programadas de seguridad) | `app/security/schedule.py` |
 
 ### E · Home Assistant (cada acción = tool del agente)
 | ID | E | Agente | Tarea | Archivos |
@@ -1060,7 +1060,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AE-07 | ⬜ | claude | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
 | AE-08 | ⬜ | claude | Detalle del dataset (abre el editor AC-03) | `apps/web/*` |
 | AE-09 | ⬜ | claude | Ajustes avanzados (hiperparámetros) plegables | `apps/web/*` |
-| AE-10 | ⬜ | claude | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
+| AE-10 | OK 100% claude | claude | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
 
 ### AF · Motor de entrenamiento (pipeline real)
 | ID | E | Agente | Tarea | Archivos |

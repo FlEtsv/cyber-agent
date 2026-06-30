@@ -239,6 +239,98 @@ async def api_training_stats(request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/api/training/models")
+async def api_training_models(request: Request):
+    """AE-02: lista de modelos entrenables con progreso (ejemplos/umbral),
+    estado 'listo', destino, criticidad y versiones."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training.registry import all_cards
+        from app.training.threshold_watcher import check
+        from app.training.orchestrator import active_runs
+        running = set(active_runs())
+        out = []
+        for card in all_cards():
+            mid = card["id"]
+            try:
+                prog = check(mid, notify=False)
+            except Exception:
+                prog = {"count": 0, "threshold": card.get("threshold", 0),
+                        "progress_pct": 0, "ready": False}
+            out.append({**card,
+                        "model_id": mid,
+                        "count": prog.get("count", 0),
+                        "threshold": prog.get("threshold", card.get("threshold", 0)),
+                        "progress_pct": prog.get("progress_pct", 0),
+                        "ready": prog.get("ready", False),
+                        "training": mid in running})
+        return {"ok": True, "models": out}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/training/estimate/{model_id}")
+async def api_training_estimate(model_id: str, request: Request):
+    """AB-05: estimación de recursos/tiempo/coste antes de entrenar un modelo."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training.estimate import estimate
+        from app.training.threshold_watcher import check
+        n = check(model_id, notify=False).get("count", 500)
+        return {"ok": True, **estimate(model_id, n_samples=max(n, 1))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/preflight")
+async def api_training_preflight(request: Request):
+    """AE-04: comprobaciones previas (presencia/VRAM/disco/seguridad) antes de entrenar."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.training.preflight import run
+        return {"ok": True, **run(b.get("model_id", ""))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/start")
+async def api_training_start(request: Request):
+    """AE-04: lanza el entrenamiento de un modelo (solo PC). El móvil ve estado."""
+    g = _gate(request)
+    if g:
+        return g
+    # AE-10: el entrenamiento solo se lanza desde la instancia local del PC.
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        return {"ok": False, "error": "El entrenamiento solo se lanza desde el PC (seguridad/VRAM)."}
+    try:
+        b = await request.json()
+        from app.training.orchestrator import start_training
+        return start_training(b.get("model_id", ""))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/cancel")
+async def api_training_cancel(request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.training.orchestrator import cancel_training
+        return cancel_training(b.get("model_id", ""))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/training/feedback")
 async def api_training_feedback(request: Request):
     """W-01: captura feedback 👍/👎 desde la web → training_store."""
