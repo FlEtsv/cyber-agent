@@ -2725,13 +2725,17 @@ def _web_search(query: str, max_results: int = 5, fetch_content: bool = True) ->
                 "snippet": snippets[i] if i < len(snippets) else "",
             })
 
-        # Trae el contenido de los 3 primeros para que el modelo cite con material real
+        # Trae el contenido de los 3 primeros EN PARALELO (antes en serie: hasta
+        # 3×12s = 36s; ahora ~12s) para que el modelo cite con material real.
         if fetch_content:
-            for item in results[:3]:
-                if item.get("url", "").startswith("http"):
-                    content = _fetch_readable(item["url"])
+            from concurrent.futures import ThreadPoolExecutor
+            top = [it for it in results[:3] if it.get("url", "").startswith("http")]
+            if top:
+                with ThreadPoolExecutor(max_workers=3) as ex:
+                    contents = list(ex.map(lambda it: _fetch_readable(it["url"]), top))
+                for it, content in zip(top, contents):
                     if content:
-                        item["content"] = content
+                        it["content"] = content
 
         return {
             "query": query,

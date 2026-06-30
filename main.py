@@ -306,6 +306,22 @@ def main():
         QSystemTrayIcon.Information, 3000,
     )
 
+    # Al salir: para apps desplegadas (procesos + túneles) y el supervisor, para
+    # no dejar procesos/túneles Cloudflare huérfanos.
+    def _cleanup_on_quit():
+        try:
+            from app.deployer import stop_all
+            stop_all()
+        except Exception:
+            pass
+        try:
+            from app.supervisor import _SUPERVISOR
+            if _SUPERVISOR:
+                _SUPERVISOR.stop()
+        except Exception:
+            pass
+    app.aboutToQuit.connect(_cleanup_on_quit)
+
     sys.exit(app.exec())
 
 
