@@ -566,6 +566,25 @@ async def api_training_history(model_id: str, request: Request):
 
 # ── G-01: Vault — listar secretos (enmascarado) + revelar con TOTP ────────────
 
+@app.get("/api/security/vision-metrics")
+async def api_vision_metrics(request: Request):
+    """V-07: reparto de análisis de visión por backend (local/nube/CPU) + GPU broker."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.security.vision_router import metrics
+        out = {"ok": True, "vision": metrics()}
+        try:
+            from app.security.gpu_broker import status as _gpu_status
+            out["gpu"] = _gpu_status()
+        except Exception:
+            pass
+        return out
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.get("/api/vault/list")
 async def api_vault_list(request: Request):
     """Lista secretos enmascarados (sin revelar valores). G-01"""

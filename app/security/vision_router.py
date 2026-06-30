@@ -12,6 +12,33 @@ Gateado por SECURITY_ENABLED; si está en 0 el router responde con stub.
 from __future__ import annotations
 
 import os
+import threading
+
+# V-07: métricas de uso de visión por backend (cuánto CPU vs GPU local vs nube).
+_METRICS = {"local": 0, "cloud": 0, "cpu": 0, "blocked": 0, "disabled": 0, "total": 0}
+_MLOCK = threading.Lock()
+
+
+def _record(backend: str) -> None:
+    bucket = ("cloud" if "cloud" in backend else
+              "cpu" if "cpu" in backend else
+              "blocked" if "blocked" in backend else
+              "disabled" if backend == "disabled" else
+              "local" if "local" in backend else "local")
+    with _MLOCK:
+        _METRICS[bucket] = _METRICS.get(bucket, 0) + 1
+        _METRICS["total"] += 1
+
+
+def metrics() -> dict:
+    """V-07: reparto de análisis de visión por backend (local/nube/CPU)."""
+    with _MLOCK:
+        m = dict(_METRICS)
+    tot = max(1, m["total"])
+    m["local_pct"] = round(m["local"] / tot * 100, 1)
+    m["cloud_pct"] = round(m["cloud"] / tot * 100, 1)
+    m["cpu_pct"] = round(m["cpu"] / tot * 100, 1)
+    return m
 
 
 def _security_enabled() -> bool:
@@ -37,6 +64,7 @@ def route(
         {"ok": bool, "text": str, "backend": str}
     """
     if not _security_enabled():
+        _record("disabled")
         return {"ok": False, "text": "", "backend": "disabled",
                 "error": "SECURITY_ENABLED=0"}
 
@@ -45,12 +73,13 @@ def route(
     use_cloud = force_cloud or is_threat or is_security_blocked()
 
     if use_cloud:
-        return _run_cloud(image_b64, prompt)
+        res = _run_cloud(image_b64, prompt)
     else:
-        result = _run_local(image_b64, prompt)
-        if not result["ok"]:
-            return _run_cloud(image_b64, prompt)
-        return result
+        res = _run_local(image_b64, prompt)
+        if not res["ok"]:
+            res = _run_cloud(image_b64, prompt)
+    _record(res.get("backend", "local"))
+    return res
 
 
 def _run_local(image_b64: str, prompt: str) -> dict:
