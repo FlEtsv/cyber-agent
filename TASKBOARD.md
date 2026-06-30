@@ -943,3 +943,70 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | V-06 | ⬜ | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
 | V-07 | ⬜ | Métricas: cuánto se usó CPU vs GPU vs nube (coste/latencia) en el dashboard | `apps/web/*`, `app/security/*` |
 | V-08 | ⬜ | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
+
+---
+
+## 🧠 ECOSISTEMA DE ENTRENAMIENTO + ALMACENAMIENTO + CÓMPUTO (visión de Steve)
+> Ecosistema VIVO: el feedback de uso entrena los modelos LOCALES más usados y
+> críticos. Entrenar SOLO con el usuario presente en el PC (necesita VRAM y deja
+> la casa sin vigilancia local → se degrada a nube). SD 1.8 TB, RAM 64 GB, CPU
+> con núcleos de sobra → aprovecharlos. Solo añadir tareas (compañeros activos).
+
+### W · Feedback → Datos de entrenamiento (recolección + señales)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| W-01 | ⬜ | Capturar feedback "¿es útil?" (mas/menos) de cada respuesta → training_store con la señal | `app/training_store.py`, `apps/web/*` |
+| W-02 | ⬜ | Capturar feedback "¿el RAZONAMIENTO es correcto?" (separado de la respuesta) | `apps/web/*`, `app/training_store.py` |
+| W-03 | ⬜ | Etiquetar QUÉ MODELO generó cada respuesta (para entrenar al correcto) | `app/api/agent_runner.py` |
+| W-04 | ⬜ | Capturar aprobaciones/rechazos de tools como señal de preferencia | `app/api/agent_runner.py` |
+| W-05 | ⬜ | Capturar CORRECCIONES del usuario (reescribe/corrige) → par instrucción→buena-respuesta | `app/training_store.py` |
+| W-06 | ⬜ | Feedback de seguridad (detección amenaza correcta? falso pos/neg) → dataset del modelo de visión | `app/security/feedback.py` |
+| W-07 | ⬜ | Normalizar todo a formato entrenamiento (chat jsonl con peso/señal) | `app/training_store.py` |
+| W-08 | ⬜ | UI: botones de feedback de razonamiento (correcto/incorrecto) en cada respuesta | `apps/web/*` |
+
+### X · Auto-entrenamiento por modelo (umbral, scheduling, QLoRA)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| X-01 | ⬜ | Registro de modelos ENTRENABLES (los más usados + críticos + LOCALES) con metadatos (uso, criticidad) | `app/training/registry.py` |
+| X-02 | ⬜ | Contador de ejemplos de entrenamiento POR MODELO (cuántos de alta señal hay listos) | `app/training/registry.py` |
+| X-03 | ⬜ | **Detección del UMBRAL por modelo** (24B ~1500, Codestral ~1000, visión ~500; auto-sugerido + configurable) | `app/training/thresholds.py` |
+| X-04 | ⬜ | Cola de entrenamiento (qué modelo toca cuando alcanza umbral) | `app/training/queue.py` |
+| X-05 | ⬜ | Scheduler: entrenar SOLO con el usuario PRESENTE en el PC (detección de presencia/actividad) | `app/training/scheduler.py` |
+| X-06 | ⬜ | Coordinar con seguridad: al entrenar, avisar y degradar vigilancia local a NUBE (casa no queda ciega) | `app/training/scheduler.py`, `app/security/gpu_broker.py` |
+| X-07 | ⬜ | Pipeline QLoRA: local si cabe en 16 GB, si no RunPod A100 (decidir por VRAM/tamaño) | `app/training/qlora.py` |
+| X-08 | ⬜ | Evaluación post-entrenamiento (A/B contra el anterior) antes de promover el adapter | `app/training/evaluate.py` |
+| X-09 | ⬜ | Versionado de modelos/adapters + rollback si empeora | `app/training/versioning.py` |
+| X-10 | ⬜ | Notificar (comms/Telegram) cuando un modelo está listo para entrenar / terminó / mejoró | `app/comms/*` |
+| X-11 | ⬜ | Consentimiento: el entrenamiento lo lanza el usuario (no automático sin permiso) | `apps/web/*`, `app/widgets/*` |
+
+### Y · Almacenamiento (SD 1.8 TB: modelos, datasets, video 15 días por ley)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| Y-01 | ⬜ | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
+| Y-02 | ⬜ | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
+| Y-03 | ⬜ | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
+| Y-04 | ⬜ | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
+| Y-05 | ⬜ | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/quota.py` |
+| Y-06 | ⬜ | Almacén de datasets de entrenamiento (jsonl comprimido, por modelo, versionado) | `app/storage/datasets.py` |
+| Y-07 | ⬜ | Índice/DB de grabaciones (cámara, momento, eventos asociados) | `app/security/recorder.py` |
+| Y-08 | ⬜ | Backups del vault/DB en la SD (rotación) | `app/storage/backup.py` |
+
+### Z · Cómputo CPU/RAM (64 GB RAM + núcleos de sobra)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| Z-01 | ⬜ | Perfil de recursos (RAM 64 GB, N núcleos) + presupuesto por subsistema | `app/compute/profile.py` |
+| Z-02 | ⬜ | Cargas en CPU: movimiento (OpenCV), transcripción (whisper.cpp), embeddings RAG | `app/compute/cpu_pool.py` |
+| Z-03 | ⬜ | Mover lo NO urgente a CPU/RAM cuando la GPU está ocupada (batch, embeddings) | `app/compute/scheduler.py` |
+| Z-04 | ⬜ | Caché en RAM de frames/embeddings (aprovechar los 64 GB) | `app/compute/ram_cache.py` |
+| Z-05 | ⬜ | Pool de workers CPU para visión/audio de respaldo | `app/compute/cpu_pool.py` |
+| Z-06 | ⬜ | VLM tiny en CPU como último recurso si GPU+nube no disponibles | `app/security/vision_local.py` |
+
+### AA · Modo JUEGO / minimización de recursos
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AA-01 | ⬜ | Detectar "modo juego" (fullscreen / GPU intensiva) y entrar en modo mínimo | `app/compute/game_mode.py` |
+| AA-02 | ⬜ | Liberar el 24B de VRAM (free_vram) al entrar en juego | `app/compute/game_mode.py` |
+| AA-03 | ⬜ | Seguridad en juego: solo ojo local mínimo o degradar a nube/CPU | `app/security/gpu_broker.py` |
+| AA-04 | ⬜ | Si no cabe nada local → Mistral NUBE para todo lo crítico | `app/security/vision_router.py` |
+| AA-05 | ⬜ | Restaurar al salir del juego (recargar modelos, reanudar vigilancia local) | `app/compute/game_mode.py` |
+| AA-06 | ⬜ | Pausar entrenamiento si arranca un juego (libera VRAM) | `app/training/scheduler.py` |
