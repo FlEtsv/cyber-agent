@@ -1153,3 +1153,70 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AM-04 | ⬜ | Modo noche: usar dispositivos de disuasión interior (próximamente) según patrón nocturno | `app/security/deterrence_tools.py` |
 | AM-05 | ⬜ | Detección de problemas: rotura, desorden, anomalía en la escena (no solo el gato) | `app/security/analysis_interior.py` |
 | AM-06 | ⬜ | Informe diario de los gatos (dónde estuvieron, incidencias, salud aparente) por comms | `app/comms/*`, `app/security/report.py` |
+
+---
+
+## 📨 NOTIFICACIONES / COMUNICACIONES TELEGRAM PROFESIONAL (visión de Steve)
+> Lo profesional: UN supergrupo FORO (Topics) con 1 bot → hilos separados por
+> importancia (Urgente/Seguridad/Notif/Gatos/Periódico/Sistema). Niveles de
+> importancia con sonido/silencio. Panel de comandos por mensaje (inline
+> keyboards) "en respuesta a". Aprovechar TODO Telegram. Fallback si no hay
+> Topics: prefijo de severidad + panel inline. Solo añadir tareas.
+
+### AN · Transporte Telegram avanzado (Topics + envío)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AN-01 | ⬜ | Detectar/crear supergrupo FORO con Topics; guardar chat_id + thread_ids por categoría | `app/comms/telegram_topics.py` |
+| AN-02 | ⬜ | Enviar a un TEMA concreto (message_thread_id) según categoría/importancia | `app/comms/telegram.py` |
+| AN-03 | ⬜ | Fallback sin Topics: prefijo de severidad (🔴🛡️🔔📊) + mismo bot, un chat | `app/comms/telegram.py` |
+| AN-04 | ⬜ | Soporte multi-canal futuro (2º bot / canales aparte) sin reescribir el router | `app/comms/router.py` |
+| AN-05 | ⬜ | Crear los temas por defecto: Urgente, Seguridad, Notificaciones, Gatos, Periódico, Sistema | `app/comms/setup.py` |
+
+### AO · Niveles de importancia + entrega
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AO-01 | ⬜ | Enum de severidad: CRÍTICA, ALTA, MEDIA, BAJA, PERIÓDICA | `app/comms/levels.py` |
+| AO-02 | ⬜ | Mapear severidad→tema + sonido (disable_notification) + pin | `app/comms/router.py` |
+| AO-03 | ⬜ | CRÍTICA: sonido + pin + (opcional) repetir hasta ACK | `app/comms/router.py` |
+| AO-04 | ⬜ | BAJA/PERIÓDICA: silenciosa + va a DIGEST (no mensaje suelto) | `app/comms/digest.py` |
+| AO-05 | ⬜ | Editar-en-sitio: una alerta evoluciona (analizando→resuelto) sin spamear | `app/comms/telegram.py` |
+| AO-06 | ⬜ | Reglas por FUENTE (agente/error/seguridad/gatos) → severidad por defecto editable | `app/comms/rules.py` |
+
+### AP · Panel de comandos por mensaje (inline keyboards "en respuesta a")
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AP-01 | ⬜ | Inline keyboard genérico por tipo de alerta (botones de acción) | `app/comms/keyboards.py` |
+| AP-02 | ⬜ | Acciones seguridad: Confirmar · Ignorar · Ver cámara · Silenciar 1h · Escalar · Disuadir | `app/comms/keyboards.py` |
+| AP-03 | ⬜ | Acciones agente: Aprobar · Rechazar · Ver detalle · Reintentar | `app/comms/keyboards.py` |
+| AP-04 | ⬜ | Handler de callback_query: ejecuta la acción y edita el mensaje con el resultado | `app/comms/callbacks.py` |
+| AP-05 | ⬜ | Las acciones peligrosas pasan por aprobación (DANGEROUS) y/o 2FA | `app/comms/callbacks.py` |
+| AP-06 | ⬜ | Confirmaciones de seguridad alimentan training_store (feedback) | `app/comms/callbacks.py`, `training_store` |
+
+### AQ · Digest / agrupación / anti-flood
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AQ-01 | ⬜ | Buffer de notificaciones BAJA/PERIÓDICA → resumen cada N min/horas | `app/comms/digest.py` |
+| AQ-02 | ⬜ | Agrupar repetidas (mismo evento N veces) en una sola con contador | `app/comms/dedup.py` |
+| AQ-03 | ⬜ | Rate-limit (respetar límites de Telegram) + cola con reintento | `app/comms/telegram.py` |
+| AQ-04 | ⬜ | Resumen diario programado (estado casa, gatos, sistema) | `app/comms/digest.py` |
+| AQ-05 | ⬜ | Horario "no molestar" (solo CRÍTICA suena de noche) | `app/comms/rules.py` |
+
+### AR · Comandos del bot (menú + control)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AR-01 | ⬜ | Menú de comandos (BotCommands): /estado /resumen /silenciar /modo /camara /ayuda | `app/comms/commands.py` |
+| AR-02 | ⬜ | /silenciar <cat> <tiempo> → muta una categoría temporalmente | `app/comms/commands.py` |
+| AR-03 | ⬜ | /modo <manual|operativa|alto-impacto> → autonomía de seguridad en caliente | `app/comms/commands.py` |
+| AR-04 | ⬜ | /camara <nombre> → snapshot/stream + panel de acciones | `app/comms/commands.py` |
+| AR-05 | ⬜ | /resumen → digest bajo demanda; /estado → salud del sistema | `app/comms/commands.py` |
+| AR-06 | ⬜ | Chat libre con el AGENTE desde Telegram (texto → brain_bridge → respuesta) | `app/comms/chat.py` |
+| AR-07 | ⬜ | Reacciones (👍/👎) como feedback rápido → training_store | `app/comms/reactions.py` |
+
+### AS · Config + permisos + UI del módulo comms
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AS-01 | ⬜ | Config de comms en Ajustes (web/PC): temas, severidades por fuente, no-molestar, digest | `apps/web/*`, `app/widgets/*` |
+| AS-02 | ⬜ | Auth: solo admin ejecuta acciones; viewers solo ven (reutiliza 2FA/vault) | `app/comms/auth.py` |
+| AS-03 | ⬜ | Registro/auditoría de notificaciones enviadas y acciones ejecutadas | `app/comms/audit.py` |
+| AS-04 | ⬜ | Plantillas de mensaje por tipo (formato/emoji/campos) editables | `app/comms/templates.py` |
+| AS-05 | ⬜ | Test de notificación (enviar de prueba a cada tema) desde la UI | `apps/web/*` |
