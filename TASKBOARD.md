@@ -812,7 +812,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | K-01 | ✅ | claude | Esquema training_store (instrucción/respuesta/señal) | `app/training_store.py` |
 | K-02 | ⬜ | claude | Hook: capturar decisión a resultado de eventos | `app/security/events.py` |
 | K-03 | ⬜ | claude | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
-| K-04 | ⬜ | claude | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
+| K-04 | ✅ | claude | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
 | K-05 | ✅ | claude | Export a formato QLoRA (jsonl chat) | `app/training_store.py` |
 | K-06 | ⬜ | claude | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
 
@@ -955,14 +955,14 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### W · Feedback → Datos de entrenamiento (recolección + señales)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| W-01 | ⬜ | claude | Capturar feedback "¿es útil?" (mas/menos) de cada respuesta → training_store con la señal | `app/training_store.py`, `apps/web/*` |
-| W-02 | ⬜ | claude | Capturar feedback "¿el RAZONAMIENTO es correcto?" (separado de la respuesta) | `apps/web/*`, `app/training_store.py` |
-| W-03 | ⬜ | claude | Etiquetar QUÉ MODELO generó cada respuesta (para entrenar al correcto) | `app/api/agent_runner.py` |
-| W-04 | ⬜ | claude | Capturar aprobaciones/rechazos de tools como señal de preferencia | `app/api/agent_runner.py` |
-| W-05 | ⬜ | claude | Capturar CORRECCIONES del usuario (reescribe/corrige) → par instrucción→buena-respuesta | `app/training_store.py` |
+| W-01 | ✅ | claude | Capturar feedback "¿es útil?" (mas/menos) de cada respuesta → training_store con la señal | `app/training_store.py`, `apps/web/*` |
+| W-02 | ✅ | claude | Capturar feedback "¿el RAZONAMIENTO es correcto?" (separado de la respuesta) | `apps/web/*`, `app/training_store.py` |
+| W-03 | ✅ | claude | Etiquetar QUÉ MODELO generó cada respuesta (para entrenar al correcto) | `app/api/agent_runner.py` |
+| W-04 | ✅ | claude | Capturar aprobaciones/rechazos de tools como señal de preferencia | `app/api/agent_runner.py` |
+| W-05 | ✅ | claude | Capturar CORRECCIONES del usuario (reescribe/corrige) → par instrucción→buena-respuesta | `app/training_store.py` |
 | W-06 | ⬜ | claude | Feedback de seguridad (detección amenaza correcta? falso pos/neg) → dataset del modelo de visión | `app/security/feedback.py` |
 | W-07 | ⬜ | claude | Normalizar todo a formato entrenamiento (chat jsonl con peso/señal) | `app/training_store.py` |
-| W-08 | ⬜ | claude | UI: botones de feedback de razonamiento (correcto/incorrecto) en cada respuesta | `apps/web/*` |
+| W-08 | ✅ | claude | UI: botones de feedback de razonamiento (correcto/incorrecto) en cada respuesta | `apps/web/*` |
 
 ### X · Auto-entrenamiento por modelo (umbral, scheduling, QLoRA)
 | ID | E | Agente | Tarea | Archivos |
@@ -1220,3 +1220,63 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AS-03 | ⬜ | Registro/auditoría de notificaciones enviadas y acciones ejecutadas | `app/comms/audit.py` |
 | AS-04 | ⬜ | Plantillas de mensaje por tipo (formato/emoji/campos) editables | `app/comms/templates.py` |
 | AS-05 | ⬜ | Test de notificación (enviar de prueba a cada tema) desde la UI | `apps/web/*` |
+
+---
+
+## 🔊 DISUASIÓN EXTERIOR — actuadores abstractos + audio (visión de Steve)
+> Realidad: 1 cámara Tapo (ampliable), HA limitado, altavoz de cámara NO sirve.
+> Palanca: altavoz POTENTE de casa por BT (o altavoces del sistema). Enfoque:
+> abstraer disuasión del HW → la IA razona "intención/nivel", la capa de
+> ACTUADORES la traduce a lo disponible (degradación elegante BT→sistema→nada).
+> Escala a N cámaras con actuadores asignados. Solo añadir tareas.
+
+### AT · Capa de actuadores (abstracción de hardware)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AT-01 | ⬜ | Interfaz `DeterrenceActuator` (capabilities, is_available, fire(intent)) | `app/security/actuators/base.py` |
+| AT-02 | ⬜ | Registro de actuadores disponibles + asignación POR CÁMARA | `app/security/actuators/registry.py` |
+| AT-03 | ⬜ | Degradación elegante: elegir el mejor actuador disponible para una intención | `app/security/actuators/registry.py` |
+| AT-04 | ⬜ | Estado/salud de cada actuador (BT conectado? altavoz vivo? HA online?) | `app/security/actuators/registry.py` |
+| AT-05 | ⬜ | UI: asignar actuadores a una cámara + test de disparo | `apps/web/*` |
+
+### AU · Audio (camino principal HOY)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AU-01 | ⬜ | Reproductor de audio del PC con selección de dispositivo de salida (Windows) | `app/security/audio/player.py` |
+| AU-02 | ⬜ | Actuador AltavozBluetooth (pair/route + reproducir) | `app/security/actuators/bt_speaker.py` |
+| AU-03 | ⬜ | Actuador AltavozSistema (fallback) | `app/security/actuators/system_speaker.py` |
+| AU-04 | ⬜ | Biblioteca de sonidos por ESCENARIO (sirena, ladrido, alarma, aviso) + gestor | `app/security/audio/library.py` |
+| AU-05 | ⬜ | TTS local (edge-tts/pyttsx3) → voz por el altavoz elegido | `app/security/audio/tts.py` |
+| AU-06 | ⬜ | TTS EN VIVO: la IA narra lo que ve (descripción del intruso) en tiempo real | `app/security/audio/live_narrate.py` |
+| AU-07 | ⬜ | Multi-idioma + voces configurables | `app/security/audio/tts.py` |
+| AU-08 | ⬜ | Reconexión BT automática (si se cae, reintenta o cae a sistema) | `app/security/actuators/bt_speaker.py` |
+
+### AV · Actuadores HA + futuros
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AV-01 | ⬜ | Actuador LuzHA (encender luces como presencia/aviso) | `app/security/actuators/ha_light.py` |
+| AV-02 | ⬜ | Actuador SirenaHA (si algún modelo lo soporta; detectar capacidad) | `app/security/actuators/ha_siren.py` |
+| AV-03 | ⬜ | Mapear funciones REALES y aprovechables de la Tapo vía HA (auditar qué llega) | `docs/TAPO_HA.md` |
+| AV-04 | ⬜ | Actuador genérico "enchufe inteligente" (foco potente/estrobo futuro) | `app/security/actuators/smart_plug.py` |
+| AV-05 | ⬜ | Actuador Láser/LuzBT (futuro, interfaz lista) | `app/security/actuators/light_bt.py` |
+| AV-06 | ⬜ | Plantilla para añadir un actuador nuevo (doc + clase base) | `docs/ADD_ACTUATOR.md` |
+
+### AW · Lógica de disuasión (la IA decide)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AW-01 | ⬜ | Niveles de disuasión: 1 presencia → 2 audio → 3 narración → 4 luz → 5 escalar | `app/security/deterrence.py` |
+| AW-02 | ⬜ | La IA elige el nivel según amenaza/zona/hora/contexto de la cámara | `app/security/deterrence.py` |
+| AW-03 | ⬜ | Escalado automático si la amenaza persiste (sube de nivel) | `app/security/deterrence.py` |
+| AW-04 | ⬜ | De-escalado/cancelar si la amenaza desaparece o el usuario lo para | `app/security/deterrence.py` |
+| AW-05 | ⬜ | Tools de disuasión para el agente (deter_warn, deter_sound, deter_narrate, deter_light) | `app/security/deterrence_tools.py`, `app/tools.py` |
+| AW-06 | ⬜ | Contexto editable por cámara (qué hay, qué se permite disuadir, límites) | `apps/web/*`, `cameras_db` |
+| AW-07 | ⬜ | Modo "solo avisar al usuario" (sin disuasión activa) configurable | `app/security/deterrence.py` |
+| AW-08 | ⬜ | Registro de cada disuasión (qué nivel, qué actuador, resultado) → training_store | `app/security/deterrence.py`, `training_store` |
+
+### AX · Seguridad/legalidad de la disuasión
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AX-01 | ⬜ | Límites configurables (no disuadir en zonas públicas, horarios, intensidad) | `app/security/deterrence_limits.py` |
+| AX-02 | ⬜ | Confirmación humana para niveles altos (láser/sirena) salvo modo autónomo | `app/security/deterrence.py` |
+| AX-03 | ⬜ | Aviso legal: la narración informa de grabación (cumplimiento) | `app/security/audio/library.py` |
+| AX-04 | ⬜ | Cooldown anti-abuso (no disparar en bucle) | `app/security/deterrence.py` |
