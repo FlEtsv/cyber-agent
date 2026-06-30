@@ -1046,7 +1046,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AD-01 | ✅ | claude | Watcher de umbral por modelo (cuenta alta señal vs threshold; estado "listo") | `app/training/threshold_watcher.py` |
 | AD-02 | ✅ | claude | Al alcanzar umbral: avisar por COMMS (Telegram) + notificación PC + badge en web | `app/comms/*`, `apps/web/*`, `main.py` |
 | AD-03 | ✅ | claude | No spamear: avisar una vez por modelo hasta que se entrene o se descarte | `app/training/threshold_watcher.py` |
-| AD-04 | ⬜ | claude | Umbral auto-sugerido y ajustable por el usuario en el menú | `apps/web/*`, `app/training/thresholds.py` |
+| AD-04 | OK 100% claude | claude | Umbral auto-sugerido y ajustable por el usuario en el menú | `apps/web/*`, `app/training/thresholds.py` |
 
 ### AE · Menú Entrenamiento (Ajustes → Entrenamiento)
 | ID | E | Agente | Tarea | Archivos |

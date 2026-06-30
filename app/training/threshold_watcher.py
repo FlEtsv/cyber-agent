@@ -46,7 +46,12 @@ def check(model_id: str, notify: bool = True) -> dict:
 
     sources = get_sources(model_id)
     count = _count_samples(sources)
-    threshold = card.threshold
+    # AD-04: umbral ajustable por el usuario (override sobre el default de la card).
+    try:
+        from app.training.thresholds import effective
+        threshold = effective(model_id, card.threshold)
+    except Exception:
+        threshold = card.threshold
     ready = count >= threshold
 
     with _lock:

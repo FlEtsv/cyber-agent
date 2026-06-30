@@ -286,6 +286,23 @@ async def api_training_estimate(model_id: str, request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.post("/api/training/threshold")
+async def api_training_threshold(request: Request):
+    """AD-04: ajustar el umbral de entrenamiento de un modelo (override del usuario)."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.training.thresholds import set_threshold, reset
+        mid = (b.get("model_id") or "").strip()
+        if b.get("reset"):
+            return reset(mid)
+        return set_threshold(mid, int(b.get("threshold", 0)))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/training/preflight")
 async def api_training_preflight(request: Request):
     """AE-04: comprobaciones previas (presencia/VRAM/disco/seguridad) antes de entrenar."""

@@ -103,3 +103,4 @@ data/deployments.json
 # Gestor de secretos (NUNCA versionar)
 data/vault.enc
 data/.vault_key
+data/training_thresholds.json
