@@ -98,3 +98,4 @@ data/local_usage.csv
 logs/watchdog.log
 relay/web_temp
 relay/test_server.py
+data/deployments.json

@@ -1210,3 +1210,16 @@ html { touch-action: manipulation; }
   border-color: rgba(214,130,90,0.6);
   box-shadow: 0 0 0 2px rgba(214,130,90,0.25);
 }
+
+/* Apps desplegadas (Cloudflare) en la vista Archivos */
+.dep-section { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.dep-item {
+  display: flex; align-items: center; gap: 10px; text-decoration: none;
+  padding: 9px 12px; border-radius: 10px;
+  background: var(--accent-soft, rgba(80,120,200,.1));
+  border: 1px solid var(--accent-line, #2a3850); color: var(--text, #e6edf3);
+}
+.dep-item:hover { border-color: var(--accent); }
+.dep-ic { font-size: 18px; }
+.dep-meta { display: flex; flex-direction: column; min-width: 0; }
+.dep-url { font-size: 11px; color: var(--dim); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

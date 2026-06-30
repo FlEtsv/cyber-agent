@@ -1720,24 +1720,57 @@ class CyberAgent {
   async generateImage() {
     if (this.streaming) return;
     const r = await this._modal({
-      title: '🎨 Crear imagen',
+      title: '🎨 Modo imagen (FLUX)',
       submitLabel: 'Generar',
-      fields: [{ name: 'prompt', label: 'Describe la imagen', type: 'textarea',
-                 placeholder: 'Ej: un gato astronauta sobre Marte, estilo acuarela' }],
+      fields: [
+        { name: 'prompt', label: 'Describe la imagen', type: 'textarea',
+          placeholder: 'Ej: un gato astronauta sobre Marte' },
+        { name: 'style', label: 'Estilo', type: 'select', options: [
+          { value: '', label: '— sin estilo —' },
+          { value: 'fotografía realista, ultra detallada, 8k', label: 'Fotorrealista' },
+          { value: 'ilustración digital', label: 'Ilustración' },
+          { value: 'render 3D, octane', label: '3D' },
+          { value: 'estilo anime', label: 'Anime' },
+          { value: 'acuarela', label: 'Acuarela' },
+          { value: 'arte cyberpunk, neón', label: 'Cyberpunk' },
+          { value: 'minimalista, vector plano', label: 'Minimalista' },
+          { value: 'óleo, pintura clásica', label: 'Óleo' },
+        ]},
+        { name: 'aspect', label: 'Relación de aspecto', type: 'select', options: [
+          { value: '', label: 'Cuadrada (1:1)' },
+          { value: 'formato horizontal 16:9', label: 'Horizontal (16:9)' },
+          { value: 'formato vertical 9:16', label: 'Vertical (9:16)' },
+          { value: 'formato retrato 3:4', label: 'Retrato (3:4)' },
+          { value: 'formato panorámico 21:9', label: 'Panorámica (21:9)' },
+        ]},
+        { name: 'count', label: 'Nº de imágenes', type: 'select', options: [
+          { value: '1', label: '1' }, { value: '2', label: '2' },
+          { value: '3', label: '3' }, { value: '4', label: '4' },
+        ]},
+        { name: 'negative', label: 'Evitar (negative prompt)', type: 'text',
+          placeholder: 'Ej: texto, marcas de agua, manos deformes' },
+      ],
     });
-    const prompt = r && (r.prompt || '').trim();
-    if (!prompt) return;
+    const base = r && (r.prompt || '').trim();
+    if (!base) return;
+    // Codifica las opciones en el prompt FLUX (el conector solo acepta texto).
+    const parts = [base];
+    if (r.style)  parts.push(r.style);
+    if (r.aspect) parts.push(r.aspect);
+    if (r.negative) parts.push('Evita: ' + r.negative);
+    const prompt = parts.join('. ');
+    const count = Math.max(1, Math.min(4, parseInt(r.count || '1', 10)));
     if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
-      this._setConnectionState('offline', 'PC offline',
-        'No se puede crear la imagen: el PC no está conectado.', true);
+      this._setStatus('offline', 'PC offline');
+      this._showConnectionBanner('offline', 'No se puede crear la imagen: el PC no está conectado.');
       return;
     }
-    this._addUserBubble('🎨 Crear imagen: ' + prompt);
-    this._lastWasImageGen = true;   // no mostrar footer de escalada en esta respuesta
+    this._addUserBubble(`🎨 Crear imagen ${count > 1 ? '(×' + count + ') ' : ''}: ${base}`);
+    this._lastWasImageGen = true;
     this._beginStreaming();
     this._send({
       type: 'generate_image',
-      prompt,
+      prompt, count,
       conversation_id: this.currentConversationId || undefined,
       folder_id: this._currentFolderId() || undefined,
     });

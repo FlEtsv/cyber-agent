@@ -21,6 +21,9 @@ def handle_sync(action: str, msg: dict) -> dict:
             return {"files": db.get_files(
                 conversation_id=msg.get("conversation_id", "__all__"),
                 favorites_only=bool(msg.get("favorites_only", False)))}
+        if action == "deployments":
+            from app.deployer import registered_deployments
+            return registered_deployments()
         if action == "file_favorite":
             db.set_file_favorite(msg["file_id"], bool(msg.get("favorite", True)))
             return {"ok": True}

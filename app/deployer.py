@@ -24,6 +24,37 @@ import time
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _APPS_DIR = os.path.join(_BASE, "app", "web", "served", "apps")
+# Registro PERSISTENTE de lo que el agente despliega (sobrevive reinicios) → así
+# el usuario tiene "en un sitio ordenado" las herramientas/apps creadas para él.
+_REGISTRY = os.path.join(_BASE, "data", "deployments.json")
+
+
+def _load_registry() -> list:
+    try:
+        import json
+        with open(_REGISTRY, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _register(slug: str, name: str, kind: str, url: str) -> None:
+    import json
+    import time as _t
+    items = [x for x in _load_registry() if x.get("slug") != slug]
+    items.insert(0, {"slug": slug, "name": name or slug, "kind": kind,
+                     "url": url, "created": _t.time()})
+    try:
+        os.makedirs(os.path.dirname(_REGISTRY), exist_ok=True)
+        with open(_REGISTRY, "w", encoding="utf-8") as f:
+            json.dump(items[:50], f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def registered_deployments() -> dict:
+    """Apps/herramientas desplegadas (persistente). Para la vista de la web."""
+    return {"count": len(_load_registry()), "deployments": _load_registry()}
 
 # slug -> dict(kind, url, port, proc, tunnel_proc, dir, name, started)
 _DEPLOYMENTS: dict[str, dict] = {}
@@ -218,6 +249,7 @@ def _publish_dynamic(slug: str, path: str, kind: str, run_cmd: str | None) -> di
         _DEPLOYMENTS[slug] = {"kind": kind, "url": url, "port": port, "proc": proc,
                               "tunnel_proc": tproc, "dir": workdir, "name": slug,
                               "started": time.time()}
+    _register(slug, slug, kind, url)
     return {"ok": True, "kind": kind, "slug": slug, "url": url, "port": port, "log": log}
 
 
@@ -240,7 +272,8 @@ def publish(path: str, name: str | None = None, kind: str | None = None,
         with _LOCK:
             _DEPLOYMENTS[slug] = {"kind": "static", "url": res.get("url"), "port": None,
                                   "proc": None, "tunnel_proc": None,
-                                  "dir": path, "name": slug, "started": time.time()}
+                                  "dir": path, "name": name or slug, "started": time.time()}
+        _register(slug, name or slug, "static", res.get("url"))
         return res
     return _publish_dynamic(slug, path, kind, run_cmd)
 

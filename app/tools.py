@@ -2825,7 +2825,11 @@ def _deploy_app(args: dict) -> dict:
         return {"ok": False, "error": f"deployer no disponible: {e}"}
     op = (args.get("op") or "publish").lower()
     if op == "list":
-        return deployer.list_deployments()
+        live = deployer.list_deployments()
+        reg = deployer.registered_deployments()
+        return {"activos": live.get("deployments", []),
+                "registradas": reg.get("deployments", []),
+                "count": reg.get("count", 0)}
     if op == "stop":
         slug = args.get("slug") or args.get("name") or ""
         return deployer.stop(slug)

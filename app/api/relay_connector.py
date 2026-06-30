@@ -298,26 +298,28 @@ class RelayConnector:
             except Exception:
                 pass
 
-        await _send({"type": "status", "data": "🎨 Generando imagen…"})
-        try:
-            from app.mistral_studio import available, run
-            if not available():
-                await _send({"type": "token",
-                             "data": "No puedo crear imágenes: falta MISTRAL_API_KEY en el PC."})
-                await _send({"type": "done"})
-                return
-            loop = asyncio.get_running_loop()
-            res = await loop.run_in_executor(
-                None, lambda: run(prompt, connectors=["image_generation"]))
-        except Exception as e:
-            await _send({"type": "token", "data": f"Error generando la imagen: {e}"})
+        count = max(1, min(4, int(msg.get("count", 1) or 1)))
+        from app.mistral_studio import available, run
+        if not available():
+            await _send({"type": "token",
+                         "data": "No puedo crear imágenes: falta MISTRAL_API_KEY en el PC."})
             await _send({"type": "done"})
             return
-
-        files = res.get("files") or [] if isinstance(res, dict) else []
+        loop = asyncio.get_running_loop()
+        files = []
+        for i in range(count):
+            await _send({"type": "status",
+                         "data": (f"🎨 Generando imagen {i+1}/{count}…" if count > 1
+                                  else "🎨 Generando imagen…")})
+            try:
+                res = await loop.run_in_executor(
+                    None, lambda: run(prompt, connectors=["image_generation"]))
+                fs = res.get("files") or [] if isinstance(res, dict) else []
+                files.extend(fs)
+            except Exception as e:
+                await _send({"type": "token", "data": f"⚠️ Error en imagen {i+1}: {e}"})
         if not files:
-            txt = (res or {}).get("text") or "No se generó ninguna imagen."
-            await _send({"type": "token", "data": txt})
+            await _send({"type": "token", "data": "No se generó ninguna imagen."})
             await _send({"type": "done"})
             return
 

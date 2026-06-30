@@ -186,6 +186,11 @@
       const r = await app._workspace('files_get', payload);
       state.dbFiles = Array.isArray(r.files) ? r.files : [];
     } catch { state.dbFiles = []; }
+    // Apps/herramientas desplegadas por el agente en Cloudflare (sitio ordenado).
+    try {
+      const d = await app._workspace('deployments', {});
+      state.deployments = Array.isArray(d.deployments) ? d.deployments : [];
+    } catch { state.deployments = []; }
     renderFiles();
   }
 
@@ -208,9 +213,24 @@
       </a></div>`;
   }
 
+  function _deploymentsHtml() {
+    const deps = (state.filter === 'all') ? (state.deployments || []) : [];
+    if (!deps.length) return '';
+    const rows = deps.map(d => {
+      const url = d.url || '#';
+      const kind = d.kind === 'static' ? '🌐' : '⚙️';
+      return `<a class="dep-item" href="${url}" target="_blank" rel="noopener">
+        <span class="dep-ic">${kind}</span>
+        <span class="dep-meta"><b>${(d.name || d.slug || '').replace(/</g,'&lt;')}</b>
+        <span class="dep-url">${String(url).replace(/^https?:\/\//,'').slice(0,46)}</span></span></a>`;
+    }).join('');
+    return `<div class="dep-section"><div class="cost-sec-title">🚀 Apps desplegadas (Cloudflare)</div>${rows}</div>`;
+  }
+
   function renderFiles() {
     const grid = $('files-grid');
     if (!grid) return;
+    const depHtml = _deploymentsHtml();
     let list;
     if (state.filter === 'all') {
       const seen = new Set(state.dbFiles.map(f => f.url || f.name));
@@ -218,16 +238,16 @@
     } else {
       list = state.dbFiles;
     }
-    if (!list.length) {
+    if (!list.length && !depHtml) {
       const msg = state.filter === 'fav'
         ? 'No tienes favoritos. Marca ⭐ en cualquier archivo para conservarlo aunque borres la conversación.'
         : state.filter === 'conv'
           ? 'Esta conversación no tiene archivos adjuntos todavía.'
           : 'Aún no hay archivos. Adjunta un documento o pide al agente generar un PDF/imagen.';
-      grid.innerHTML = `<div class="files-empty">${msg}</div>`;
+      grid.innerHTML = depHtml + `<div class="files-empty">${msg}</div>`;
       return;
     }
-    grid.innerHTML = list.map(_fileCard).join('');
+    grid.innerHTML = depHtml + list.map(_fileCard).join('');
   }
 
   // Filtros Todos / Esta conversación / Favoritos
