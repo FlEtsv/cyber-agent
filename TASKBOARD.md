@@ -164,7 +164,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] AO..AX+K-06 — Niveles de importancia, digest, comandos bot, actuadores, audio, disuasión — Fecha: 2026-06-30
+[claude] Y+AG-01..02+AF-07+X+storage — almacenamiento, evaluación A/B, merge adapter, scheduler entrenamiento — Fecha: 2026-06-30
 
 [codex] AUTH-RECOVERY-005 — Recuperar acceso al relay y preparar login por email si hay proveedor SMTP: diagnosticar credenciales/TOTP desplegados, regenerar QR/credenciales si procede y mejorar flujo de recuperación sin romper auth actual — Archivos: `relay/main.py`, `relay/web/login.html`, `relay/web/login.css`, `relay/generate_secrets.py`, `tests/test_relay_integration.py`, `TASKBOARD.md`, `data/relay_totp_qr.png`, `data/relay_login_credentials.txt`, `data/relay_secrets.env` — Fecha: 2026-06-27 20:25
 
@@ -201,6 +201,8 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Mover aquí desde EN PROGRESO al terminar.
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
+[claude] AT..AW — Actuadores (base, registry, system_speaker), audio (player, library, tts, live_narrate), deterrence.py+deterrence_tools.py — Commit: 7a5b186 — Fecha: 2026-06-30
+[claude] AO..AR+K-06+AF-09 — Comms niveles, digest, reglas, keyboards, callbacks, comandos bot Telegram, RunPod doc, training scheduler — Commit: f8357a1 — Fecha: 2026-06-30
 [claude] AI..AN — Detección+reID+tracking+patrones+anomalías+Telegram Topics (detect.py, pets.py, reid.py, tracker.py, space_map.py, zones.py, patterns.py, predictor.py, anomaly.py, species_priors.py, telegram_topics.py, setup.py) — Commit: 88b9730 — Fecha: 2026-06-30
 [claude] WEBPROD-001 — Web como producto único en `apps/web` (relay invisible; fin duplicación) — Commit: dc1449e — Fecha: 2026-06-29
 [claude] WEBPROD-002 — Identidad de producto PWA (manifest, sw v12, README) — Commit: 847256f — Fecha: 2026-06-29
@@ -983,14 +985,14 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### Y · Almacenamiento (SD 1.8 TB: modelos, datasets, video 15 días por ley)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| Y-01 | ⬜ | claude | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
+| Y-01 | ✅ 100% claude | claude | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
 | Y-02 | ⬜ | claude | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
 | Y-03 | ⬜ | claude | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
-| Y-04 | ⬜ | claude | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
-| Y-05 | ⬜ | claude | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/quota.py` |
-| Y-06 | ⬜ | claude | Almacén de datasets de entrenamiento (jsonl comprimido, por modelo, versionado) | `app/storage/datasets.py` |
+| Y-04 | ✅ 100% claude | claude | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
+| Y-05 | ✅ 100% claude | claude | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/layout.py` (StorageLayout.info) |
+| Y-06 | ✅ 100% claude | claude | Almacén de datasets de entrenamiento (jsonl comprimido, por modelo, versionado) | `app/storage/datasets.py` |
 | Y-07 | ⬜ | claude | Índice/DB de grabaciones (cámara, momento, eventos asociados) | `app/security/recorder.py` |
-| Y-08 | ⬜ | claude | Backups del vault/DB en la SD (rotación) | `app/storage/backup.py` |
+| Y-08 | ✅ 100% claude | claude | Backups del vault/DB en la SD (rotación) | `app/storage/backup.py` |
 
 ### Z · Cómputo CPU/RAM (64 GB RAM + núcleos de sobra)
 | ID | E | Agente | Tarea | Archivos |
@@ -1035,7 +1037,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AC-02 | ✅ | claude | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
 | AC-03 | ⬜ | claude | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
 | AC-04 | ✅ | claude | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
-| AC-05 | ⬜ | claude | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
+| AC-05 | ✅ 100% claude | claude | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
 | AC-06 | ✅ | claude | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |
 
 ### AD · Umbral + aviso multicanal
@@ -1069,15 +1071,15 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AF-04 | ✅ | claude | Runner RUNPOD QLoRA (subir dataset, lanzar pod A100, recoger adapter) | `app/training/runner_runpod.py` |
 | AF-05 | ✅ | claude | Decisor local-vs-runpod por VRAM/tamaño/coste | `app/training/orchestrator.py` |
 | AF-06 | ✅ | claude | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
-| AF-07 | ⬜ | claude | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
+| AF-07 | ✅ 100% claude | claude | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
 | AF-08 | ✅ | claude | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
 | AF-09 | ✅ 100% claude | claude | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
 
 ### AG · Evaluación + promoción + seguridad del proceso
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AG-01 | ⬜ | claude | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
-| AG-02 | ⬜ | claude | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
+| AG-01 | ✅ 100% claude | claude | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
+| AG-02 | ✅ 100% claude | claude | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
 | AG-03 | ✅ | claude | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
 | AG-04 | ⬜ | claude | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
 | AG-05 | ✅ | claude | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
