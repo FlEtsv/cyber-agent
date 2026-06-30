@@ -985,7 +985,7 @@ class CyberAgent {
     const opts = [
       { value: '',                      label: '(heredar / auto)' },
       { value: 'cyberagent-24b',        label: 'Modelo local — Mistral 24B' },
-      { value: 'codestral:22b',         label: 'Codestral 22B — local' },
+      { value: 'cyberagent-codestral:latest', label: 'Codestral 22B — local (código)' },
       { value: 'codestral-latest',      label: 'Codestral (nube)' },
       { value: 'mistral-medium-latest', label: 'Mistral Medium (nube)' },
       { value: 'mistral-large-latest',  label: 'Mistral Large (nube)' },
@@ -1995,7 +1995,7 @@ class CyberAgent {
     // Catálogo curado y AGRUPADO para que no haya dudas del modelo (origen + coste).
     // Los modelos de nube y los alias (auto/fused) no vienen en availableModels
     // (que solo lista los Ollama locales del host), así que se fijan aquí.
-    const LOCAL_CODESTRAL = 'codestral:22b';
+    const LOCAL_CODESTRAL = 'cyberagent-codestral:latest';
     const groups = [
       { label: 'Automático', items: [
         { value: '',      label: '🔀 Auto (local primero)' },
