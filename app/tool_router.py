@@ -33,6 +33,8 @@ CATEGORIES: dict[str, set[str]] = {
     "documents": {"generate_document", "serve_file", "deploy_app"},
     # Gestión de contenedores Docker (incl. Home Assistant/comunicaciones)
     "docker": {"docker"},
+    # Control de dispositivos Home Assistant (luces, TTS, cámaras, scripts)
+    "ha": {"ha_control"},
     # 2.0: git, lectura de documentos del usuario, navegador headless
     "devtools":  {"git_op", "read_document", "browse_page"},
     # 2.0: programación de tareas autónomas + mensajería saliente
@@ -121,8 +123,11 @@ _KW: dict[str, set[str]] = {
                   "grafica","gráfica","calcula","últimas noticias","ultimas noticias",
                   "actualizado","tiempo real","fuentes","cita","citaciones"},
     "docker": {"docker","contenedor","container","compose","imagen docker","levanta el contenedor",
-               "para el contenedor","reinicia el contenedor","home assistant","homeassistant","ha ",
-               "logs del contenedor","docker ps","docker run"},
+               "para el contenedor","reinicia el contenedor","logs del contenedor","docker ps","docker run"},
+    "ha":     {"home assistant","homeassistant","ha ","enciende la luz","apaga la luz",
+               "turn on","turn off","toggle","entidad","entity","script ha","automatizaci",
+               "tts","texto a voz","habla","altavoz","camara ha","snapshot ha",
+               "ir sensor","autofoco","luz infrarroja","ha_control"},
     "documents": {"documento","pdf","informe","reporte","entrega","entregable",
                   "genera un pdf","genera documento","exporta","exportar","docx",
                   "enlace","link","url","descargar","sirve","servir","comparte",

@@ -286,7 +286,52 @@ class SecurityService(_Service):
         log("WARN", "supervisor", "SecurityService: Telegram no responde — nada que curar automáticamente")
 
 
-# ── 5) Watchdog (supervisión mutua) ───────────────────────────────────────────
+# ── 5) Docker HA health-check (J-03, gateado por SECURITY_ENABLED) ───────────
+_HA_CONTAINER_NAMES = ("homeassistant", "home-assistant", "apicomunicaciones", "centralita")
+
+
+class DockerHAService(_Service):
+    """Verifica que el contenedor HA/comunicaciones esté corriendo.
+    Solo actúa si CYBERAGENT_SECURITY_ENABLED=1. En heal, intenta start."""
+    name = "docker_ha"
+    interval = 60.0
+    heal_after = 2
+
+    def check(self) -> tuple[bool, str]:
+        if os.environ.get("CYBERAGENT_SECURITY_ENABLED", "0") != "1":
+            return True, "ha_docker=skipped (SECURITY_ENABLED=0)"
+        try:
+            from app.docker_tools import available, run
+            if not available():
+                return True, "ha_docker=skipped (docker no instalado)"
+            result = run("ps_all")
+            for c in result.get("containers", []):
+                cname = (c.get("name") or "").lower()
+                if any(n in cname for n in _HA_CONTAINER_NAMES):
+                    state = (c.get("state") or "").lower()
+                    return state == "running", f"ha_docker={state} ({c['name']})"
+            return True, "ha_docker=no encontrado (no configurado)"
+        except Exception as e:
+            return False, f"ha_docker=error: {e}"
+
+    def heal(self) -> None:
+        if os.environ.get("CYBERAGENT_SECURITY_ENABLED", "0") != "1":
+            return
+        try:
+            from app.docker_tools import available, run
+            if not available():
+                return
+            for c in run("ps_all").get("containers", []):
+                cname = (c.get("name") or "").lower()
+                if any(n in cname for n in _HA_CONTAINER_NAMES):
+                    log("INFO", "supervisor", f"DockerHAService heal: arrancando {c['name']}")
+                    run("start", c["name"])
+                    return
+        except Exception as e:
+            log("WARN", "supervisor", f"DockerHAService heal falló: {e}")
+
+
+# ── 6) Watchdog (supervisión mutua) ───────────────────────────────────────────
 def _startup_bat() -> str:
     return os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows",
                         "Start Menu", "Programs", "Startup", "CyberAgentWatchdog.bat")
@@ -340,6 +385,7 @@ class Supervisor:
             OllamaService(),
             ConnectionService(),
             SecurityService(),
+            DockerHAService(),
             WatchdogService(),
         ]
 

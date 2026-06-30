@@ -704,9 +704,25 @@ TOOLS_SCHEMA = [
                        "ejecutar comandos dentro, pull de imágenes, docker run y docker-compose. Acción "
                        "sensible (controla servicios reales): requiere aprobación.",
         "parameters": {"type": "object", "properties": {
-            "op": {"type": "string", "description": "ps|ps_all|images|start|stop|restart|logs|stats|inspect|rm|pull|run|exec|compose_up|compose_down|compose_ps"},
+            "op": {"type": "string", "description": "ps|ps_all|images|start|stop|restart|logs|stats|inspect|rm|pull|run|exec|compose_up|compose_down|compose_ps|update"},
             "name": {"type": "string", "description": "Nombre/ID del contenedor (o imagen en pull)"},
-            "params": {"type": "object", "description": "Extra: {tail, force, image, ports[], env[], args[], cmd, path (carpeta del compose)}"},
+            "params": {"type": "object", "description": "Extra: {tail, force, image, ports[], env[], args[], cmd, path (carpeta del compose), cpus (limite CPU), memory (limite RAM, ej: '512m')}"},
+        }, "required": ["op"]}
+    }},
+    {"type": "function", "function": {
+        "name": "ha_control",
+        "description": "Controla Home Assistant: enciende/apaga/toggle entidades (luces IR, autofoco, "
+                       "interruptores), reproduce TTS en altavoces, obtiene snapshots de cámaras, "
+                       "ejecuta scripts HA y consulta el estado de cualquier entidad. "
+                       "Requiere SEC_HA_URL + SEC_HA_TOKEN en el vault. Acción sensible: requiere aprobación.",
+        "parameters": {"type": "object", "properties": {
+            "op": {"type": "string",
+                   "description": "turn_on|turn_off|toggle|call|speak|snapshot|camera_state|script|state|states|services|ping"},
+            "entity_id": {"type": "string",
+                          "description": "ID de la entidad HA (ej: light.salon, script.reboot, camera.entrada)"},
+            "params": {"type": "object",
+                       "description": "Extra según op: {service (para call), data (atributos extra), "
+                                      "message+media_player+language (para speak)}"},
         }, "required": ["op"]}
     }},
     {"type": "function", "function": {
@@ -1139,7 +1155,7 @@ TOOLS_SCHEMA = [
 DANGEROUS_TOOLS = {"shell", "write_file", "edit_file", "multi_edit", "run_python", "install_package",
                    "uninstall_package", "kill_process", "env_vars",
                    "run_tests", "apply_patch", "gmail_send", "apps_script", "deploy_app",
-                   "docker"} | MOBILE_DANGEROUS
+                   "docker", "ha_control"} | MOBILE_DANGEROUS
 
 ACTIVE_SECURITY_TOOLS = {
     "port_scan", "dir_bruteforce", "ping_sweep", "banner_grab",
@@ -1228,6 +1244,7 @@ TOOL_CATEGORIES = {
     "messaging": {"send_message"},
     "self": {"list_self_files", "syntax_check", "restart_self"},
     "docker": {"docker"},
+    "ha": {"ha_control"},
 }
 
 TOOL_USE_GUIDES = {
@@ -1489,6 +1506,8 @@ def execute_tool(name: str, args: dict) -> dict:
                                        args.get("title", "CyberAgent"), args.get("body", "")),
             "docker":               lambda: __import__("app.docker_tools", fromlist=["run"]).run(
                                        args.get("op", ""), args.get("name", ""), args.get("params")),
+            "ha_control":           lambda: __import__("app.security.ha_tools", fromlist=["run"]).run(
+                                       args.get("op", ""), args.get("entity_id", ""), args.get("params")),
             "deploy_app":           lambda: _deploy_app(args),
             "apps_script":          lambda: __import__("app.apps_script", fromlist=["run"]).run(
                                         args.get("op", ""),

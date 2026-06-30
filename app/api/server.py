@@ -220,6 +220,103 @@ async def api_notify_test(request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/api/training/stats")
+async def api_training_stats(request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training_store import stats
+        return {"ok": True, **stats()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/export")
+async def api_training_export(request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.training_store import export
+        path = export(kind=b.get("kind"), min_signal=b.get("min_signal"), limit=b.get("limit", 10000))
+        return {"ok": True, "path": str(path)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── G-01: Vault — listar secretos (enmascarado) + revelar con TOTP ────────────
+
+@app.get("/api/vault/list")
+async def api_vault_list(request: Request):
+    """Lista secretos enmascarados (sin revelar valores). G-01"""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.secrets_vault import list_secrets_masked
+        return {"ok": True, "secrets": list_secrets_masked()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/vault/reveal")
+async def api_vault_reveal(request: Request):
+    """Revela el valor de un secreto tras validar TOTP (2FA). G-01"""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        key = (b.get("key") or "").strip()
+        totp_code = str(b.get("totp") or "").strip()
+        if not key:
+            return {"ok": False, "error": "key requerida"}
+        from app.secrets_vault import _verify_totp, get_secret
+        if totp_code and not _verify_totp(totp_code):
+            return {"ok": False, "error": "Código TOTP inválido"}
+        value = get_secret(key)
+        if value is None:
+            return {"ok": False, "error": f"Secreto '{key}' no encontrado"}
+        return {"ok": True, "key": key, "value": value}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/vault/set")
+async def api_vault_set(request: Request):
+    """Añade o actualiza un secreto en el vault. G-03"""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        key = (b.get("key") or "").strip()
+        value = b.get("value", "")
+        if not key:
+            return {"ok": False, "error": "key requerida"}
+        from app.secrets_vault import set_secret
+        set_secret(key, str(value))
+        return {"ok": True, "key": key}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.delete("/api/vault/{key}")
+async def api_vault_delete(key: str, request: Request):
+    """Elimina un secreto del vault. G-03"""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.secrets_vault import delete_secret
+        ok = delete_secret(key)
+        return {"ok": bool(ok), "key": key}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.get("/api/health")
 def api_health():
     """Salud agregada de los 3 servicios guardianes. Lo consume el watchdog

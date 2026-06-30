@@ -114,6 +114,28 @@
       <h3>Permisos por herramienta</h3>
       <div id="permissions-list" class="permissions-list"></div>
     </section>
+
+    <!-- G-02+G-03: Gestor de Secretos (Vault) -->
+    <section class="settings-section" id="vault-section">
+      <h3>Gestor de secretos</h3>
+      <p class="settings-hint">Los valores se muestran enmascarados. Para revelar, introduce el código de tu autenticador (TOTP).</p>
+      <div id="vault-list" class="vault-list"></div>
+      <div class="vault-reveal-row" id="vault-reveal-row" style="display:none">
+        <input id="vault-reveal-key" type="text" class="settings-input" placeholder="Clave" readonly>
+        <input id="vault-reveal-totp" type="text" class="settings-input" placeholder="Código TOTP (6 dígitos)" maxlength="6" inputmode="numeric">
+        <button class="mini-btn" id="vault-reveal-btn">Revelar</button>
+        <span id="vault-reveal-result" class="vault-revealed"></span>
+      </div>
+      <details class="vault-add-details">
+        <summary class="mini-btn" style="cursor:pointer;display:inline-flex">+ Añadir / Editar secreto</summary>
+        <div class="vault-add-form">
+          <input id="vault-new-key" type="text" class="settings-input" placeholder="Nombre (ej: SEC_HA_TOKEN)">
+          <input id="vault-new-val" type="password" class="settings-input" placeholder="Valor">
+          <button class="mini-btn" id="vault-save-btn">Guardar</button>
+          <span id="vault-save-result" class="vault-revealed"></span>
+        </div>
+      </details>
+    </section>
   </aside>
 
   <!-- ── Vistas conmutables ────────────────────────────────────────────── -->
@@ -223,46 +245,165 @@
       <div id="files-grid" class="files-grid"></div>
     </section>
 
-    <!-- Vista SEGURIDAD (estructura visible, funciones deshabilitadas) -->
+    <!-- Vista SEGURIDAD -->
     <section id="view-security" class="view">
       <div class="view-head">
         <h2>Seguridad</h2>
-        <span class="badge-soon">próximamente</span>
+        <span class="badge-soon">módulo en construcción</span>
       </div>
-      <p class="view-sub" style="padding:0 22px 16px">Control del hogar, cámaras, alertas y autonomía.</p>
-      <div class="sec-grid">
-        <div class="sec-card sec-disabled">
-          <span class="sec-ico">📷</span>
-          <span class="sec-name">Cámaras</span>
-          <span class="badge-soon">próximamente</span>
-        </div>
-        <div class="sec-card sec-disabled">
-          <span class="sec-ico">🚨</span>
-          <span class="sec-name">Alertas</span>
-          <span class="badge-soon">próximamente</span>
-        </div>
-        <div class="sec-card sec-disabled">
-          <span class="sec-ico">🏠</span>
-          <span class="sec-name">Eventos</span>
-          <span class="badge-soon">próximamente</span>
-        </div>
-        <div class="sec-card sec-disabled">
-          <span class="sec-ico">🤖</span>
-          <span class="sec-name">Autonomía</span>
-          <span class="badge-soon">próximamente</span>
-        </div>
-        <div class="sec-card sec-active" id="sec-telegram-card">
-          <span class="sec-ico">📱</span>
-          <span class="sec-name">Telegram</span>
+
+      <!-- Sub-navegación de módulos -->
+      <div class="sec-tabs" id="sec-tabs">
+        <button class="sec-tab sec-tab-active" data-sec="telegram">📱 Telegram</button>
+        <button class="sec-tab" data-sec="cameras">📷 Cámaras</button>
+        <button class="sec-tab" data-sec="alerts">🚨 Alertas</button>
+        <button class="sec-tab" data-sec="events">🏠 Eventos</button>
+        <button class="sec-tab" data-sec="autonomy">🤖 Autonomía</button>
+        <button class="sec-tab" data-sec="apps">📦 Apps</button>
+        <button class="sec-tab" data-sec="learning">🎓 Aprendizaje</button>
+      </div>
+
+      <!-- Panel: Telegram (ACTIVO) -->
+      <div class="sec-panel sec-panel-active" id="sec-panel-telegram">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">📱</span>
+          <div>
+            <div class="sec-panel-title">Telegram</div>
+            <div class="sec-panel-sub">Canal de notificaciones activo — CyberAgent te avisa de tareas completadas, aprobaciones pendientes y alertas.</div>
+          </div>
           <span id="sec-telegram-status" class="badge-ok">activo</span>
-          <button class="mini-btn" id="sec-telegram-test" title="Enviar mensaje de prueba">Probar</button>
         </div>
-        <div class="sec-card sec-disabled">
-          <span class="sec-ico">🐳</span>
-          <span class="sec-name">Docker</span>
-          <span class="badge-soon">próximamente</span>
+        <div class="sec-panel-body">
+          <button class="mini-btn" id="sec-telegram-test">Probar notificación</button>
+          <span id="sec-telegram-result" class="sec-inline-status"></span>
         </div>
       </div>
+
+      <!-- Panel: Cámaras (F-01 — DESACTIVADO) -->
+      <div class="sec-panel" id="sec-panel-cameras">
+        <div class="sec-disabled-overlay">
+          <span class="sec-lock">🔒</span>
+          <span>Módulo desactivado — <code>SECURITY_ENABLED=0</code></span>
+        </div>
+        <div class="sec-panel-header sec-blurred">
+          <span class="sec-panel-ico">📷</span>
+          <div>
+            <div class="sec-panel-title">Cámaras</div>
+            <div class="sec-panel-sub">Grid de cámaras IP / HA · snapshots · seguimiento RTSP</div>
+          </div>
+          <span class="badge-soon">próximamente</span>
+        </div>
+        <div class="sec-cam-grid sec-blurred">
+          <div class="sec-cam-placeholder"><span>CAM-01</span><div class="sec-cam-thumb"></div></div>
+          <div class="sec-cam-placeholder"><span>CAM-02</span><div class="sec-cam-thumb"></div></div>
+          <div class="sec-cam-placeholder"><span>CAM-03</span><div class="sec-cam-thumb"></div></div>
+          <div class="sec-cam-placeholder"><span>CAM-04</span><div class="sec-cam-thumb"></div></div>
+        </div>
+      </div>
+
+      <!-- Panel: Alertas (F-03 — DESACTIVADO) -->
+      <div class="sec-panel" id="sec-panel-alerts">
+        <div class="sec-disabled-overlay">
+          <span class="sec-lock">🔒</span>
+          <span>Módulo desactivado — <code>SECURITY_ENABLED=0</code></span>
+        </div>
+        <div class="sec-panel-header sec-blurred">
+          <span class="sec-panel-ico">🚨</span>
+          <div>
+            <div class="sec-panel-title">Alertas</div>
+            <div class="sec-panel-sub">Historial de alertas · feedback 👍/👎 · resolución</div>
+          </div>
+          <span class="badge-soon">próximamente</span>
+        </div>
+        <div class="sec-blurred" style="padding:16px 22px;">
+          <div class="sec-event-row"><span class="sec-evt-badge sec-evt-warn">MOVIMIENTO</span><span>Entrada principal · hace 2 h</span><span class="sec-evt-signal">👍</span></div>
+          <div class="sec-event-row"><span class="sec-evt-badge sec-evt-info">SISTEMA</span><span>Telegram heartbeat OK · hace 4 h</span><span class="sec-evt-signal">—</span></div>
+          <div class="sec-event-row"><span class="sec-evt-badge sec-evt-warn">MOVIMIENTO</span><span>Jardín · hace 8 h</span><span class="sec-evt-signal">👎</span></div>
+        </div>
+      </div>
+
+      <!-- Panel: Eventos (F-02 — DESACTIVADO) -->
+      <div class="sec-panel" id="sec-panel-events">
+        <div class="sec-disabled-overlay">
+          <span class="sec-lock">🔒</span>
+          <span>Módulo desactivado — <code>SECURITY_ENABLED=0</code></span>
+        </div>
+        <div class="sec-panel-header sec-blurred">
+          <span class="sec-panel-ico">🏠</span>
+          <div>
+            <div class="sec-panel-title">Eventos</div>
+            <div class="sec-panel-sub">Timeline de eventos del sistema · ring-buffer · fuentes externas</div>
+          </div>
+          <span class="badge-soon">próximamente</span>
+        </div>
+        <div class="sec-timeline sec-blurred">
+          <div class="sec-tl-item"><span class="sec-tl-dot sec-tl-green"></span><span class="sec-tl-ts">10:24</span><span>Sistema online</span></div>
+          <div class="sec-tl-item"><span class="sec-tl-dot sec-tl-yellow"></span><span class="sec-tl-ts">09:12</span><span>Movimiento detectado</span></div>
+          <div class="sec-tl-item"><span class="sec-tl-dot sec-tl-green"></span><span class="sec-tl-ts">08:00</span><span>Heartbeat Telegram OK</span></div>
+        </div>
+      </div>
+
+      <!-- Panel: Autonomía (F-04 — DESACTIVADO) -->
+      <div class="sec-panel" id="sec-panel-autonomy">
+        <div class="sec-disabled-overlay">
+          <span class="sec-lock">🔒</span>
+          <span>Módulo desactivado — <code>SECURITY_ENABLED=0</code></span>
+        </div>
+        <div class="sec-panel-header sec-blurred">
+          <span class="sec-panel-ico">🤖</span>
+          <div>
+            <div class="sec-panel-title">Autonomía</div>
+            <div class="sec-panel-sub">Modo manual · operativo · alto impacto · políticas de aprobación</div>
+          </div>
+          <span class="badge-soon">próximamente</span>
+        </div>
+        <div class="sec-autonomy-modes sec-blurred">
+          <label class="sec-mode-btn sec-mode-active"><input type="radio" name="autonomy" disabled checked> Manual</label>
+          <label class="sec-mode-btn"><input type="radio" name="autonomy" disabled> Operativo</label>
+          <label class="sec-mode-btn"><input type="radio" name="autonomy" disabled> Alto impacto</label>
+        </div>
+      </div>
+
+      <!-- Panel: Apps externas (F-05 — DESACTIVADO) -->
+      <div class="sec-panel" id="sec-panel-apps">
+        <div class="sec-disabled-overlay">
+          <span class="sec-lock">🔒</span>
+          <span>Módulo desactivado — <code>SECURITY_ENABLED=0</code></span>
+        </div>
+        <div class="sec-panel-header sec-blurred">
+          <span class="sec-panel-ico">📦</span>
+          <div>
+            <div class="sec-panel-title">Apps</div>
+            <div class="sec-panel-sub">Aplicaciones externas registradas · X-Event-Token · estado</div>
+          </div>
+          <span class="badge-soon">próximamente</span>
+        </div>
+        <div class="sec-blurred" style="padding:16px 22px;">
+          <div class="sec-event-row"><span class="sec-evt-badge sec-evt-info">APP</span><span>APiComuni centralita</span><span class="badge-soon">pendiente</span></div>
+          <div class="sec-event-row"><span class="sec-evt-badge sec-evt-info">APP</span><span>Home Assistant</span><span class="badge-soon">pendiente</span></div>
+        </div>
+      </div>
+
+      <!-- Panel: Aprendizaje (F-06) -->
+      <div class="sec-panel" id="sec-panel-learning">
+        <div class="sec-panel-header">
+          <span class="sec-panel-ico">🎓</span>
+          <div>
+            <div class="sec-panel-title">Aprendizaje</div>
+            <div class="sec-panel-sub">Muestras capturadas para fine-tuning QLoRA · señal de feedback</div>
+          </div>
+        </div>
+        <div class="sec-panel-body">
+          <div id="sec-learning-stats" class="sec-stats-grid">
+            <div class="sec-stat-card"><span class="sec-stat-n" id="sl-total">—</span><span class="sec-stat-lbl">muestras total</span></div>
+            <div class="sec-stat-card"><span class="sec-stat-n" id="sl-interaction">—</span><span class="sec-stat-lbl">interacciones</span></div>
+            <div class="sec-stat-card"><span class="sec-stat-n" id="sl-approval">—</span><span class="sec-stat-lbl">aprobaciones</span></div>
+            <div class="sec-stat-card"><span class="sec-stat-n" id="sl-feedback">—</span><span class="sec-stat-lbl">feedback</span></div>
+          </div>
+          <button class="mini-btn" id="sec-training-refresh" style="margin-top:12px">Actualizar</button>
+        </div>
+      </div>
+
     </section>
 
   </div>

@@ -174,6 +174,8 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 
 ## ✅ COMPLETADO
 
+[claude] E+F+G+J+K(01+05) — HA tools (E-01..05 dispatcher unificado ha_control + DANGEROUS + router); web sub-vistas seguridad (F-01..06: pestañas Telegram/Cámaras/Alertas/Eventos/Autonomía/Apps/Aprendizaje con overlay desactivado + CSS); vault web UI (G-01..03: endpoints /api/vault/list+reveal+set+DELETE + UI en Ajustes con reveal TOTP + add/edit); docker update/resources (J-02: op update con cpus/memory); DockerHAService supervisor (J-03); training_store SQLite (K-01+K-05: schema + export QLoRA JSONL); /api/training/stats+export endpoints — 71/71 tests OK — Fecha: 2026-06-30
+
 [claude] DESGLOSE-A..M — 68 tareas granulares marcadas con agente y estado: A..D+B+K → codex; E+F+G+H+J+L+M → claude; I-01 → codex, I-02 → claude. Completados: F-07 (badge CSS ya en SEC-002), H-01 (SecurityPanel GUI en SEC-003), L-01 (system prompt en SEC-010), M-04 (Telegram wiring en SEC-005) — Fecha: 2026-06-30
 
 [claude] SEC-003+SEC-006+SEC-010 — GUI Seguridad escritorio (SecurityPanel + pestaña 🛡️ en MainWindow); categoría Docker en TOOL_CATEGORIES; system prompt del agente con 2 claves Mistral / cámaras / HA / Docker — Archivos: `app/widgets/security_panel.py`, `app/widgets/main_window.py`, `app/tools.py`, `app/ollama_client.py`, `TASKBOARD.md` — Fecha: 2026-06-30
@@ -760,29 +762,29 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### E · Home Assistant (cada acción = tool del agente)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| E-01 | ⬜ | claude | Tool `ha_control` (luz IR on/off, autofoco on/off) | `app/security/ha_tools.py` |
-| E-02 | ⬜ | claude | Tool `ha_speak` (TTS por altavoz) | `app/security/ha_tools.py` |
-| E-03 | ⬜ | claude | Tool `ha_camera` (snapshot/stream) | `app/security/ha_tools.py` |
-| E-04 | ⬜ | claude | Tool `ha_script` (reboot, sync_clock, genérico) | `app/security/ha_tools.py` |
-| E-05 | ⬜ | claude | Registrar tools HA en tools.py + router + DANGEROUS | `app/tools.py`, `app/tool_router.py` |
+| E-01 | ✅ | claude | Tool `ha_control` (luz IR on/off, autofoco on/off) | `app/security/ha_tools.py` |
+| E-02 | ✅ | claude | Tool `ha_speak` (TTS por altavoz) | `app/security/ha_tools.py` |
+| E-03 | ✅ | claude | Tool `ha_camera` (snapshot/stream) | `app/security/ha_tools.py` |
+| E-04 | ✅ | claude | Tool `ha_script` (reboot, sync_clock, genérico) | `app/security/ha_tools.py` |
+| E-05 | ✅ | claude | Registrar tools HA en tools.py + router + DANGEROUS | `app/tools.py`, `app/tool_router.py` |
 
 ### F · UI Web Seguridad (cada sub-vista, desactivada)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| F-01 | ⬜ | claude | Sub-vista Cámaras (grid + placeholder) | `apps/web/*` |
-| F-02 | ⬜ | claude | Sub-vista Eventos (timeline) | `apps/web/*` |
-| F-03 | ⬜ | claude | Sub-vista Alertas (historial + feedback) | `apps/web/*` |
-| F-04 | ⬜ | claude | Sub-vista Autonomía (toggle modos) | `apps/web/*` |
-| F-05 | ⬜ | claude | Sub-vista Apps (registro externas) | `apps/web/*` |
-| F-06 | ⬜ | claude | Sub-vista Aprendizaje (training_store stats) | `apps/web/*` |
+| F-01 | ✅ | claude | Sub-vista Cámaras (grid + placeholder) | `apps/web/index.html`, `apps/web/style.css` |
+| F-02 | ✅ | claude | Sub-vista Eventos (timeline) | `apps/web/index.html`, `apps/web/style.css` |
+| F-03 | ✅ | claude | Sub-vista Alertas (historial + feedback) | `apps/web/index.html`, `apps/web/style.css` |
+| F-04 | ✅ | claude | Sub-vista Autonomía (toggle modos) | `apps/web/index.html`, `apps/web/style.css` |
+| F-05 | ✅ | claude | Sub-vista Apps (registro externas) | `apps/web/index.html`, `apps/web/style.css` |
+| F-06 | ✅ | claude | Sub-vista Aprendizaje (training_store stats) | `apps/web/index.html`, `apps/web/ui.js` |
 | F-07 | ✅ | claude | Badge "próximamente" consistente | `apps/web/style.css` |
 
 ### G · Vault web UI + 2FA
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| G-01 | ⬜ | claude | Endpoint `/api/vault/list` (enmascarado) + `/api/vault/reveal` (TOTP) | `app/api/server.py` |
-| G-02 | ⬜ | claude | UI en Ajustes: lista de secretos + input authenticator a revelar | `apps/web/*` |
-| G-03 | ⬜ | claude | UI: añadir/editar/borrar secreto | `apps/web/*` |
+| G-01 | ✅ | claude | Endpoint `/api/vault/list` (enmascarado) + `/api/vault/reveal` (TOTP) | `app/api/server.py` |
+| G-02 | ✅ | claude | UI en Ajustes: lista de secretos + input authenticator a revelar | `apps/web/index.html`, `apps/web/ui.js`, `apps/web/style.css` |
+| G-03 | ✅ | claude | UI: añadir/editar/borrar secreto | `apps/web/index.html`, `apps/web/ui.js` |
 | G-04 | ⬜ | claude | Vault por el conector del relay (móvil) | `app/api/relay_connector.py` |
 
 ### H · UI PC (GUI escritorio)
@@ -801,18 +803,18 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | J-01 | ⬜ | claude | Compose del stack de seguridad (HA/comunicaciones) gestionable por el agente | `integrations/security/docker-compose.yml` |
-| J-02 | ⬜ | claude | Tool docker op update/resources (límites cpu/mem) | `app/docker_tools.py` |
-| J-03 | ⬜ | claude | Health/auto-arranque del contenedor HA bajo el supervisor (gateado) | `app/supervisor.py` |
+| J-02 | ✅ | claude | Tool docker op update/resources (límites cpu/mem) | `app/docker_tools.py` |
+| J-03 | ✅ | claude | Health/auto-arranque del contenedor HA bajo el supervisor (gateado) | `app/supervisor.py` |
 
 ### K · training_store + QLoRA
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| K-01 | ⬜ | codex | Esquema training_store (instrucción/respuesta/señal) | `app/training_store.py` |
-| K-02 | ⬜ | codex | Hook: capturar decisión a resultado de eventos | `app/security/events.py` |
-| K-03 | ⬜ | codex | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
-| K-04 | ⬜ | codex | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
-| K-05 | ⬜ | codex | Export a formato QLoRA (jsonl chat) | `app/training_store.py` |
-| K-06 | ⬜ | codex | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
+| K-01 | ✅ | claude | Esquema training_store (instrucción/respuesta/señal) | `app/training_store.py` |
+| K-02 | ⬜ | claude | Hook: capturar decisión a resultado de eventos | `app/security/events.py` |
+| K-03 | ⬜ | claude | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
+| K-04 | ⬜ | claude | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
+| K-05 | ✅ | claude | Export a formato QLoRA (jsonl chat) | `app/training_store.py` |
+| K-06 | ⬜ | claude | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
 
 ### L · Conciencia del agente
 | ID | E | Agente | Tarea | Archivos |

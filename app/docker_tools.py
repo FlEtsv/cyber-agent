@@ -162,4 +162,21 @@ def run(op: str, name: str = "", params: dict | None = None) -> dict:
             return {"ok": False, "error": "params.path inválido"}
         return _run_cli(["compose", "ps"], timeout=30, cwd=path)
 
+    # J-02: actualizar límites de recursos de un contenedor en caliente
+    if op in ("update", "resources"):
+        if not name:
+            return {"ok": False, "error": "falta 'name' del contenedor"}
+        args = ["update"]
+        if p.get("cpus"):
+            args += ["--cpus", str(p["cpus"])]
+        if p.get("memory"):
+            args += ["--memory", str(p["memory"])]
+        if p.get("memory_swap"):
+            args += ["--memory-swap", str(p["memory_swap"])]
+        if p.get("cpu_shares"):
+            args += ["--cpu-shares", str(p["cpu_shares"])]
+        if len(args) == 1:
+            return {"ok": False, "error": "falta al menos un parámetro de recurso: cpus, memory, memory_swap, cpu_shares"}
+        return _run_cli(args + [name], timeout=30)
+
     return {"ok": False, "error": f"operación Docker desconocida: {op}"}

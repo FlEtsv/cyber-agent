@@ -62,23 +62,131 @@
   document.querySelectorAll('.nav-item[data-view]').forEach(btn =>
     btn.addEventListener('click', () => showView(btn.dataset.view)));
 
-  // ── Vista Seguridad: botón "Probar" Telegram ──────────────────────────────
+  // ── Vista Seguridad: sub-pestañas ────────────────────────────────────────
+  document.querySelectorAll('.sec-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sec-tab').forEach(t => t.classList.remove('sec-tab-active'));
+      document.querySelectorAll('.sec-panel').forEach(p => {
+        p.classList.remove('sec-panel-active');
+        p.style.display = 'none';
+      });
+      tab.classList.add('sec-tab-active');
+      const panel = $('sec-panel-' + tab.dataset.sec);
+      if (panel) { panel.style.display = 'flex'; panel.classList.add('sec-panel-active'); }
+      if (tab.dataset.sec === 'learning') _loadLearningStats();
+    });
+  });
+
+  // ── Telegram: botón "Probar" ──────────────────────────────────────────────
   const secTgTest = $('sec-telegram-test');
+  const secTgResult = $('sec-telegram-result');
   if (secTgTest) {
     secTgTest.addEventListener('click', async () => {
       secTgTest.disabled = true;
       secTgTest.textContent = '…';
+      if (secTgResult) secTgResult.textContent = '';
       try {
         const r = await fetch('/api/notify/test', { method: 'POST' });
         const d = await r.json();
         secTgTest.textContent = d.ok ? '✅ enviado' : '❌ error';
-        if (!d.ok) console.warn('Telegram test error:', d.error);
+        if (secTgResult) secTgResult.textContent = d.ok ? 'Mensaje enviado correctamente.' : (d.error || 'Error desconocido');
       } catch (e) {
         secTgTest.textContent = '❌ fallo';
+        if (secTgResult) secTgResult.textContent = String(e);
       }
-      setTimeout(() => { secTgTest.disabled = false; secTgTest.textContent = 'Probar'; }, 3000);
+      setTimeout(() => { secTgTest.disabled = false; secTgTest.textContent = 'Probar notificación'; }, 3000);
     });
   }
+
+  // ── Aprendizaje: stats del training_store ────────────────────────────────
+  async function _loadLearningStats() {
+    try {
+      const r = await fetch('/api/training/stats');
+      if (!r.ok) return;
+      const d = await r.json();
+      const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+      set('sl-total', d.total ?? '—');
+      const bk = d.by_kind || {};
+      set('sl-interaction', bk.interaction?.count ?? 0);
+      set('sl-approval',    bk.approval?.count ?? 0);
+      set('sl-feedback',    bk.feedback?.count ?? 0);
+    } catch (_) {}
+  }
+  const refreshBtn = $('sec-training-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', _loadLearningStats);
+
+  // ── G-02+G-03: Vault UI ──────────────────────────────────────────────────
+  async function _loadVault() {
+    const list = $('vault-list');
+    if (!list) return;
+    try {
+      const r = await fetch('/api/vault/list');
+      if (!r.ok) return;
+      const d = await r.json();
+      list.innerHTML = '';
+      (d.secrets || []).forEach(s => {
+        const row = document.createElement('div');
+        row.className = 'vault-row';
+        row.innerHTML = `<span class="vault-key">${s.key}</span><span class="vault-val">${s.masked}</span>`
+          + `<button class="mini-btn vault-btn-reveal" data-key="${s.key}">Revelar</button>`;
+        list.appendChild(row);
+      });
+      list.querySelectorAll('.vault-btn-reveal').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const rr = $('vault-reveal-row');
+          const ki = $('vault-reveal-key');
+          if (rr) rr.style.display = 'flex';
+          if (ki) ki.value = btn.dataset.key;
+          const ti = $('vault-reveal-totp'); if (ti) { ti.value = ''; ti.focus(); }
+          const res = $('vault-reveal-result'); if (res) res.textContent = '';
+        });
+      });
+    } catch (_) {}
+  }
+
+  const vaultRevealBtn = $('vault-reveal-btn');
+  if (vaultRevealBtn) {
+    vaultRevealBtn.addEventListener('click', async () => {
+      const key = ($('vault-reveal-key') || {}).value || '';
+      const totp = ($('vault-reveal-totp') || {}).value || '';
+      const res = $('vault-reveal-result');
+      vaultRevealBtn.disabled = true;
+      try {
+        const r = await fetch('/api/vault/reveal', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({key, totp})
+        });
+        const d = await r.json();
+        if (res) res.textContent = d.ok ? d.value : ('Error: ' + d.error);
+      } catch (e) { if (res) res.textContent = String(e); }
+      vaultRevealBtn.disabled = false;
+    });
+  }
+
+  const vaultSaveBtn = $('vault-save-btn');
+  if (vaultSaveBtn) {
+    vaultSaveBtn.addEventListener('click', async () => {
+      const key = ($('vault-new-key') || {}).value.trim();
+      const value = ($('vault-new-val') || {}).value;
+      const res = $('vault-save-result');
+      if (!key) { if (res) res.textContent = 'Introduce un nombre de clave.'; return; }
+      vaultSaveBtn.disabled = true;
+      try {
+        const r = await fetch('/api/vault/set', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({key, value})
+        });
+        const d = await r.json();
+        if (res) res.textContent = d.ok ? '✅ guardado' : ('Error: ' + d.error);
+        if (d.ok) { _loadVault(); if ($('vault-new-key')) $('vault-new-key').value = ''; if ($('vault-new-val')) $('vault-new-val').value = ''; }
+      } catch (e) { if (res) res.textContent = String(e); }
+      vaultSaveBtn.disabled = false;
+    });
+  }
+
+  // Cargar vault cuando se abre el panel de ajustes
+  const settingsBtn2 = $('settings-btn');
+  if (settingsBtn2) settingsBtn2.addEventListener('click', () => setTimeout(_loadVault, 200));
 
   const navSettings = $('nav-settings');
   if (navSettings) navSettings.addEventListener('click', () => {
