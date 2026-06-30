@@ -161,7 +161,9 @@ class CyberAgent {
       } catch {}
       this.ws = null;
     }
-    this._setConnectionState('offline', 'conectando...', 'Conectando con CyberAgent...', true);
+    // Conexión suave: solo el indicador discreto, sin banner alarmante ni bloqueo
+    // del input. Si tras 4s sigue sin conectar, _handleDisconnect mostrará el aviso.
+    this._setStatus('thinking', 'conectando…');
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url   = `${proto}//${location.host}/ws`;
@@ -183,7 +185,10 @@ class CyberAgent {
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.7, 15000);
       this.reconnectTimer = setTimeout(() => this._connect(), wait);
     };
-    this.ws.onerror = () => this._setConnectionState('error', 'error WS', 'Error de conexion con el relay.', true);
+    // onerror salta en cada reintento normal de reconexión: NO mostramos banner
+    // rojo (haría 'parecer que falla'). El onclose se encarga de reconectar con
+    // un aviso discreto y diferido si la caída persiste.
+    this.ws.onerror = () => {};
     this.ws.onmessage = e => {
       try {
         this._onMessage(JSON.parse(e.data));
@@ -266,6 +271,13 @@ class CyberAgent {
         this._requestHistory();
         this._loadFolders();
         this._showWelcome();
+        // Reenvía el mensaje que quedó pendiente mientras estábamos desconectados.
+        if (this.pcOnline && this._pendingSendText) {
+          const t = this._pendingSendText;
+          this._pendingSendText = null;
+          if (!this.inputEl.value.trim()) { this.inputEl.value = t; this._autoResize?.(); }
+          setTimeout(() => this.send(), 400);
+        }
         break;
 
       case 'workspace:result': {
@@ -477,8 +489,14 @@ class CyberAgent {
     const text = this.inputEl.value.trim();
     if ((!text && this.attachedImgs.length === 0 && this.attachedFiles.length === 0) || this.streaming) return;
     if (this.ws?.readyState !== WebSocket.OPEN || !this.pcOnline) {
-      this._setConnectionState('offline', this.pcOnline ? 'reconectando...' : 'PC offline',
-        this.pcOnline ? 'Esperando reconexion con el relay.' : 'El PC principal no esta conectado al relay.', true);
+      // No bloqueamos con cara de error: guardamos el mensaje y lo enviamos solo
+      // en cuanto vuelva la conexión (cold start / redeploy son segundos).
+      this._pendingSendText = text;
+      this._setStatus('thinking', this.pcOnline ? 'conectando… se enviará solo' : 'PC apagado');
+      if (!this.pcOnline) {
+        this._showConnectionBanner('offline',
+          'Tu PC está apagado. Verás chats, carpetas y archivos guardados; el mensaje se enviará cuando se conecte.');
+      }
       return;
     }
 
@@ -1813,7 +1831,9 @@ class CyberAgent {
       this.reconnectNoticeTimer = null;
     }
     this._setStatus(cls, text);
-    this._setInputLocked(lockInput || this.streaming);
+    // El input NUNCA se bloquea por el estado de conexión: lo que escribas se
+    // encola y se envía al reconectar. Solo se bloquea mientras se genera.
+    this._setInputLocked(this.streaming);
     if (bannerText) {
       this._showConnectionBanner(cls, bannerText);
     } else {
@@ -1824,11 +1844,13 @@ class CyberAgent {
   _handleDisconnect(text) {
     this.pcOnline = true;
     this._setStatus('offline', text);
-    this._setInputLocked(true);
+    this._setInputLocked(this.streaming);   // no bloquees por desconexión
     if (this.reconnectNoticeTimer) clearTimeout(this.reconnectNoticeTimer);
+    // Aviso discreto y SOLO si la caída persiste >4s (las reconexiones rápidas
+    // —cold start de Cloud Run, redeploy— pasan desapercibidas).
     this.reconnectNoticeTimer = setTimeout(() => {
-      this._showConnectionBanner('offline', 'Reconectando con el relay. El envio se reactivara automaticamente.');
-    }, 3000);
+      this._showConnectionBanner('offline', 'Reconectando… el envío se reactivará solo.');
+    }, 4000);
   }
 
   _clearTransientConversationState() {
