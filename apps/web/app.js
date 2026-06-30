@@ -229,6 +229,7 @@ class CyberAgent {
   _modelLabel(id = '') {
     const m = String(id || '').toLowerCase();
     if (!m) return 'Modelo local';
+    if (m === 'claude') return 'Claude Code 🤖';
     if (m.endsWith('+code')) return 'Mistral 24B + Codestral';
     // Codestral: el local de Ollama lleva ":" (p.ej. codestral:22b); el de nube es codestral-latest.
     if (m.includes('codestral')) return m.includes(':') ? 'Codestral 22B (local)' : 'Codestral (nube)';
@@ -1697,6 +1698,25 @@ class CyberAgent {
   }
 
   // WEBPROD-005: crear imagen con IA (FLUX) — flujo directo, no depende del modelo.
+  toggleClaudeMode() {
+    const btn = this.$('claude-btn');
+    if (this.selectedModel === 'claude') {
+      this.selectedModel = this._prevModel || '';
+      btn?.classList.remove('active');
+      this._setStatus('', 'Modo Claude desactivado');
+    } else {
+      this._prevModel = this.selectedModel;
+      this.selectedModel = 'claude';
+      btn?.classList.add('active');
+      this._setStatus('thinking', '🤖 Modo Claude (sin permisos)');
+      this._showConnectionBanner('', '🤖 Modo Claude activado: hablas directo con Claude Code en tu PC, con permisos saltados (control total). Pulsa 🤖 de nuevo para salir.');
+      setTimeout(() => this._hideConnectionBanner(), 6000);
+    }
+    this._syncModelSelect();
+    this._savePreferences();
+    this._setHeaderModel(this.availableModels, this.activeModel);
+  }
+
   async generateImage() {
     if (this.streaming) return;
     const r = await this._modal({
@@ -2067,6 +2087,9 @@ class CyberAgent {
         { value: 'mistral-medium-latest', label: '☁️ Mistral Medium' },
         { value: 'mistral-large-latest',  label: '☁️ Mistral Large (caro)' },
       ]},
+      { label: '🤖 Claude Code (terminal directo)', items: [
+        { value: 'claude', label: '🤖 Modo Claude — control total (sin permisos)' },
+      ]},
     ];
     // Solo mostramos los modelos locales IDEALES (24B general + Codestral código).
     // No volcamos toda la lista de Ollama para no llenar el selector de modelos
@@ -2268,6 +2291,7 @@ class CyberAgent {
     this.$('camera-btn').addEventListener('click', () => this.openCamera());
     this.$('file-btn')?.addEventListener('click', () => this.openFilePicker());
     this.$('image-btn')?.addEventListener('click', () => this.generateImage());
+    this.$('claude-btn')?.addEventListener('click', () => this.toggleClaudeMode());
     this.$('screen-btn').addEventListener('click', () => this.captureScreen());
     this.$('voice-btn').addEventListener('click',  () => this.toggleVoice());
   }

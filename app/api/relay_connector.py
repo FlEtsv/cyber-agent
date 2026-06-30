@@ -424,6 +424,11 @@ class RelayConnector:
         except Exception:
             pass
 
+        # ── MODO CLAUDE: terminal directo con Claude Code (skip permissions) ──
+        if (requested_model or "").lower() == "claude":
+            await self._handle_claude(ws, session_id, content)
+            return
+
         try:
             from app.api.agent_runner import AgentRunner
             runner = AgentRunner(
@@ -487,6 +492,49 @@ class RelayConnector:
             # Lo quitamos para que use la conversación acumulada (ya con la réplica).
             nxt.pop("history", None)
             asyncio.create_task(self._handle_message(ws, nxt))
+
+    async def _handle_claude(self, ws, session_id: str, content: str):
+        """Modo Claude: corre el CLI de Claude Code (skip permissions) y streamea."""
+        loop = asyncio.get_running_loop()
+        q: asyncio.Queue = asyncio.Queue()
+        _SENT = object()
+
+        def _emit(obj):
+            loop.call_soon_threadsafe(q.put_nowait, obj)
+
+        def _run():
+            try:
+                from app.claude_cli import stream_claude
+                res = stream_claude(
+                    content, web_session=session_id,
+                    emit_token=lambda t: _emit({"type": "token", "data": t}),
+                    emit_status=lambda s: _emit({"type": "status", "data": s}),
+                )
+                if not res.get("ok"):
+                    _emit({"type": "token", "data": f"\n\n⚠️ Modo Claude: {res.get('error')}"})
+            except Exception as e:
+                _emit({"type": "token", "data": f"\n\n⚠️ Modo Claude error: {e}"})
+            finally:
+                _emit(_SENT)
+
+        threading.Thread(target=_run, daemon=True).start()
+        full = []
+        while True:
+            evt = await q.get()
+            if evt is _SENT:
+                break
+            if evt.get("type") == "token":
+                full.append(evt.get("data", ""))
+            try:
+                await ws.send(json.dumps({**evt, "session_id": session_id}))
+            except Exception:
+                break
+        text = "".join(full)
+        self._convs.setdefault(session_id, []).append({"role": "assistant", "content": text})
+        try:
+            await ws.send(json.dumps({"type": "done", "data": text, "session_id": session_id}))
+        except Exception:
+            pass
 
     async def _handle_new_session(self, ws, msg: dict):
         session_id = msg.get("session_id", "")

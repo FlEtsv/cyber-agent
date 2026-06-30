@@ -1203,3 +1203,10 @@ html { touch-action: manipulation; }
 @media (max-width: 640px) {
   #input, .view-search, input, textarea, select { font-size: 16px !important; }
 }
+
+/* Modo Claude: botón 🤖 activo */
+#claude-btn.active {
+  background: linear-gradient(140deg, rgba(214,130,90,0.25), rgba(214,130,90,0.12));
+  border-color: rgba(214,130,90,0.6);
+  box-shadow: 0 0 0 2px rgba(214,130,90,0.25);
+}
