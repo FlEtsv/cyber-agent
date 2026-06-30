@@ -377,6 +377,57 @@ class WatchdogService(_Service):
             log("ERROR", "supervisor", f"No se pudo relanzar el watchdog: {e}")
 
 
+# ── 7) Bot Telegram polling (B-01, gateado por SECURITY_ENABLED) ─────────────
+class TelegramBotService(_Service):
+    """Arranca el bot de long-polling si SECURITY_ENABLED=1."""
+    name = "telegram_bot"
+    interval = 30.0
+    heal_after = 2
+
+    def check(self) -> tuple[bool, str]:
+        if os.environ.get("SECURITY_ENABLED", "0") != "1":
+            return True, "bot=skipped (SECURITY_ENABLED=0)"
+        try:
+            from app.security.telegram.bot import status
+            s = status()
+            if s.get("running") and s.get("thread_alive"):
+                return True, f"bot=running offset={s.get('offset', 0)}"
+            return False, "bot=stopped"
+        except Exception as e:
+            return False, f"bot=error: {e}"
+
+    def heal(self) -> None:
+        if os.environ.get("SECURITY_ENABLED", "0") != "1":
+            return
+        try:
+            from app.security.telegram.bot import start, stop
+            stop()
+            time.sleep(1)
+            start()
+            log("INFO", "supervisor", "TelegramBot relanzado")
+        except Exception as e:
+            log("WARN", "supervisor", f"TelegramBotService heal falló: {e}")
+
+
+# ── 8) Tareas programadas de seguridad (D-09) ─────────────────────────────────
+class SecurityScheduleService(_Service):
+    """Ejecuta las tareas periódicas de seguridad (retention, backup, digest)."""
+    name = "security_schedule"
+    interval = 60.0
+    heal_after = 5
+
+    def check(self) -> tuple[bool, str]:
+        if os.environ.get("SECURITY_ENABLED", "0") != "1":
+            return True, "schedule=skipped"
+        try:
+            from app.security.schedule import run_due, default_tasks
+            default_tasks()
+            ran = run_due()
+            return True, f"schedule=ok tasks_ran={len(ran)}"
+        except Exception as e:
+            return False, f"schedule=error: {e}"
+
+
 # ── Supervisor ────────────────────────────────────────────────────────────────
 class Supervisor:
     def __init__(self):
@@ -387,6 +438,8 @@ class Supervisor:
             SecurityService(),
             DockerHAService(),
             WatchdogService(),
+            TelegramBotService(),
+            SecurityScheduleService(),
         ]
 
     def start(self):

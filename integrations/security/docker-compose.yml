@@ -1,15 +1,17 @@
-# docker-compose del stack de seguridad / comunicaciones
-# Gestionable por el agente CyberAgent vía tool docker (compose_up/compose_down/compose_ps).
+# docker-compose del stack de seguridad — CyberAgent
+# Gestionable por el agente vía tool docker(op=compose_up, params={path:"integrations/security"})
 #
-# SECRETOS: nunca en texto plano aquí — el agente los pasa vía env desde el vault.
-# ACTIVAR: el agente llama docker(op=compose_up, params={path: "integrations/security"})
+# SECRETOS: nunca en texto plano — se pasan por variables de entorno desde el vault.
+# ACTIVAR:
+#   1. Copiar .env.example a .env y rellenar las variables
+#   2. docker compose up -d
+#   o vía el agente: docker(op=compose_up, params={path:"integrations/security"})
 #
-# Servicios incluidos:
-#   homeassistant   — Home Assistant (control domótica, cámaras HA, TTS)
-#   apicomunicaciones — APiComuni centralita (Telegram bot, cámaras RTSP, eventos)
-#
-# Red compartida: cyberagent_sec
-# Volúmenes persistentes: ha_config, centralita_data
+# Servicios:
+#   homeassistant   — HA (control domótica, cámaras, TTS, webhooks)
+#   cyberagent-sec  — API de seguridad + bot Telegram + procesamiento de eventos
+#   go2rtc          — proxy de streams RTSP→WebRTC/HLS para el dashboard
+#   nginx           — reverse-proxy (HTTPS local con cert auto-firmado)
 
 version: "3.9"
 
@@ -21,45 +23,114 @@ networks:
 volumes:
   ha_config:
     name: ha_config
-  centralita_data:
-    name: centralita_data
+  cyberagent_data:
+    name: cyberagent_data
+  go2rtc_config:
+    name: go2rtc_config
 
 services:
 
+  # ── Home Assistant ────────────────────────────────────────────────────────
   homeassistant:
     image: "ghcr.io/home-assistant/home-assistant:stable"
     container_name: homeassistant
     restart: unless-stopped
     privileged: true
-    network_mode: host          # HA necesita acceso a red local para mdns/UPNP
+    network_mode: host           # HA necesita acceso a red local (mDNS/UPnP)
     volumes:
       - ha_config:/config
       - /etc/localtime:/etc/localtime:ro
     environment:
-      TZ: "Europe/Madrid"
-    # El agente puede arrancarlo con: docker(op=start, name=homeassistant)
-    # o vía compose: docker(op=compose_up, params={path: "integrations/security"})
+      TZ: "${TZ:-Europe/Madrid}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     labels:
       cyberagent.service: "ha"
       cyberagent.managed: "true"
 
-  apicomunicaciones:
-    image: "python:3.11-slim"
-    container_name: apicomunicaciones
+  # ── go2rtc — proxy RTSP→WebRTC/HLS/MJPEG ──────────────────────────────
+  go2rtc:
+    image: "alexxit/go2rtc:latest"
+    container_name: go2rtc
     restart: unless-stopped
     networks:
       - cyberagent_sec
-    volumes:
-      - centralita_data:/app/data
-    working_dir: /app
-    # El agente gestiona el inicio; imagen base de Python — el código se monta desde el host
-    # o se construye con un Dockerfile personalizado cuando esté portado.
-    command: ["python", "-m", "http.server", "8082"]   # placeholder hasta portar APiComuni
-    environment:
-      SECURITY_ENABLED: "0"     # desactivado por defecto, el agente lo activa
-      TZ: "Europe/Madrid"
     ports:
-      - "8082:8082"
+      - "1984:1984"     # go2rtc API + WebUI
+      - "8554:8554"     # RTSP re-stream
+      - "8555:8555/udp" # WebRTC UDP
+    volumes:
+      - go2rtc_config:/config
+    environment:
+      TZ: "${TZ:-Europe/Madrid}"
     labels:
-      cyberagent.service: "centralita"
+      cyberagent.service: "go2rtc"
       cyberagent.managed: "true"
+
+  # ── CyberAgent Security Service ─────────────────────────────────────────
+  # Ejecuta el backend Python: API de seguridad en :8766, bot Telegram,
+  # procesamiento de eventos, motion tracker, brain_bridge.
+  # El código se monta desde el host (desarrollo) o se usa imagen pre-construida.
+  cyberagent-sec:
+    build:
+      context: ../..          # raíz del repo
+      dockerfile: integrations/security/Dockerfile
+    image: cyberagent-sec:latest
+    container_name: cyberagent-sec
+    restart: unless-stopped
+    networks:
+      - cyberagent_sec
+    ports:
+      - "8766:8766"     # API de seguridad (eventos, cámaras, estado)
+    volumes:
+      - cyberagent_data:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      # Activar módulo de seguridad
+      SECURITY_ENABLED: "${SECURITY_ENABLED:-1}"
+      TZ: "${TZ:-Europe/Madrid}"
+      # Secretos (NO poner valores aquí — rellenar en .env)
+      SEC_TELEGRAM_BOT_TOKEN: "${SEC_TELEGRAM_BOT_TOKEN}"
+      SEC_TELEGRAM_CHAT_ID: "${SEC_TELEGRAM_CHAT_ID}"
+      SEC_TELEGRAM_ADMIN_ID: "${SEC_TELEGRAM_ADMIN_ID}"
+      SEC_HA_URL: "${SEC_HA_URL:-http://homeassistant:8123}"
+      SEC_HA_TOKEN: "${SEC_HA_TOKEN}"
+      SEC_MISTRAL_SEC_API_KEY: "${SEC_MISTRAL_SEC_API_KEY}"
+      SEC_EVENT_TOKEN: "${SEC_EVENT_TOKEN}"
+      # Parámetros de operación
+      MOTION_INTERVAL: "${MOTION_INTERVAL:-5}"
+      MOTION_MAX_DURATION: "${MOTION_MAX_DURATION:-120}"
+      MOTION_COOLDOWN: "${MOTION_COOLDOWN:-30}"
+      ACTION_APPROVAL_TIMEOUT: "${ACTION_APPROVAL_TIMEOUT:-120}"
+    depends_on:
+      - homeassistant
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8766/health', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      cyberagent.service: "security"
+      cyberagent.managed: "true"
+
+  # ── nginx reverse-proxy (opcional, HTTPS local) ───────────────────────
+  # Comenta este servicio si no necesitas HTTPS local.
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: cyberagent-nginx
+  #   restart: unless-stopped
+  #   networks:
+  #     - cyberagent_sec
+  #   ports:
+  #     - "443:443"
+  #     - "80:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - cyberagent-sec

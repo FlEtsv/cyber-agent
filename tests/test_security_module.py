@@ -232,3 +232,247 @@ class TestDockerHAService:
                        return_value=(True, "ha_docker=running (homeassistant)")):
                 ok, msg = svc.check()
         assert ok is True
+
+
+# ── B-07: format (nueva suite) ────────────────────────────────────────────────
+class TestFormatNew:
+    def test_strip_think(self):
+        from app.security.telegram.format import strip_think
+        assert strip_think("<think>internal</think>hello") == "hello"
+        assert strip_think("no think here") == "no think here"
+
+    def test_md_bold(self):
+        from app.security.telegram.format import md_to_html
+        assert "<b>hello</b>" in md_to_html("**hello**")
+
+    def test_sanitize_strips_think(self):
+        from app.security.telegram.format import sanitize
+        result = sanitize("<think>secret</think>visible")
+        assert "secret" not in result
+        assert "visible" in result
+
+    def test_sanitize_truncates(self):
+        from app.security.telegram.format import sanitize
+        result = sanitize("x" * 5000, max_len=100)
+        assert len(result) <= 103
+
+
+# ── A-07: decision parser (nueva suite) ───────────────────────────────────────
+class TestDecisionParser:
+    def test_parse_json(self):
+        from app.security.decision import parse
+        d = parse('{"action": "notify", "confidence": 0.8, "reason": "test", "threat_score": 0.7}')
+        assert d.action == "notify"
+
+    def test_parse_json_in_markdown(self):
+        from app.security.decision import parse
+        t = '```json\n{"action": "deter", "confidence": 0.9, "reason": "x", "threat_score": 0.8}\n```'
+        d = parse(t)
+        assert d.action == "deter"
+
+    def test_invalid_action_defaults(self):
+        from app.security.decision import parse
+        d = parse('{"action": "destroy_world", "confidence": 0.5, "reason": "x", "threat_score": 0.5}')
+        assert d.action == "notify"
+
+    def test_clamps_values(self):
+        from app.security.decision import parse
+        d = parse('{"action": "notify", "confidence": 99, "reason": "x", "threat_score": -5}')
+        assert 0.0 <= d.confidence <= 1.0
+        assert 0.0 <= d.threat_score <= 1.0
+
+    def test_parse_visual(self):
+        from app.security.decision import parse_visual
+        v = parse_visual('{"threat_score": 0.6, "description": "dog", "action": "notify", "confidence": 0.75}')
+        assert abs(v["threat_score"] - 0.6) < 0.01
+
+
+# ── D-05: autonomy (nueva suite) ──────────────────────────────────────────────
+class TestAutonomyNew:
+    def setup_method(self):
+        import app.security.autonomy as a
+        a._STATE_PATH = Path(tempfile.mktemp(suffix=".json"))
+        a._state = {"mode": "manual"}
+
+    def test_default_manual(self):
+        from app.security.autonomy import get_mode
+        assert get_mode() == "manual"
+
+    def test_set_valid(self):
+        from app.security.autonomy import set_mode, get_mode
+        set_mode("operativa")
+        assert get_mode() == "operativa"
+
+    def test_set_invalid(self):
+        from app.security.autonomy import set_mode
+        r = set_mode("nuclear")
+        assert not r["ok"]
+
+    def test_auto_act_manual(self):
+        from app.security.autonomy import set_mode, should_auto_act
+        set_mode("manual")
+        assert not should_auto_act("low")
+
+    def test_auto_act_alto_impacto(self):
+        from app.security.autonomy import set_mode, should_auto_act
+        set_mode("alto-impacto")
+        assert should_auto_act("high")
+
+
+# ── D-01: events (nueva suite) ────────────────────────────────────────────────
+class TestEventsNew:
+    def setup_method(self):
+        import app.security.events as e
+        e._ring.clear()
+        e._subscribers.clear()
+        e._DB_PATH = Path(tempfile.mktemp(suffix=".db"))
+
+    def test_emit_and_recent(self):
+        from app.security.events import emit, recent
+        emit("test_event", {"cam_id": "cam1"})
+        evts = recent(10)
+        assert len(evts) >= 1
+        assert evts[-1]["event_type"] == "test_event"
+
+    def test_subscribe(self):
+        from app.security.events import emit, subscribe
+        received = []
+        subscribe(lambda t, p: received.append(t))
+        emit("motion", {})
+        assert "motion" in received
+
+    def test_ring_filter(self):
+        from app.security.events import emit, recent
+        emit("motion", {})
+        emit("alarm", {})
+        evts = recent(10, event_type="motion")
+        assert all(e["event_type"] == "motion" for e in evts)
+
+
+# ── D-07: app_registry (nueva suite) ─────────────────────────────────────────
+class TestAppRegistryNew:
+    def setup_method(self):
+        import app.security.app_registry as r
+        r._REGISTRY_PATH = Path(tempfile.mktemp(suffix=".json"))
+
+    def test_register_and_validate(self):
+        from app.security.app_registry import register_app, validate_token
+        register_app("test_app", token="tok123")
+        assert validate_token("tok123") == "test_app"
+
+    def test_invalid_token(self):
+        from app.security.app_registry import validate_token
+        assert validate_token("bad_token_xyz999") is None
+
+    def test_revoke(self):
+        from app.security.app_registry import register_app, revoke_app, validate_token
+        register_app("app_to_revoke", token="rev999")
+        revoke_app("app_to_revoke")
+        assert validate_token("rev999") is None
+
+
+# ── D-09: schedule (nueva suite) ─────────────────────────────────────────────
+class TestScheduleNew:
+    def setup_method(self):
+        import app.security.schedule as s
+        s._PATH = Path(tempfile.mktemp(suffix=".json"))
+
+    def test_add_and_list(self):
+        from app.security.schedule import add_task, list_tasks
+        add_task("snapshot", 300, {"cam_id": "cam1"})
+        tasks = list_tasks()
+        assert len(tasks) == 1
+
+    def test_remove(self):
+        from app.security.schedule import add_task, remove_task, list_tasks
+        t = add_task("backup_dbs", 3600)
+        remove_task(t["id"])
+        assert not list_tasks()
+
+    def test_default_tasks(self):
+        from app.security.schedule import default_tasks, list_tasks
+        default_tasks()
+        types = {t["type"] for t in list_tasks()}
+        assert "retention_cleanup" in types
+        assert "backup_dbs" in types
+
+
+# ── B-06: keyboards (nueva suite) ────────────────────────────────────────────
+class TestKeyboardsNew:
+    def test_security_keyboard(self):
+        from app.security.telegram.keyboards import security_keyboard
+        kb = security_keyboard("cam1", "ev123")
+        assert "inline_keyboard" in kb
+        assert len(kb["inline_keyboard"]) == 3
+
+    def test_agent_keyboard(self):
+        from app.security.telegram.keyboards import agent_keyboard
+        kb = agent_keyboard("deter_warn", "run001")
+        assert "inline_keyboard" in kb
+        callbacks = [b["callback_data"] for b in kb["inline_keyboard"][0]]
+        assert any("approve" in c for c in callbacks)
+
+
+# ── A-06: prompts (nueva suite) ───────────────────────────────────────────────
+class TestPromptsNew:
+    def test_build_visual_prompt(self):
+        from app.security.prompts import build_visual_prompt
+        p = build_visual_prompt("cam_entrada")
+        assert "cam_entrada" in p
+        assert "threat_score" in p
+
+    def test_build_event_prompt(self):
+        from app.security.prompts import build_event_prompt
+        p = build_event_prompt("motion", "persona detectada", "cam1")
+        assert "motion" in p
+
+    def test_build_chat_prompt(self):
+        from app.security.prompts import build_chat_prompt
+        p = build_chat_prompt()
+        assert "CyberAgent" in p
+
+
+# ── C-07: property_context (nueva suite) ─────────────────────────────────────
+class TestPropertyContextNew:
+    def test_load_returns_dict(self):
+        from app.security.property_context import load_property
+        assert isinstance(load_property(), dict)
+
+    def test_get_context(self):
+        from app.security.property_context import get_context_for_model
+        assert isinstance(get_context_for_model(), str)
+
+    def test_save_and_load(self):
+        import app.security.property_context as pc
+        orig = pc._PROPERTY_JSON
+        pc._PROPERTY_JSON = Path(tempfile.mktemp(suffix=".json"))
+        try:
+            pc.save_property({"address": "Test St", "cameras": []})
+            loaded = pc.load_property()
+            assert loaded["address"] == "Test St"
+        finally:
+            pc._PROPERTY_JSON = orig
+
+
+# ── B-04: viewers (nueva suite) ──────────────────────────────────────────────
+class TestViewersNew:
+    def setup_method(self):
+        import app.security.telegram.viewers as v
+        v._DB = Path(tempfile.mktemp(suffix=".db"))
+
+    def test_add_and_list(self):
+        from app.security.telegram import viewers
+        viewers.add_viewer(111, "alice", "admin")
+        assert any(v["user_id"] == 111 for v in viewers.list_all())
+
+    def test_is_admin(self):
+        from app.security.telegram import viewers
+        viewers.add_viewer(333, "admin_user", "admin")
+        assert viewers.is_admin(333)
+        assert not viewers.is_admin(999)
+
+    def test_remove(self):
+        from app.security.telegram import viewers
+        viewers.add_viewer(444, "temp", "viewer")
+        viewers.remove_viewer(444)
+        assert not viewers.is_authorized(444)

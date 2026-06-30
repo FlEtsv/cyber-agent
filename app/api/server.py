@@ -67,6 +67,13 @@ class _DynamicCORS(BaseHTTPMiddleware):
 
 app.add_middleware(_DynamicCORS)
 
+# D-03: Router de seguridad (/security/*)
+try:
+    from app.api.security_routes import router as _sec_router
+    app.include_router(_sec_router)
+except Exception:
+    pass
+
 
 @app.exception_handler(HTTPException)
 async def _http_exc(request: Request, exc: HTTPException):
