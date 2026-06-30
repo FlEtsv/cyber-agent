@@ -838,93 +838,93 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 > Objetivo: mantener a salvo la casa y los gatos, con trabajo IMPECABLE (es seguridad).
 
 ### N · Dashboard de Cámaras (rejilla principal)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| N-01 | ⬜ | Layout dashboard de cámaras (grid responsive, web + PC) | `apps/web/*`, `app/widgets/*` |
-| N-02 | ⬜ | Tarjeta de cámara con stream EN TIEMPO REAL (HA camera_proxy / RTSP a WebRTC-HLS-MJPEG) | `apps/web/*`, `app/security/stream.py` |
-| N-03 | ⬜ | Botón "Añadir cámara" (modal: nombre, tipo exterior/interior, RTSP/HA entity, ubicación) | `apps/web/*` |
-| N-04 | ⬜ | Botón "Volver a CyberAgent" | `apps/web/*` |
-| N-05 | ⬜ | Botón "Abrir agente con contexto de cámara" (seleccionar cámara a chat contextualizado) | `apps/web/*`, `app/api/*` |
-| N-06 | ⬜ | Estado por cámara (online/offline, IA activa, última detección) | `apps/web/*` |
-| N-07 | ⬜ | Backend: CRUD de cámaras en DB (tipo, fuente, ubicación, zonas, tools asignadas) | `app/security/cameras_db.py` |
-| N-08 | ⬜ | Backend: proxy de stream en vivo (go2rtc o ffmpeg RTSP a WebRTC) | `app/security/stream.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| N-01 | ⬜ | claude | Layout dashboard de cámaras (grid responsive, web + PC) | `apps/web/*`, `app/widgets/*` |
+| N-02 | ⬜ | claude | Tarjeta de cámara con stream EN TIEMPO REAL (HA camera_proxy / RTSP a WebRTC-HLS-MJPEG) | `apps/web/*`, `app/security/stream.py` |
+| N-03 | ⬜ | claude | Botón "Añadir cámara" (modal: nombre, tipo exterior/interior, RTSP/HA entity, ubicación) | `apps/web/*` |
+| N-04 | ⬜ | claude | Botón "Volver a CyberAgent" | `apps/web/*` |
+| N-05 | ⬜ | claude | Botón "Abrir agente con contexto de cámara" (seleccionar cámara a chat contextualizado) | `apps/web/*`, `app/api/*` |
+| N-06 | ⬜ | claude | Estado por cámara (online/offline, IA activa, última detección) | `apps/web/*` |
+| N-07 | ⬜ | claude | Backend: CRUD de cámaras en DB (tipo, fuente, ubicación, zonas, tools asignadas) | `app/security/cameras_db.py` |
+| N-08 | ⬜ | claude | Backend: proxy de stream en vivo (go2rtc o ffmpeg RTSP a WebRTC) | `app/security/stream.py` |
 
 ### O · Vista de cámara individual (IA en vivo)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| O-01 | ⬜ | Layout vista de UNA cámara (video grande + panel IA) | `apps/web/*` |
-| O-02 | ⬜ | Panel "Lo que la IA ve y razona" EN VIVO (stream de razonamiento) | `apps/web/*`, `app/security/live_brain.py` |
-| O-03 | ⬜ | Lista de DETECCIONES (timestamp, tipo, confianza, recorte) | `apps/web/*` |
-| O-04 | ⬜ | ACTIVIDADES IGNORADAS (lo que la IA descartó) + por qué | `apps/web/*` |
-| O-05 | ⬜ | Línea de tiempo de eventos de esa cámara | `apps/web/*` |
-| O-06 | ⬜ | Backend: stream del razonamiento IA por cámara (SSE/WS) | `app/security/live_brain.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| O-01 | ⬜ | claude | Layout vista de UNA cámara (video grande + panel IA) | `apps/web/*` |
+| O-02 | ⬜ | claude | Panel "Lo que la IA ve y razona" EN VIVO (stream de razonamiento) | `apps/web/*`, `app/security/live_brain.py` |
+| O-03 | ⬜ | claude | Lista de DETECCIONES (timestamp, tipo, confianza, recorte) | `apps/web/*` |
+| O-04 | ⬜ | claude | ACTIVIDADES IGNORADAS (lo que la IA descartó) + por qué | `apps/web/*` |
+| O-05 | ⬜ | claude | Línea de tiempo de eventos de esa cámara | `apps/web/*` |
+| O-06 | ⬜ | claude | Backend: stream del razonamiento IA por cámara (SSE/WS) | `app/security/live_brain.py` |
 
 ### P · Grabación / reproducción / exportación
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| P-01 | ⬜ | Grabar clip (manual + automático en evento) | `app/security/recorder.py` |
-| P-02 | ⬜ | Almacén de videos por cámara (DB índice + ficheros) | `app/security/recorder.py` |
-| P-03 | ⬜ | Reproductor con controles nativos (play/pause/seek/velocidad) | `apps/web/*` |
-| P-04 | ⬜ | Saltar a MOMENTOS de actividad (marcadores en la timeline) | `apps/web/*` |
-| P-05 | ⬜ | Recorte de video (trim in/out) | `apps/web/*`, `app/security/recorder.py` |
-| P-06 | ⬜ | Descarga / exportación de clips | `app/api/*` |
-| P-07 | ⬜ | Exportar el RAZONAMIENTO de la IA (por qué fue amenaza, si notificó, si lo descartó) en informe | `app/security/report.py` |
-| P-08 | ⬜ | Retención/limpieza de grabaciones (política + espacio) | `app/security/recorder.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| P-01 | ⬜ | claude | Grabar clip (manual + automático en evento) | `app/security/recorder.py` |
+| P-02 | ⬜ | claude | Almacén de videos por cámara (DB índice + ficheros) | `app/security/recorder.py` |
+| P-03 | ⬜ | claude | Reproductor con controles nativos (play/pause/seek/velocidad) | `apps/web/*` |
+| P-04 | ⬜ | claude | Saltar a MOMENTOS de actividad (marcadores en la timeline) | `apps/web/*` |
+| P-05 | ⬜ | claude | Recorte de video (trim in/out) | `apps/web/*`, `app/security/recorder.py` |
+| P-06 | ⬜ | claude | Descarga / exportación de clips | `app/api/*` |
+| P-07 | ⬜ | claude | Exportar el RAZONAMIENTO de la IA (por qué fue amenaza, si notificó, si lo descartó) en informe | `app/security/report.py` |
+| P-08 | ⬜ | claude | Retención/limpieza de grabaciones (política + espacio) | `app/security/recorder.py` |
 
 ### Q · Zonas de vigilancia (áreas dibujables)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| Q-01 | ⬜ | Editor de zonas sobre el frame (dibujar polígonos) | `apps/web/*` |
-| Q-02 | ⬜ | Tipos de zona: WARNING/amenaza y SEGURA (colorear cada una) | `apps/web/*` |
-| Q-03 | ⬜ | Solapamiento: prevalece la de MAYOR riesgo | `app/security/zones.py` |
-| Q-04 | ⬜ | Solo notificar si la amenaza está DENTRO de zona de vigilancia | `app/security/zones.py` |
-| Q-05 | ⬜ | Cuadrícula "lo que la IA debe vigilar" (regiones de interés) | `apps/web/*` |
-| Q-06 | ⬜ | Backend: persistir zonas por cámara + punto-en-polígono | `app/security/zones.py` |
-| Q-07 | ⬜ | La IA recibe las zonas como contexto al analizar | `app/security/live_brain.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| Q-01 | ⬜ | claude | Editor de zonas sobre el frame (dibujar polígonos) | `apps/web/*` |
+| Q-02 | ⬜ | claude | Tipos de zona: WARNING/amenaza y SEGURA (colorear cada una) | `apps/web/*` |
+| Q-03 | ⬜ | claude | Solapamiento: prevalece la de MAYOR riesgo | `app/security/zones.py` |
+| Q-04 | ⬜ | claude | Solo notificar si la amenaza está DENTRO de zona de vigilancia | `app/security/zones.py` |
+| Q-05 | ⬜ | claude | Cuadrícula "lo que la IA debe vigilar" (regiones de interés) | `apps/web/*` |
+| Q-06 | ⬜ | claude | Backend: persistir zonas por cámara + punto-en-polígono | `app/security/zones.py` |
+| Q-07 | ⬜ | claude | La IA recibe las zonas como contexto al analizar | `app/security/live_brain.py` |
 
 ### R · Cámara EXTERIOR
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| R-01 | ⬜ | Tipo exterior (config + eventos esperados: intrusión, merodeo, persona) | `app/security/camera_types.py` |
-| R-02 | ⬜ | Análisis de personas: etnia, vestimenta, acción, aspecto, puntos clave (descripción policial) | `app/security/analysis_exterior.py` |
-| R-03 | ⬜ | Mejora de imagen (resolución/nitidez/enfoque) para capturar lo importante | `app/security/imaging.py` |
-| R-04 | ⬜ | Lógica de DISUASIÓN (la IA decide disuadir vs alertar) | `app/security/deterrence.py` |
-| R-05 | ⬜ | Tools de disuasión exterior (HA + externos): luz potente/láser/linterna BT, altavoz con retransmisión de video en curso | `app/security/deterrence_tools.py` |
-| R-06 | ⬜ | Contexto de la cámara (ubicación, qué vigilar) editable | `apps/web/*`, `cameras_db` |
-| R-07 | ⬜ | Catálogo de herramientas disuasorias asignables por cámara | `apps/web/*`, `app/security/*` |
-| R-08 | ⬜ | Escalado de amenaza (disuadir a alertar usuario a emergencia) | `app/security/deterrence.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| R-01 | ⬜ | claude | Tipo exterior (config + eventos esperados: intrusión, merodeo, persona) | `app/security/camera_types.py` |
+| R-02 | ⬜ | claude | Análisis de personas: etnia, vestimenta, acción, aspecto, puntos clave (descripción policial) | `app/security/analysis_exterior.py` |
+| R-03 | ⬜ | claude | Mejora de imagen (resolución/nitidez/enfoque) para capturar lo importante | `app/security/imaging.py` |
+| R-04 | ⬜ | claude | Lógica de DISUASIÓN (la IA decide disuadir vs alertar) | `app/security/deterrence.py` |
+| R-05 | ⬜ | claude | Tools de disuasión exterior (HA + externos): luz potente/láser/linterna BT, altavoz con retransmisión de video en curso | `app/security/deterrence_tools.py` |
+| R-06 | ⬜ | claude | Contexto de la cámara (ubicación, qué vigilar) editable | `apps/web/*`, `cameras_db` |
+| R-07 | ⬜ | claude | Catálogo de herramientas disuasorias asignables por cámara | `apps/web/*`, `app/security/*` |
+| R-08 | ⬜ | claude | Escalado de amenaza (disuadir a alertar usuario a emergencia) | `app/security/deterrence.py` |
 
 ### S · Cámara INTERIOR (protección de gatos)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| S-01 | ⬜ | Tipo interior (hereda genérico, NO exterior) | `app/security/camera_types.py` |
-| S-02 | ⬜ | Gestión de mascotas (añadir gato + fotos para reconocimiento) | `apps/web/*`, `app/security/pets.py` |
-| S-03 | ⬜ | Reconocimiento/re-identificación de gatos por las fotos | `app/security/pets.py` |
-| S-04 | ⬜ | Modo trayectoria (seguir el recorrido del gato) | `app/security/motion.py` |
-| S-05 | ⬜ | Zonas peligrosas para el animal (cocina, enchufes, TV…) dibujables | `apps/web/*`, `zones` |
-| S-06 | ⬜ | Detección de peligros (gato en zona peligrosa, rotura, desorden, anomalía) | `app/security/analysis_interior.py` |
-| S-07 | ⬜ | Aprendizaje de lugares seguros/patrones de los gatos | `app/security/pets.py`, `training_store` |
-| S-08 | ⬜ | Tools de disuasión interior (altavoz potente, sonidos por escenario para separar gatos) | `app/security/deterrence_tools.py` |
-| S-09 | ⬜ | Modo noche (conectar a dispositivos de disuasión interior — próximamente) | `app/security/deterrence_tools.py` |
-| S-10 | ⬜ | Preconfigurar 3 cámaras de interior | `cameras_db` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| S-01 | ⬜ | claude | Tipo interior (hereda genérico, NO exterior) | `app/security/camera_types.py` |
+| S-02 | ⬜ | claude | Gestión de mascotas (añadir gato + fotos para reconocimiento) | `apps/web/*`, `app/security/pets.py` |
+| S-03 | ⬜ | claude | Reconocimiento/re-identificación de gatos por las fotos | `app/security/pets.py` |
+| S-04 | ⬜ | claude | Modo trayectoria (seguir el recorrido del gato) | `app/security/motion.py` |
+| S-05 | ⬜ | claude | Zonas peligrosas para el animal (cocina, enchufes, TV…) dibujables | `apps/web/*`, `zones` |
+| S-06 | ⬜ | claude | Detección de peligros (gato en zona peligrosa, rotura, desorden, anomalía) | `app/security/analysis_interior.py` |
+| S-07 | ⬜ | claude | Aprendizaje de lugares seguros/patrones de los gatos | `app/security/pets.py`, `training_store` |
+| S-08 | ⬜ | claude | Tools de disuasión interior (altavoz potente, sonidos por escenario para separar gatos) | `app/security/deterrence_tools.py` |
+| S-09 | ⬜ | claude | Modo noche (conectar a dispositivos de disuasión interior — próximamente) | `app/security/deterrence_tools.py` |
+| S-10 | ⬜ | claude | Preconfigurar 3 cámaras de interior | `cameras_db` |
 
 ### T · Modelo de visión local rápido (+ nube)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| T-01 | ⬜ | Evaluar VLM local ligero/rápido (Moondream2 ~1.8B vs Qwen2.5-VL 3B) para triage continuo | `docs/VISION_MODEL.md` |
-| T-02 | ⬜ | Integrar el VLM de triage (presencia/movimiento/¿persona o gato?) en Ollama | `app/security/vision_local.py` |
-| T-03 | ⬜ | Análisis profundo bajo demanda a Mistral NUBE (Pixtral) cuando el triage dispara | `app/security/brain_bridge.py` |
-| T-04 | ⬜ | Pipeline eficiente (frame sampling, no cada frame; cola; backpressure) | `app/security/vision_pipeline.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| T-01 | ⬜ | claude | Evaluar VLM local ligero/rápido (Moondream2 ~1.8B vs Qwen2.5-VL 3B) para triage continuo | `docs/VISION_MODEL.md` |
+| T-02 | ⬜ | claude | Integrar el VLM de triage (presencia/movimiento/¿persona o gato?) en Ollama | `app/security/vision_local.py` |
+| T-03 | ⬜ | claude | Análisis profundo bajo demanda a Mistral NUBE (Pixtral) cuando el triage dispara | `app/security/brain_bridge.py` |
+| T-04 | ⬜ | claude | Pipeline eficiente (frame sampling, no cada frame; cola; backpressure) | `app/security/vision_pipeline.py` |
 
 ### U · Comunicaciones/Notificaciones CENTRALIZADAS (CyberAgent general, NO submódulo)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| U-01 | ⬜ | Módulo `app/comms/` central (Telegram canal); seguridad solo lo USA | `app/comms/__init__.py`, `app/comms/telegram.py` |
-| U-02 | ⬜ | Fuentes unificadas: respuestas de agentes, ERRORES del sistema, amenazas ext/int | `app/comms/router.py` |
-| U-03 | ⬜ | Niveles de IMPORTANCIA + filtros de mensajes | `app/comms/router.py` |
-| U-04 | ⬜ | (futuro) múltiples chats/canales por tipo; de momento un solo chat | `app/comms/*` |
-| U-05 | ⬜ | Comandos del módulo de comunicación (config, silenciar, filtrar) | `app/comms/commands.py` |
-| U-06 | ⬜ | Plan de presentación de mensajes (formato por tipo/importancia) | `docs/COMMS_PLAN.md` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| U-01 | ⬜ | claude | Módulo `app/comms/` central (Telegram canal); seguridad solo lo USA | `app/comms/__init__.py`, `app/comms/telegram.py` |
+| U-02 | ⬜ | claude | Fuentes unificadas: respuestas de agentes, ERRORES del sistema, amenazas ext/int | `app/comms/router.py` |
+| U-03 | ⬜ | claude | Niveles de IMPORTANCIA + filtros de mensajes | `app/comms/router.py` |
+| U-04 | ⬜ | claude | (futuro) múltiples chats/canales por tipo; de momento un solo chat | `app/comms/*` |
+| U-05 | ⬜ | claude | Comandos del módulo de comunicación (config, silenciar, filtrar) | `app/comms/commands.py` |
+| U-06 | ⬜ | claude | Plan de presentación de mensajes (formato por tipo/importancia) | `docs/COMMS_PLAN.md` |
 
 ---
 
@@ -933,16 +933,16 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 > usuario tiene prioridad de GPU, seguridad cae a NUBE cuando la GPU está ocupada.
 > Así la seguridad NUNCA bloquea al usuario y el usuario NUNCA ciega la seguridad.
 
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| V-01 | ⬜ | Capa 0: detección de MOVIMIENTO en CPU (OpenCV/ffmpeg) por cámara, sin GPU | `app/security/motion_cpu.py` |
-| V-02 | ⬜ | Árbitro de GPU (broker): estado "GPU ocupada por usuario" consultable; seguridad lo respeta | `app/security/gpu_broker.py` |
-| V-03 | ⬜ | Router de visión: GPU libre→VLM local; GPU ocupada→Pixtral nube; amenaza→siempre nube | `app/security/vision_router.py` |
-| V-04 | ⬜ | Prioridad: la inferencia del usuario NUNCA espera por seguridad (seguridad degrada a nube) | `app/security/gpu_broker.py`, `app/ollama_client.py` |
-| V-05 | ⬜ | Co-residencia: cerbero 24B Q3 (~11GB) + VLM triage (~2.5GB) caben juntos; validar VRAM real | `docs/VISION_MODEL.md` |
-| V-06 | ⬜ | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
-| V-07 | ⬜ | Métricas: cuánto se usó CPU vs GPU vs nube (coste/latencia) en el dashboard | `apps/web/*`, `app/security/*` |
-| V-08 | ⬜ | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| V-01 | ⬜ | claude | Capa 0: detección de MOVIMIENTO en CPU (OpenCV/ffmpeg) por cámara, sin GPU | `app/security/motion_cpu.py` |
+| V-02 | ⬜ | claude | Árbitro de GPU (broker): estado "GPU ocupada por usuario" consultable; seguridad lo respeta | `app/security/gpu_broker.py` |
+| V-03 | ⬜ | claude | Router de visión: GPU libre→VLM local; GPU ocupada→Pixtral nube; amenaza→siempre nube | `app/security/vision_router.py` |
+| V-04 | ⬜ | claude | Prioridad: la inferencia del usuario NUNCA espera por seguridad (seguridad degrada a nube) | `app/security/gpu_broker.py`, `app/ollama_client.py` |
+| V-05 | ⬜ | claude | Co-residencia: cerbero 24B Q3 (~11GB) + VLM triage (~2.5GB) caben juntos; validar VRAM real | `docs/VISION_MODEL.md` |
+| V-06 | ⬜ | claude | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
+| V-07 | ⬜ | claude | Métricas: cuánto se usó CPU vs GPU vs nube (coste/latencia) en el dashboard | `apps/web/*`, `app/security/*` |
+| V-08 | ⬜ | claude | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
 
 ---
 
@@ -953,63 +953,63 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 > con núcleos de sobra → aprovecharlos. Solo añadir tareas (compañeros activos).
 
 ### W · Feedback → Datos de entrenamiento (recolección + señales)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| W-01 | ⬜ | Capturar feedback "¿es útil?" (mas/menos) de cada respuesta → training_store con la señal | `app/training_store.py`, `apps/web/*` |
-| W-02 | ⬜ | Capturar feedback "¿el RAZONAMIENTO es correcto?" (separado de la respuesta) | `apps/web/*`, `app/training_store.py` |
-| W-03 | ⬜ | Etiquetar QUÉ MODELO generó cada respuesta (para entrenar al correcto) | `app/api/agent_runner.py` |
-| W-04 | ⬜ | Capturar aprobaciones/rechazos de tools como señal de preferencia | `app/api/agent_runner.py` |
-| W-05 | ⬜ | Capturar CORRECCIONES del usuario (reescribe/corrige) → par instrucción→buena-respuesta | `app/training_store.py` |
-| W-06 | ⬜ | Feedback de seguridad (detección amenaza correcta? falso pos/neg) → dataset del modelo de visión | `app/security/feedback.py` |
-| W-07 | ⬜ | Normalizar todo a formato entrenamiento (chat jsonl con peso/señal) | `app/training_store.py` |
-| W-08 | ⬜ | UI: botones de feedback de razonamiento (correcto/incorrecto) en cada respuesta | `apps/web/*` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| W-01 | ⬜ | claude | Capturar feedback "¿es útil?" (mas/menos) de cada respuesta → training_store con la señal | `app/training_store.py`, `apps/web/*` |
+| W-02 | ⬜ | claude | Capturar feedback "¿el RAZONAMIENTO es correcto?" (separado de la respuesta) | `apps/web/*`, `app/training_store.py` |
+| W-03 | ⬜ | claude | Etiquetar QUÉ MODELO generó cada respuesta (para entrenar al correcto) | `app/api/agent_runner.py` |
+| W-04 | ⬜ | claude | Capturar aprobaciones/rechazos de tools como señal de preferencia | `app/api/agent_runner.py` |
+| W-05 | ⬜ | claude | Capturar CORRECCIONES del usuario (reescribe/corrige) → par instrucción→buena-respuesta | `app/training_store.py` |
+| W-06 | ⬜ | claude | Feedback de seguridad (detección amenaza correcta? falso pos/neg) → dataset del modelo de visión | `app/security/feedback.py` |
+| W-07 | ⬜ | claude | Normalizar todo a formato entrenamiento (chat jsonl con peso/señal) | `app/training_store.py` |
+| W-08 | ⬜ | claude | UI: botones de feedback de razonamiento (correcto/incorrecto) en cada respuesta | `apps/web/*` |
 
 ### X · Auto-entrenamiento por modelo (umbral, scheduling, QLoRA)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| X-01 | ⬜ | Registro de modelos ENTRENABLES (los más usados + críticos + LOCALES) con metadatos (uso, criticidad) | `app/training/registry.py` |
-| X-02 | ⬜ | Contador de ejemplos de entrenamiento POR MODELO (cuántos de alta señal hay listos) | `app/training/registry.py` |
-| X-03 | ⬜ | **Detección del UMBRAL por modelo** (24B ~1500, Codestral ~1000, visión ~500; auto-sugerido + configurable) | `app/training/thresholds.py` |
-| X-04 | ⬜ | Cola de entrenamiento (qué modelo toca cuando alcanza umbral) | `app/training/queue.py` |
-| X-05 | ⬜ | Scheduler: entrenar SOLO con el usuario PRESENTE en el PC (detección de presencia/actividad) | `app/training/scheduler.py` |
-| X-06 | ⬜ | Coordinar con seguridad: al entrenar, avisar y degradar vigilancia local a NUBE (casa no queda ciega) | `app/training/scheduler.py`, `app/security/gpu_broker.py` |
-| X-07 | ⬜ | Pipeline QLoRA: local si cabe en 16 GB, si no RunPod A100 (decidir por VRAM/tamaño) | `app/training/qlora.py` |
-| X-08 | ⬜ | Evaluación post-entrenamiento (A/B contra el anterior) antes de promover el adapter | `app/training/evaluate.py` |
-| X-09 | ⬜ | Versionado de modelos/adapters + rollback si empeora | `app/training/versioning.py` |
-| X-10 | ⬜ | Notificar (comms/Telegram) cuando un modelo está listo para entrenar / terminó / mejoró | `app/comms/*` |
-| X-11 | ⬜ | Consentimiento: el entrenamiento lo lanza el usuario (no automático sin permiso) | `apps/web/*`, `app/widgets/*` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| X-01 | ⬜ | claude | Registro de modelos ENTRENABLES (los más usados + críticos + LOCALES) con metadatos (uso, criticidad) | `app/training/registry.py` |
+| X-02 | ⬜ | claude | Contador de ejemplos de entrenamiento POR MODELO (cuántos de alta señal hay listos) | `app/training/registry.py` |
+| X-03 | ⬜ | claude | **Detección del UMBRAL por modelo** (24B ~1500, Codestral ~1000, visión ~500; auto-sugerido + configurable) | `app/training/thresholds.py` |
+| X-04 | ⬜ | claude | Cola de entrenamiento (qué modelo toca cuando alcanza umbral) | `app/training/queue.py` |
+| X-05 | ⬜ | claude | Scheduler: entrenar SOLO con el usuario PRESENTE en el PC (detección de presencia/actividad) | `app/training/scheduler.py` |
+| X-06 | ⬜ | claude | Coordinar con seguridad: al entrenar, avisar y degradar vigilancia local a NUBE (casa no queda ciega) | `app/training/scheduler.py`, `app/security/gpu_broker.py` |
+| X-07 | ⬜ | claude | Pipeline QLoRA: local si cabe en 16 GB, si no RunPod A100 (decidir por VRAM/tamaño) | `app/training/qlora.py` |
+| X-08 | ⬜ | claude | Evaluación post-entrenamiento (A/B contra el anterior) antes de promover el adapter | `app/training/evaluate.py` |
+| X-09 | ⬜ | claude | Versionado de modelos/adapters + rollback si empeora | `app/training/versioning.py` |
+| X-10 | ⬜ | claude | Notificar (comms/Telegram) cuando un modelo está listo para entrenar / terminó / mejoró | `app/comms/*` |
+| X-11 | ⬜ | claude | Consentimiento: el entrenamiento lo lanza el usuario (no automático sin permiso) | `apps/web/*`, `app/widgets/*` |
 
 ### Y · Almacenamiento (SD 1.8 TB: modelos, datasets, video 15 días por ley)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| Y-01 | ⬜ | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
-| Y-02 | ⬜ | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
-| Y-03 | ⬜ | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
-| Y-04 | ⬜ | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
-| Y-05 | ⬜ | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/quota.py` |
-| Y-06 | ⬜ | Almacén de datasets de entrenamiento (jsonl comprimido, por modelo, versionado) | `app/storage/datasets.py` |
-| Y-07 | ⬜ | Índice/DB de grabaciones (cámara, momento, eventos asociados) | `app/security/recorder.py` |
-| Y-08 | ⬜ | Backups del vault/DB en la SD (rotación) | `app/storage/backup.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| Y-01 | ⬜ | claude | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
+| Y-02 | ⬜ | claude | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
+| Y-03 | ⬜ | claude | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
+| Y-04 | ⬜ | claude | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
+| Y-05 | ⬜ | claude | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/quota.py` |
+| Y-06 | ⬜ | claude | Almacén de datasets de entrenamiento (jsonl comprimido, por modelo, versionado) | `app/storage/datasets.py` |
+| Y-07 | ⬜ | claude | Índice/DB de grabaciones (cámara, momento, eventos asociados) | `app/security/recorder.py` |
+| Y-08 | ⬜ | claude | Backups del vault/DB en la SD (rotación) | `app/storage/backup.py` |
 
 ### Z · Cómputo CPU/RAM (64 GB RAM + núcleos de sobra)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| Z-01 | ⬜ | Perfil de recursos (RAM 64 GB, N núcleos) + presupuesto por subsistema | `app/compute/profile.py` |
-| Z-02 | ⬜ | Cargas en CPU: movimiento (OpenCV), transcripción (whisper.cpp), embeddings RAG | `app/compute/cpu_pool.py` |
-| Z-03 | ⬜ | Mover lo NO urgente a CPU/RAM cuando la GPU está ocupada (batch, embeddings) | `app/compute/scheduler.py` |
-| Z-04 | ⬜ | Caché en RAM de frames/embeddings (aprovechar los 64 GB) | `app/compute/ram_cache.py` |
-| Z-05 | ⬜ | Pool de workers CPU para visión/audio de respaldo | `app/compute/cpu_pool.py` |
-| Z-06 | ⬜ | VLM tiny en CPU como último recurso si GPU+nube no disponibles | `app/security/vision_local.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| Z-01 | ⬜ | claude | Perfil de recursos (RAM 64 GB, N núcleos) + presupuesto por subsistema | `app/compute/profile.py` |
+| Z-02 | ⬜ | claude | Cargas en CPU: movimiento (OpenCV), transcripción (whisper.cpp), embeddings RAG | `app/compute/cpu_pool.py` |
+| Z-03 | ⬜ | claude | Mover lo NO urgente a CPU/RAM cuando la GPU está ocupada (batch, embeddings) | `app/compute/scheduler.py` |
+| Z-04 | ⬜ | claude | Caché en RAM de frames/embeddings (aprovechar los 64 GB) | `app/compute/ram_cache.py` |
+| Z-05 | ⬜ | claude | Pool de workers CPU para visión/audio de respaldo | `app/compute/cpu_pool.py` |
+| Z-06 | ⬜ | claude | VLM tiny en CPU como último recurso si GPU+nube no disponibles | `app/security/vision_local.py` |
 
 ### AA · Modo JUEGO / minimización de recursos
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AA-01 | ⬜ | Detectar "modo juego" (fullscreen / GPU intensiva) y entrar en modo mínimo | `app/compute/game_mode.py` |
-| AA-02 | ⬜ | Liberar el 24B de VRAM (free_vram) al entrar en juego | `app/compute/game_mode.py` |
-| AA-03 | ⬜ | Seguridad en juego: solo ojo local mínimo o degradar a nube/CPU | `app/security/gpu_broker.py` |
-| AA-04 | ⬜ | Si no cabe nada local → Mistral NUBE para todo lo crítico | `app/security/vision_router.py` |
-| AA-05 | ⬜ | Restaurar al salir del juego (recargar modelos, reanudar vigilancia local) | `app/compute/game_mode.py` |
-| AA-06 | ⬜ | Pausar entrenamiento si arranca un juego (libera VRAM) | `app/training/scheduler.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AA-01 | ⬜ | claude | Detectar "modo juego" (fullscreen / GPU intensiva) y entrar en modo mínimo | `app/compute/game_mode.py` |
+| AA-02 | ⬜ | claude | Liberar el 24B de VRAM (free_vram) al entrar en juego | `app/compute/game_mode.py` |
+| AA-03 | ⬜ | claude | Seguridad en juego: solo ojo local mínimo o degradar a nube/CPU | `app/security/gpu_broker.py` |
+| AA-04 | ⬜ | claude | Si no cabe nada local → Mistral NUBE para todo lo crítico | `app/security/vision_router.py` |
+| AA-05 | ⬜ | claude | Restaurar al salir del juego (recargar modelos, reanudar vigilancia local) | `app/compute/game_mode.py` |
+| AA-06 | ⬜ | claude | Pausar entrenamiento si arranca un juego (libera VRAM) | `app/training/scheduler.py` |
 
 ---
 
@@ -1019,75 +1019,137 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 > Solo añadir tareas (compañeros activos). Estilo CyberAgent.
 
 ### AB · Ficha de modelo entrenable (el "detrás" por modelo)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AB-01 | ⬜ | Esquema "ModelCard" entrenable: id, base, cuantización-train, destino(local/runpod), umbral, plantilla prompt, criticidad, uso | `app/training/model_card.py` |
-| AB-02 | ⬜ | Registrar las fichas: cyberagent-24b, codestral, visión-seguridad, router-tools | `app/training/registry.py` |
-| AB-03 | ⬜ | Mapear QUÉ datos entrenan cada modelo (fuente→modelo): chats→24b, code_specialist→codestral, detecciones→visión, tool_router→router | `app/training/data_map.py` |
-| AB-04 | ⬜ | Hiperparámetros QLoRA por modelo (rank, alpha, lr, epochs, batch) con defaults sensatos | `app/training/hparams.py` |
-| AB-05 | ⬜ | Estimador de recursos/tiempo por modelo (VRAM train, horas RunPod, coste $) | `app/training/estimate.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AB-01 | ⬜ | claude | Esquema "ModelCard" entrenable: id, base, cuantización-train, destino(local/runpod), umbral, plantilla prompt, criticidad, uso | `app/training/model_card.py` |
+| AB-02 | ⬜ | claude | Registrar las fichas: cyberagent-24b, codestral, visión-seguridad, router-tools | `app/training/registry.py` |
+| AB-03 | ⬜ | claude | Mapear QUÉ datos entrenan cada modelo (fuente→modelo): chats→24b, code_specialist→codestral, detecciones→visión, tool_router→router | `app/training/data_map.py` |
+| AB-04 | ⬜ | claude | Hiperparámetros QLoRA por modelo (rank, alpha, lr, epochs, batch) con defaults sensatos | `app/training/hparams.py` |
+| AB-05 | ⬜ | claude | Estimador de recursos/tiempo por modelo (VRAM train, horas RunPod, coste $) | `app/training/estimate.py` |
 
 ### AC · Dataset por modelo (preparación + curación)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AC-01 | ⬜ | Builder de dataset por modelo desde training_store (filtra por señal mínima) | `app/training/dataset_builder.py` |
-| AC-02 | ⬜ | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
-| AC-03 | ⬜ | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
-| AC-04 | ⬜ | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
-| AC-05 | ⬜ | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
-| AC-06 | ⬜ | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AC-01 | ⬜ | claude | Builder de dataset por modelo desde training_store (filtra por señal mínima) | `app/training/dataset_builder.py` |
+| AC-02 | ⬜ | claude | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
+| AC-03 | ⬜ | claude | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
+| AC-04 | ⬜ | claude | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
+| AC-05 | ⬜ | claude | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
+| AC-06 | ⬜ | claude | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |
 
 ### AD · Umbral + aviso multicanal
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AD-01 | ⬜ | Watcher de umbral por modelo (cuenta alta señal vs threshold; estado "listo") | `app/training/threshold_watcher.py` |
-| AD-02 | ⬜ | Al alcanzar umbral: avisar por COMMS (Telegram) + notificación PC + badge en web | `app/comms/*`, `apps/web/*`, `main.py` |
-| AD-03 | ⬜ | No spamear: avisar una vez por modelo hasta que se entrene o se descarte | `app/training/threshold_watcher.py` |
-| AD-04 | ⬜ | Umbral auto-sugerido y ajustable por el usuario en el menú | `apps/web/*`, `app/training/thresholds.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AD-01 | ⬜ | claude | Watcher de umbral por modelo (cuenta alta señal vs threshold; estado "listo") | `app/training/threshold_watcher.py` |
+| AD-02 | ⬜ | claude | Al alcanzar umbral: avisar por COMMS (Telegram) + notificación PC + badge en web | `app/comms/*`, `apps/web/*`, `main.py` |
+| AD-03 | ⬜ | claude | No spamear: avisar una vez por modelo hasta que se entrene o se descarte | `app/training/threshold_watcher.py` |
+| AD-04 | ⬜ | claude | Umbral auto-sugerido y ajustable por el usuario en el menú | `apps/web/*`, `app/training/thresholds.py` |
 
 ### AE · Menú Entrenamiento (Ajustes → Entrenamiento)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AE-01 | ⬜ | Sección "Entrenamiento" en Ajustes (web + PC) | `apps/web/*`, `app/widgets/*` |
-| AE-02 | ⬜ | Lista de modelos con barra de progreso (ejemplos/umbral) + estado | `apps/web/*` |
-| AE-03 | ⬜ | Badge "✅ listo para entrenar" cuando supera umbral | `apps/web/*` |
-| AE-04 | ⬜ | Botón "Entrenar <modelo>" → preflight (VRAM/presencia/seguridad/coste) → confirmar | `apps/web/*`, `app/api/*` |
-| AE-05 | ⬜ | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
-| AE-06 | ⬜ | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
-| AE-07 | ⬜ | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
-| AE-08 | ⬜ | Detalle del dataset (abre el editor AC-03) | `apps/web/*` |
-| AE-09 | ⬜ | Ajustes avanzados (hiperparámetros) plegables | `apps/web/*` |
-| AE-10 | ⬜ | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AE-01 | ⬜ | claude | Sección "Entrenamiento" en Ajustes (web + PC) | `apps/web/*`, `app/widgets/*` |
+| AE-02 | ⬜ | claude | Lista de modelos con barra de progreso (ejemplos/umbral) + estado | `apps/web/*` |
+| AE-03 | ⬜ | claude | Badge "✅ listo para entrenar" cuando supera umbral | `apps/web/*` |
+| AE-04 | ⬜ | claude | Botón "Entrenar <modelo>" → preflight (VRAM/presencia/seguridad/coste) → confirmar | `apps/web/*`, `app/api/*` |
+| AE-05 | ⬜ | claude | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
+| AE-06 | ⬜ | claude | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
+| AE-07 | ⬜ | claude | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
+| AE-08 | ⬜ | claude | Detalle del dataset (abre el editor AC-03) | `apps/web/*` |
+| AE-09 | ⬜ | claude | Ajustes avanzados (hiperparámetros) plegables | `apps/web/*` |
+| AE-10 | ⬜ | claude | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
 
 ### AF · Motor de entrenamiento (pipeline real)
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AF-01 | ⬜ | Orquestador: preflight → preparar dataset → lanzar train → evaluar → promover/rollback | `app/training/orchestrator.py` |
-| AF-02 | ⬜ | Preflight: usuario presente + VRAM libre + avisar a seguridad (degradar a nube) + espacio SD | `app/training/preflight.py` |
-| AF-03 | ⬜ | Runner LOCAL QLoRA (modelos que caben; PEFT/bitsandbytes) | `app/training/runner_local.py` |
-| AF-04 | ⬜ | Runner RUNPOD QLoRA (subir dataset, lanzar pod A100, recoger adapter) | `app/training/runner_runpod.py` |
-| AF-05 | ⬜ | Decisor local-vs-runpod por VRAM/tamaño/coste | `app/training/orchestrator.py` |
-| AF-06 | ⬜ | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
-| AF-07 | ⬜ | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
-| AF-08 | ⬜ | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
-| AF-09 | ⬜ | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AF-01 | ⬜ | claude | Orquestador: preflight → preparar dataset → lanzar train → evaluar → promover/rollback | `app/training/orchestrator.py` |
+| AF-02 | ⬜ | claude | Preflight: usuario presente + VRAM libre + avisar a seguridad (degradar a nube) + espacio SD | `app/training/preflight.py` |
+| AF-03 | ⬜ | claude | Runner LOCAL QLoRA (modelos que caben; PEFT/bitsandbytes) | `app/training/runner_local.py` |
+| AF-04 | ⬜ | claude | Runner RUNPOD QLoRA (subir dataset, lanzar pod A100, recoger adapter) | `app/training/runner_runpod.py` |
+| AF-05 | ⬜ | claude | Decisor local-vs-runpod por VRAM/tamaño/coste | `app/training/orchestrator.py` |
+| AF-06 | ⬜ | claude | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
+| AF-07 | ⬜ | claude | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
+| AF-08 | ⬜ | claude | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
+| AF-09 | ⬜ | claude | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
 
 ### AG · Evaluación + promoción + seguridad del proceso
-| ID | E | Tarea | Archivos |
-|----|---|-------|----------|
-| AG-01 | ⬜ | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
-| AG-02 | ⬜ | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
-| AG-03 | ⬜ | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
-| AG-04 | ⬜ | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
-| AG-05 | ⬜ | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
-| AG-06 | ⬜ | Tras promover: marcar los ejemplos como "usados" (no re-entrenar con lo mismo) | `app/training_store.py` |
-| AG-07 | ⬜ | Notificar resultado por comms (mejoró X%, promovido/descartado) | `app/comms/*` |
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AG-01 | ⬜ | claude | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
+| AG-02 | ⬜ | claude | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
+| AG-03 | ⬜ | claude | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
+| AG-04 | ⬜ | claude | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
+| AG-05 | ⬜ | claude | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
+| AG-06 | ⬜ | claude | Tras promover: marcar los ejemplos como "usados" (no re-entrenar con lo mismo) | `app/training_store.py` |
+| AG-07 | ⬜ | claude | Notificar resultado por comms (mejoró X%, promovido/descartado) | `app/comms/*` |
 
 ### AH · Herramientas/tools por modelo (qué tools refuerza cada uno)
+| ID | E | Agente | Tarea | Archivos |
+|----|---|--------|-------|----------|
+| AH-01 | ⬜ | claude | Por cada modelo, registrar QUÉ tools usa más (telemetría de uso de tools) | `app/training/tool_usage.py` |
+| AH-02 | ⬜ | claude | Generar ejemplos de tool-use EXITOSO (orquestación correcta) como dato de entrenamiento | `app/training_store.py` |
+| AH-03 | ⬜ | claude | Entrenar al 24b en mejor SELECCIÓN de tools (del tool_router + resultados) | `app/training/data_map.py` |
+| AH-04 | ⬜ | claude | Entrenar al router de tools con sus aciertos/fallos de categoría | `app/training/data_map.py` |
+| AH-05 | ⬜ | claude | Métricas: tasa de tool correcta antes/después de entrenar (medir mejora real) | `app/training/evaluate.py` |
+
+---
+
+## 🐈 RECONOCIMIENTO DE GATOS + APRENDIZAJE DE PATRONES (visión de Steve)
+> 3 capas: DETECCIÓN (hay gato y dónde) → RE-ID (cuál gato, por embedding+pelaje)
+> → TRACKING (trayectoria). Patrones = auto-supervisado: el modelo predice el
+> movimiento, comprueba si se cumple (feedback +/-), aprende por repetición.
+> Genérico por especie + refinamiento por individuo. OpenCV en Python (cv2).
+> Solo añadir tareas (compañeros activos).
+
+### AI · Detección de animales (capa 1)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AH-01 | ⬜ | Por cada modelo, registrar QUÉ tools usa más (telemetría de uso de tools) | `app/training/tool_usage.py` |
-| AH-02 | ⬜ | Generar ejemplos de tool-use EXITOSO (orquestación correcta) como dato de entrenamiento | `app/training_store.py` |
-| AH-03 | ⬜ | Entrenar al 24b en mejor SELECCIÓN de tools (del tool_router + resultados) | `app/training/data_map.py` |
-| AH-04 | ⬜ | Entrenar al router de tools con sus aciertos/fallos de categoría | `app/training/data_map.py` |
-| AH-05 | ⬜ | Métricas: tasa de tool correcta antes/después de entrenar (medir mejora real) | `app/training/evaluate.py` |
+| AI-01 | ⬜ | Detector de objetos animal/gato (YOLO o VLM ligero) → bounding box + score | `app/security/detect.py` |
+| AI-02 | ⬜ | Filtro especie (gato vs persona vs otro) y multi-instancia (varios gatos a la vez) | `app/security/detect.py` |
+| AI-03 | ⬜ | Detección eficiente: corre tras el motion CPU (solo frames con movimiento) | `app/security/vision_pipeline.py` |
+| AI-04 | ⬜ | Recorte del animal (crop) normalizado para re-ID | `app/security/detect.py` |
+
+### AJ · Re-identificación (capa 2: cuál gato)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AJ-01 | ⬜ | Alta de mascota: subir fotos por gato (varias poses) en la UI | `apps/web/*`, `app/security/pets.py` |
+| AJ-02 | ⬜ | Extraer EMBEDDING del recorte (encoder visual) y guardar referencias por gato | `app/security/reid.py` |
+| AJ-03 | ⬜ | Features extra del pelaje: histograma de color + patrón (manchas/rayas) | `app/security/reid.py` |
+| AJ-04 | ⬜ | Proporciones corporales (relación cabeza/cuerpo, tamaño relativo) | `app/security/reid.py` |
+| AJ-05 | ⬜ | Matcher: similitud coseno embedding + pelaje + proporciones → cuál gato (con umbral de confianza) | `app/security/reid.py` |
+| AJ-06 | ⬜ | "Desconocido" si ninguna referencia supera el umbral (gato nuevo / intruso animal) | `app/security/reid.py` |
+| AJ-07 | ⬜ | Aprendizaje continuo: confirmaciones del usuario añaden referencias (mejora re-ID) | `app/security/reid.py`, `training_store` |
+| AJ-08 | ⬜ | UI: confirmar/corregir "¿es Michi?" → feedback que refina el matcher | `apps/web/*` |
+
+### AK · Tracking + comprensión espacial (capa 3)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AK-01 | ⬜ | Tracker multi-objeto (ByteTrack/SORT): enlaza detecciones en tracks por frame | `app/security/tracker.py` |
+| AK-02 | ⬜ | Trayectoria por gato (secuencia de posiciones + tiempo) | `app/security/tracker.py` |
+| AK-03 | ⬜ | Mapa espacial de la habitación (homografía/zonas) → coordenadas normalizadas | `app/security/space_map.py` |
+| AK-04 | ⬜ | Occupancy grid / heatmap de dónde va cada gato | `app/security/space_map.py` |
+| AK-05 | ⬜ | Detección de lugares de descanso ("lugares seguros") por permanencia | `app/security/patterns.py` |
+| AK-06 | ⬜ | Asociar trayectorias con zonas dibujadas (peligrosas/seguras) | `app/security/zones.py` |
+
+### AL · Aprendizaje de patrones (auto-supervisado)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AL-01 | ⬜ | Predictor de movimiento: dado posición+hora+zona → siguiente posición/zona | `app/security/predictor.py` |
+| AL-02 | ⬜ | Bucle auto-feedback: predice → espera → compara con real → ejemplo +/- al training_store | `app/security/predictor.py`, `training_store` |
+| AL-03 | ⬜ | Contador de aciertos/fallos del predictor por gato (señal de aprendizaje) | `app/training/registry.py` |
+| AL-04 | ⬜ | Patrones por FRECUENCIA: zonas/horas habituales, rutas comunes | `app/security/patterns.py` |
+| AL-05 | ⬜ | Priors por ESPECIE (gato: altura, sol, comida, sigilo) como base | `app/security/species_priors.py` |
+| AL-06 | ⬜ | Refinamiento por INDIVIDUO sobre los priors (cada gato su modelo) | `app/security/patterns.py` |
+| AL-07 | ⬜ | Detección de ANOMALÍA: comportamiento fuera del patrón aprendido → posible problema | `app/security/anomaly.py` |
+| AL-08 | ⬜ | Dataset del predictor visual → entra en el subsistema de entrenamiento (umbral propio) | `app/training/data_map.py` |
+| AL-09 | ⬜ | Visualización de patrones en el dashboard (heatmap, rutas, horarios por gato) | `apps/web/*` |
+
+### AM · Seguridad de los gatos (acción sobre patrones)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AM-01 | ⬜ | Alerta si un gato entra en zona peligrosa (cocina/enchufes/TV) | `app/security/anomaly.py`, `app/comms/*` |
+| AM-02 | ⬜ | Predicción preventiva: si el patrón sugiere que VA hacia zona peligrosa, avisar/disuadir antes | `app/security/predictor.py` |
+| AM-03 | ⬜ | Disuasión interior por escenario (altavoz: sonidos para separar gatos / alejarlos de peligro) | `app/security/deterrence_tools.py` |
+| AM-04 | ⬜ | Modo noche: usar dispositivos de disuasión interior (próximamente) según patrón nocturno | `app/security/deterrence_tools.py` |
+| AM-05 | ⬜ | Detección de problemas: rotura, desorden, anomalía en la escena (no solo el gato) | `app/security/analysis_interior.py` |
+| AM-06 | ⬜ | Informe diario de los gatos (dónde estuvieron, incidencias, salud aparente) por comms | `app/comms/*`, `app/security/report.py` |
