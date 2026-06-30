@@ -253,6 +253,13 @@ def main():
     except Exception as e:
         print(f"[relay] No se pudo iniciar conector: {e}")
 
+    # ── Supervisor: 3 servicios guardianes (datos · Ollama · conexión) ────────
+    try:
+        from app.supervisor import start_supervisor
+        start_supervisor()
+    except Exception as e:
+        print(f"[supervisor] No se pudo iniciar: {e}")
+
     # ── Autoaprendizaje autónomo ──────────────────────────────────────────────
     try:
         from app.autonomous_learner import start_learner

@@ -205,6 +205,18 @@ async def api_status():
         return {"ollama": False, "models": []}
 
 
+@app.get("/api/health")
+def api_health():
+    """Salud agregada de los 3 servicios guardianes. Lo consume el watchdog
+    externo: si esto no responde o `healthy` es False de forma persistente,
+    reinicia la app entera."""
+    try:
+        from app.supervisor import supervisor_status
+        return supervisor_status()
+    except Exception as e:
+        return {"healthy": None, "services": [], "error": str(e)}
+
+
 @app.get("/api/tools")
 async def api_tools():
     """Catálogo completo de herramientas: categoría, riesgo y descripción."""

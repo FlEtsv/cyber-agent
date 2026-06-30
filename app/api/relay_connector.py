@@ -80,6 +80,10 @@ class RelayConnector:
     def stop(self):
         self._running = False
 
+    def is_connected(self) -> bool:
+        """True si hay una WebSocket activa con el relay (para el supervisor)."""
+        return self._ws is not None
+
     # ── Background thread ─────────────────────────────────────────────────────
 
     def _thread(self):
@@ -610,3 +614,14 @@ def start_relay_connector():
     _connector.start()
     log.info(f"[relay] Conector iniciado → {relay_url}")
     return _connector
+
+
+def relay_status() -> dict:
+    """Estado del conector del relay para el supervisor de Conexión."""
+    configured = bool(os.environ.get("RELAY_URL") and os.environ.get("RELAY_HOST_SECRET"))
+    c = _connector
+    return {
+        "configured": configured,
+        "thread_alive": bool(c and c._running),
+        "connected": bool(c and c.is_connected()),
+    }
