@@ -1,6 +1,18 @@
 import sys, os, ctypes
 sys.path.insert(0, os.path.dirname(__file__))
 
+# ── pythonw: sin consola, sys.stdout/stderr son None ──────────────────────────
+# Bajo pythonw.exe (lanzador normal, sin ventana) stdout/stderr no existen y
+# uvicorn —y cualquier lib que escriba a stderr al arrancar— peta EN SILENCIO,
+# dejando el servidor local :8765 sin enlazar (la web del PC y el túnel caídos).
+# Redirigir a devnull lo soluciona y deja :8765 operativo también sin consola.
+if sys.stdout is None or sys.stderr is None:
+    _devnull = open(os.devnull, "w")
+    if sys.stdout is None:
+        sys.stdout = _devnull
+    if sys.stderr is None:
+        sys.stderr = _devnull
+
 # ── Instancia única: mutex con nombre ────────────────────────────────────────
 _MUTEX_NAME = "Global\\CyberAgent_SingleInstance_v1"
 _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, _MUTEX_NAME)
