@@ -106,11 +106,39 @@ def main():
     menu = QMenu()
     show_action    = menu.addAction("⚡  Abrir CyberAgent")
     update_action  = menu.addAction("🔄  Buscar actualización")
+    health_action  = menu.addAction("🩺  Estado de servicios")
     vram_action    = menu.addAction("🎮  Liberar VRAM (para jugar)")
     menu.addSeparator()
     restart_action = menu.addAction("↻  Reiniciar CyberAgent")
     quit_action    = menu.addAction("✕  Salir")
     tray.setContextMenu(menu)
+
+    # Mejora 2: salud del supervisor visible. Notificación al pulsar + tooltip vivo.
+    def _service_summary():
+        try:
+            from app.supervisor import supervisor_status
+            st = supervisor_status()
+            emoji = {True: "✅", False: "❌", None: "⏳"}
+            lines = [f"{emoji.get(s.get('ok'),'⏳')} {s['service']}: {s.get('detail','')[:60]}"
+                     for s in st.get("services", [])]
+            return st.get("healthy"), "\n".join(lines) or "(supervisor iniciando)"
+        except Exception as e:
+            return None, f"sin datos: {e}"
+
+    def _show_health():
+        healthy, body = _service_summary()
+        title = "CyberAgent — servicios " + ("OK ✅" if healthy else "con avisos ⚠️" if healthy is False else "iniciando ⏳")
+        tray_notify(title, body, QSystemTrayIcon.Information, 6000)
+
+    health_action.triggered.connect(_show_health)
+
+    def _refresh_health_tooltip():
+        healthy, _ = _service_summary()
+        mark = "✅" if healthy else "⚠️" if healthy is False else "⏳"
+        tray.setToolTip(f"CyberAgent — servicios {mark}")
+    _health_timer = QTimer()
+    _health_timer.timeout.connect(_refresh_health_tooltip)
+    _health_timer.start(20000)   # cada 20s
 
     def _restart_app():
         """Relanza una instancia nueva y cierra la actual (control de instancia).

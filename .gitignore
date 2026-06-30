@@ -91,3 +91,10 @@ app/web/served/
 # Web es un producto único en apps/web. relay/web es un artefacto de build
 # (se sincroniza desde apps/web en el deploy del relay) y no se versiona.
 relay/web/
+
+# Artefactos runtime / depuración (no versionar)
+startup_debug.*
+data/local_usage.csv
+logs/watchdog.log
+relay/web_temp
+relay/test_server.py

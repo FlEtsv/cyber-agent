@@ -4,7 +4,11 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$Project,
     [string]$Region = "us-central1",
-    [string]$ServiceName = "cyberagent-relay"
+    [string]$ServiceName = "cyberagent-relay",
+    # 1 = una instancia siempre caliente (sin cold-starts ni cortes de conexión al
+    # redesplegar; ~unos pocos $/mes). 0 = escala a cero (gratis en reposo pero con
+    # cold-starts y reconexiones tras redeploy, mitigadas por el self-check del PC).
+    [int]$MinInstances = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,7 +67,7 @@ $args = @(
     "--region=$Region",
     "--platform=managed",
     "--allow-unauthenticated",
-    "--min-instances=0",
+    "--min-instances=$MinInstances",
     "--max-instances=1",
     "--memory=256Mi",
     "--cpu=1",

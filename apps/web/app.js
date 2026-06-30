@@ -271,6 +271,14 @@ class CyberAgent {
         this._requestHistory();
         this._loadFolders();
         this._showWelcome();
+        // Reenvía la aprobación pendiente si seguimos dentro de la ventana (~60s).
+        if (this.pcOnline && this._pendingApprove) {
+          const pa = this._pendingApprove;
+          this._pendingApprove = null;
+          if (Date.now() - pa.ts < 55000 && this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'approve', tool_id: pa.tool_id, approved: pa.approved }));
+          }
+        }
         // Reenvía el mensaje que quedó pendiente mientras estábamos desconectados.
         if (this.pcOnline && this._pendingSendText) {
           const t = this._pendingSendText;
@@ -1577,9 +1585,14 @@ class CyberAgent {
       this._savePreferences();
       this._renderPermissionsList();
     }
-    // Send directly — must NOT go into outbox (server timeout may have already expired)
+    // Envío directo si hay conexión. Si no, lo guardamos con marca de tiempo y lo
+    // reenviamos al reconectar SOLO si seguimos dentro de la ventana de aprobación
+    // del runner (~60s); pasado ese tiempo sería un approve caducado y lo
+    // descartamos (no arriesgamos aprobar la herramienta de otra ejecución).
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'approve', tool_id: id, approved }));
+    } else {
+      this._pendingApprove = { tool_id: id, approved, ts: Date.now() };
     }
     if (!approved) this._setToolCancelled(id);
   }

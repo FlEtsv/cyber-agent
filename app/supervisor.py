@@ -225,6 +225,52 @@ class ConnectionService(_Service):
                 log("ERROR", "supervisor", f"No se pudo relanzar el conector: {e}")
 
 
+# ── 4) Watchdog (supervisión mutua) ───────────────────────────────────────────
+def _startup_bat() -> str:
+    return os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows",
+                        "Start Menu", "Programs", "Startup", "CyberAgentWatchdog.bat")
+
+
+def _watchdog_running() -> bool:
+    try:
+        import psutil
+    except Exception:
+        return True   # sin psutil no podemos saber; no molestamos
+    for p in psutil.process_iter(["cmdline"]):
+        try:
+            if "watchdog.py" in " ".join(p.info.get("cmdline") or []).lower():
+                return True
+        except Exception:
+            pass
+    return False
+
+
+class WatchdogService(_Service):
+    """La app vigila al watchdog externo (que a su vez vigila a la app): si el
+    watchdog se cae, lo relanzamos. Solo actúa si está instalado en autostart."""
+    name = "watchdog"
+    interval = 60.0
+    heal_after = 1
+
+    def check(self) -> tuple[bool, str]:
+        if not os.path.isfile(_startup_bat()):
+            return True, "no instalado"
+        alive = _watchdog_running()
+        return alive, ("vivo" if alive else "CAÍDO — relanzando")
+
+    def heal(self) -> None:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pyw = os.path.join(base, ".venv", "Scripts", "pythonw.exe")
+        wd = os.path.join(base, "watchdog.py")
+        try:
+            subprocess.Popen([pyw, wd], cwd=base,
+                             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
+                             close_fds=True)
+            log("INFO", "supervisor", "Watchdog relanzado")
+        except Exception as e:
+            log("ERROR", "supervisor", f"No se pudo relanzar el watchdog: {e}")
+
+
 # ── Supervisor ────────────────────────────────────────────────────────────────
 class Supervisor:
     def __init__(self):
@@ -232,6 +278,7 @@ class Supervisor:
             PersistenceService(),
             OllamaService(),
             ConnectionService(),
+            WatchdogService(),
         ]
 
     def start(self):
