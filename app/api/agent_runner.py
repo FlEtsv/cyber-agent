@@ -142,6 +142,14 @@ class AgentRunner:
                                 else _db.get_conversation_folder(self.conversation_id))
             except Exception:
                 self._folder = None
+            # Modo RELEVO DE CÓDIGO: Mistral 24B (agente) + Codestral (especialista).
+            # El selector manda 'cyberagent-24b+code'; lo resolvemos al 24B real y
+            # activamos la delegación: el agente usa la herramienta code_specialist
+            # para que Codestral escriba el código, y él sigue (guardar/ejecutar).
+            self._code_relay = False
+            if isinstance(self.model, str) and self.model.endswith("+code"):
+                self.model = self.model[:-5] or OLLAMA_MODEL
+                self._code_relay = True
             # El modelo por defecto de la carpeta MANDA si el usuario está en auto/local
             if (self._folder and self._folder.get("default_model")
                     and self.model in (OLLAMA_MODEL, "auto")):
@@ -155,7 +163,7 @@ class AgentRunner:
             except Exception:
                 pass
             from app.brain import is_mistral_model, is_fused, resolve_model
-            if self.model in (OLLAMA_MODEL, "auto"):
+            if self.model in (OLLAMA_MODEL, "auto") and not getattr(self, "_code_relay", False):
                 try:
                     from app.model_router import route
                     routed_model, reason = route(last_user)
@@ -178,6 +186,15 @@ class AgentRunner:
                 f"- iPhone: usa ios_shell (SSH).\n"
                 f"- PC: acceso total al sistema Windows."
             )
+            if getattr(self, "_code_relay", False):
+                system += (
+                    "\n\n## RELEVO DE CÓDIGO (Mistral 24B + Codestral)\n"
+                    "Para escribir o refactorizar código no trivial, DELEGA en la herramienta "
+                    "`code_specialist` (la ejecuta Codestral, especialista local). Tú orquestas: "
+                    "le pasas la tarea con el contexto, recibes el código y LO USAS TÚ "
+                    "(write_file para guardarlo, run_python/shell para ejecutarlo, y corriges si falla). "
+                    "No escribas tú el código complejo a mano: delega y verifica."
+                )
 
             # A3/WEBPROD-010: contexto de la carpeta + herencia desde la categoría
             # padre (categoría → subcategoría/proyecto). Raíz primero.
@@ -236,6 +253,19 @@ class AgentRunner:
                 )
             except Exception:
                 from app.tools import TOOLS_SCHEMA as _routed_tools  # type: ignore
+
+            # Modo relevo: garantiza que code_specialist esté disponible para el agente.
+            if getattr(self, "_code_relay", False):
+                try:
+                    names = {t.get("function", {}).get("name") for t in _routed_tools}
+                    if "code_specialist" not in names:
+                        from app.tools import TOOLS_SCHEMA
+                        cs = next((t for t in TOOLS_SCHEMA
+                                   if t.get("function", {}).get("name") == "code_specialist"), None)
+                        if cs:
+                            _routed_tools = list(_routed_tools) + [cs]
+                except Exception:
+                    pass
 
             _emit_status("Inicio la tarea y la dividiré en pasos verificables.")
 

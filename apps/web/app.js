@@ -229,6 +229,7 @@ class CyberAgent {
   _modelLabel(id = '') {
     const m = String(id || '').toLowerCase();
     if (!m) return 'Modelo local';
+    if (m.endsWith('+code')) return 'Mistral 24B + Codestral';
     // Codestral: el local de Ollama lleva ":" (p.ej. codestral:22b); el de nube es codestral-latest.
     if (m.includes('codestral')) return m.includes(':') ? 'Codestral 22B (local)' : 'Codestral (nube)';
     if (/mistral-large|mistral_large/.test(m)) return 'Mistral Large (nube)';
@@ -1030,8 +1031,8 @@ class CyberAgent {
   _modelOptions() {
     const opts = [
       { value: '',                      label: '(heredar / auto)' },
-      { value: 'cyberagent-24b',        label: 'Mistral 24B — general (~45 tok/s)' },
-      { value: 'cyberagent-codestral:latest', label: 'Codestral 22B — código (~20 tok/s)' },
+      { value: 'cyberagent-24b',        label: 'Mistral 24B — solo agente' },
+      { value: 'cyberagent-24b+code',   label: 'Mistral 24B + Codestral (código)' },
       { value: 'codestral-latest',      label: 'Codestral (nube)' },
       { value: 'mistral-medium-latest', label: 'Mistral Medium (nube)' },
       { value: 'mistral-large-latest',  label: 'Mistral Large (nube)' },
@@ -2057,8 +2058,8 @@ class CyberAgent {
         { value: 'fused', label: '🤝 Fusionado (local + Mistral)' },
       ]},
       { label: '🟢 Local · gratis (tu GPU)', items: [
-        { value: 'cyberagent-24b',  label: '🟢 Mistral 24B — general (~45 tok/s · 16k ctx)' },
-        { value: LOCAL_CODESTRAL,   label: '🟢 Codestral 22B — código (~20 tok/s · 16k ctx)' },
+        { value: 'cyberagent-24b',       label: '🟢 Mistral 24B — solo agente (~45 tok/s)' },
+        { value: 'cyberagent-24b+code',  label: '🟢 Mistral 24B + Codestral — código (relevo)' },
       ]},
       { label: '☁️ Nube · de pago', items: [
         { value: 'codestral-latest',      label: '☁️ Codestral (nube · código)' },

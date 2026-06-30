@@ -738,6 +738,17 @@ TOOLS_SCHEMA = [
         }, "required": ["prompt"]}
     }},
     {"type": "function", "function": {
+        "name": "code_specialist",
+        "description": "Delega la GENERACIÓN/REFACTOR de código en Codestral (especialista local en "
+                       "programación). Tú orquestas y Codestral codifica (carrera de relevos): pásale la "
+                       "tarea, te devuelve el código, y TÚ sigues (guardarlo con write_file, ejecutarlo con "
+                       "run_python, corregir, etc.). Úsalo para funciones/clases/scripts no triviales.",
+        "parameters": {"type": "object", "properties": {
+            "task": {"type": "string", "description": "Qué código generar, claro y específico (lenguaje, firma, comportamiento)"},
+            "context": {"type": "string", "description": "Código o contexto existente relevante (opcional)"},
+        }, "required": ["task"]}
+    }},
+    {"type": "function", "function": {
         "name": "git_op",
         "description": "Control de versiones git: status, log, diff, branch, add, commit, push, pull, "
                        "checkout, create_branch, clone. Trabaja sobre repos locales o clona remotos autorizados.",
@@ -1461,6 +1472,8 @@ def execute_tool(name: str, args: dict) -> dict:
                                         args.get("fmt", "pdf"),
                                         args.get("title")),
             "serve_file":           lambda: _serve_file(args["path"]),
+            "code_specialist":      lambda: _code_specialist(
+                                       args.get("task", ""), args.get("context", "")),
             "local_llm_consult":    lambda: _local_llm_consult(
                                         args["prompt"], args.get("model")),
             # ── 2.0: git, ingesta, navegador, scheduler ──────────────────────
@@ -1659,6 +1672,33 @@ def _generate_document(content: str, filename: str = "documento",
 def _serve_file(path: str) -> dict:
     from app.documents import serve_file
     return serve_file(path)
+
+
+def _code_specialist(task: str, context: str = "") -> dict:
+    """Relevo de código: el agente (24B) delega la generación en Codestral."""
+    import httpx as _httpx
+    from app.ollama_client import OLLAMA_URL
+    model = (os.environ.get("CYBERAGENT_CODE_MODEL") or "cyberagent-codestral").strip()
+    sysmsg = ("Eres un generador de código experto. Devuelve el código pedido COMPLETO y "
+              "ejecutable en bloques ```; sin relleno ni '...'; comentarios en inglés. "
+              "Si falta un detalle, asume lo más razonable y deja una nota breve.")
+    msgs = [{"role": "system", "content": sysmsg}]
+    if context:
+        msgs.append({"role": "user", "content": f"Contexto existente:\n{context[:6000]}"})
+    msgs.append({"role": "user", "content": task})
+    try:
+        from app.ollama_client import ensure_single_local_model
+        ensure_single_local_model(model)
+        r = _httpx.post(OLLAMA_URL,
+            json={"model": model, "stream": False, "messages": msgs,
+                  "options": {"temperature": 0.2, "num_ctx": 16384}},
+            timeout=_httpx.Timeout(connect=10, read=240, write=30, pool=5))
+        if r.status_code != 200:
+            return {"ok": False, "error": f"Ollama HTTP {r.status_code}: {r.text[:300]}"}
+        return {"ok": True, "model": model,
+                "code": r.json().get("message", {}).get("content", "")}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 def _local_llm_consult(prompt: str, model: str | None = None) -> dict:
