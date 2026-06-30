@@ -132,6 +132,7 @@ class RelayConnector:
                     backoff = _BACKOFF_INIT
                     log.info(f"[relay] Conectado a {self.ws_url}/host")
                     await self._send_models(ws)
+                    await self._send_tools(ws)
                     await self._handle_connection(ws)
             except Exception as e:
                 log.error(f"[relay] Error en conexión: {e}")
@@ -208,6 +209,15 @@ class RelayConnector:
             return bool(r.json().get("pc_online", False))
         except Exception:
             return None
+
+    async def _send_tools(self, ws):
+        """Manda el catálogo de herramientas al relay para que la vista
+        'Herramientas' se vea también en el móvil (antes salía vacía)."""
+        try:
+            from app.tools import tool_catalog
+            await ws.send(json.dumps({"type": "tools", "tools": tool_catalog()}))
+        except Exception as e:
+            log.error(f"[relay] No se pudo enviar el catálogo de tools: {e}")
 
     async def _handle_connection(self, ws):
         """Main loop: receive messages from relay, spawn runners."""

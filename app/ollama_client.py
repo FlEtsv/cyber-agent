@@ -117,6 +117,30 @@ def _norm_model(name: str) -> str:
     return name[:-7] if name.endswith(":latest") else name
 
 
+_TOOLS_CAP_CACHE: dict[str, bool] = {}
+
+
+def model_supports_tools(model: str) -> bool:
+    """¿El modelo local soporta function-calling (tools)? Codestral, p.ej., NO
+    (solo completion/insert) → enviarle tools da error en Ollama. Cacheado."""
+    m = _norm_model(model)
+    if m in _TOOLS_CAP_CACHE:
+        return _TOOLS_CAP_CACHE[m]
+    ok = True
+    try:
+        r = httpx.post("http://localhost:11434/api/show",
+                       json={"model": model}, timeout=6.0)
+        if r.status_code == 200:
+            caps = r.json().get("capabilities", []) or []
+            # Si Ollama declara capacidades y 'tools' no está, no las soporta.
+            if caps:
+                ok = "tools" in caps
+    except Exception:
+        ok = True   # ante la duda, no rompemos (Ollama dará error y reintentamos sin tools)
+    _TOOLS_CAP_CACHE[m] = ok
+    return ok
+
+
 def ensure_single_local_model(target: str) -> None:
     """Garantiza que SOLO `target` esté cargado en GPU: descarga cualquier OTRO
     modelo local antes de cargar el nuevo. En 16 GB no caben dos modelos grandes
@@ -865,10 +889,17 @@ class AgentWorker(QThread):
         log("INFO", "stream_once", "Iniciando llamada Ollama",
             {"model": self.model, "num_ctx": num_ctx,
              "num_tools": len(_tools_used), "history_msgs": len(history)})
+        # Codestral y otros modelos de solo-código no soportan tools en Ollama:
+        # enviárselas da error. Si el modelo no las soporta, las omitimos (el
+        # modelo responde como generador de texto/código sin llamar herramientas).
+        _payload_tools = _tools_used if model_supports_tools(self.model) else []
+        if _tools_used and not _payload_tools:
+            log("INFO", "stream_once", "Modelo sin soporte de tools → enviando sin herramientas",
+                {"model": self.model})
         payload = {
             "model":    self.model,
             "messages": history,
-            "tools":    _tools_used,
+            "tools":    _payload_tools,
             "stream":   True,
             # Thinking nativo OFF por defecto (inestable en streaming+tools con este
             # abliterado). Interruptor: CYBERAGENT_THINK=1.

@@ -221,25 +221,8 @@ def api_health():
 async def api_tools():
     """Catálogo completo de herramientas: categoría, riesgo y descripción."""
     try:
-        from app.tools import TOOLS_SCHEMA, TOOL_CATEGORIES, DANGEROUS_TOOLS
-        cat_of = {}
-        for cat, names in TOOL_CATEGORIES.items():
-            for n in names:
-                cat_of.setdefault(n, cat)
-        out = []
-        for t in TOOLS_SCHEMA:
-            fn = t.get("function", {})
-            name = fn.get("name", "")
-            desc = (fn.get("description", "") or "").split("\n")[0][:160]
-            params = list((fn.get("parameters", {}).get("properties", {}) or {}).keys())
-            out.append({
-                "name": name,
-                "category": cat_of.get(name, "otros"),
-                "dangerous": name in DANGEROUS_TOOLS,
-                "description": desc,
-                "params": params,
-            })
-        out.sort(key=lambda x: (x["category"], x["name"]))
+        from app.tools import tool_catalog
+        out = tool_catalog()
         return {"ok": True, "tools": out, "count": len(out)}
     except Exception as e:
         return {"ok": False, "error": str(e), "tools": []}

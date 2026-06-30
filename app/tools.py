@@ -1122,6 +1122,32 @@ SENSITIVE_ACCESS_TOOLS = {
 
 DANGEROUS_TOOLS |= ACTIVE_SECURITY_TOOLS | SENSITIVE_ACCESS_TOOLS
 
+
+def tool_catalog() -> list:
+    """Catálogo de herramientas (nombre, categoría, riesgo, descripción) para la
+    UI. Lo usan /api/tools (local) y el conector del relay (para que la vista
+    Herramientas se vea también en el móvil)."""
+    cat_of = {}
+    for cat, names in TOOL_CATEGORIES.items():
+        for n in names:
+            cat_of.setdefault(n, cat)
+    out = []
+    for t in TOOLS_SCHEMA:
+        fn = t.get("function", {})
+        name = fn.get("name", "")
+        desc = (fn.get("description", "") or "").split("\n")[0][:160]
+        params = list((fn.get("parameters", {}).get("properties", {}) or {}).keys())
+        out.append({
+            "name": name,
+            "category": cat_of.get(name, "otros"),
+            "dangerous": name in DANGEROUS_TOOLS,
+            "description": desc,
+            "params": params,
+        })
+    out.sort(key=lambda x: (x["category"], x["name"]))
+    return out
+
+
 TOOL_CATEGORIES = {
     "core": {
         "shell", "read_file", "write_file", "edit_file", "multi_edit", "list_directory", "run_python",
