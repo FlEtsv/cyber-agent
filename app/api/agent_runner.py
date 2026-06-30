@@ -449,7 +449,14 @@ class AgentRunner:
                         except Exception:
                             pass
                         ev.wait(timeout=60)
-                        if self._approval_res.get(tid, False):
+                        _approved = self._approval_res.get(tid, False)
+                        try:  # K-04: capturar aprobación → training_store
+                            from app.training_store import record_approval
+                            record_approval(name, args, _approved,
+                                            reason="" if _approved else "user_timeout")
+                        except Exception:
+                            pass
+                        if _approved:
                             result = execute_tool(name, args)
                         else:
                             result = {"cancelled": True, "reason": "user_timeout", "tool": name}

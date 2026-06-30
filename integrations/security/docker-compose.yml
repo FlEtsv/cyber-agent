@@ -1,0 +1,65 @@
+# docker-compose del stack de seguridad / comunicaciones
+# Gestionable por el agente CyberAgent vía tool docker (compose_up/compose_down/compose_ps).
+#
+# SECRETOS: nunca en texto plano aquí — el agente los pasa vía env desde el vault.
+# ACTIVAR: el agente llama docker(op=compose_up, params={path: "integrations/security"})
+#
+# Servicios incluidos:
+#   homeassistant   — Home Assistant (control domótica, cámaras HA, TTS)
+#   apicomunicaciones — APiComuni centralita (Telegram bot, cámaras RTSP, eventos)
+#
+# Red compartida: cyberagent_sec
+# Volúmenes persistentes: ha_config, centralita_data
+
+version: "3.9"
+
+networks:
+  cyberagent_sec:
+    name: cyberagent_sec
+    driver: bridge
+
+volumes:
+  ha_config:
+    name: ha_config
+  centralita_data:
+    name: centralita_data
+
+services:
+
+  homeassistant:
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    container_name: homeassistant
+    restart: unless-stopped
+    privileged: true
+    network_mode: host          # HA necesita acceso a red local para mdns/UPNP
+    volumes:
+      - ha_config:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: "Europe/Madrid"
+    # El agente puede arrancarlo con: docker(op=start, name=homeassistant)
+    # o vía compose: docker(op=compose_up, params={path: "integrations/security"})
+    labels:
+      cyberagent.service: "ha"
+      cyberagent.managed: "true"
+
+  apicomunicaciones:
+    image: "python:3.11-slim"
+    container_name: apicomunicaciones
+    restart: unless-stopped
+    networks:
+      - cyberagent_sec
+    volumes:
+      - centralita_data:/app/data
+    working_dir: /app
+    # El agente gestiona el inicio; imagen base de Python — el código se monta desde el host
+    # o se construye con un Dockerfile personalizado cuando esté portado.
+    command: ["python", "-m", "http.server", "8082"]   # placeholder hasta portar APiComuni
+    environment:
+      SECURITY_ENABLED: "0"     # desactivado por defecto, el agente lo activa
+      TZ: "Europe/Madrid"
+    ports:
+      - "8082:8082"
+    labels:
+      cyberagent.service: "centralita"
+      cyberagent.managed: "true"
