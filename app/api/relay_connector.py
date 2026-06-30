@@ -98,6 +98,7 @@ class RelayConnector:
             except Exception:
                 pass
         self._runners.clear()
+        self._pending.clear()   # no dejar colas de instrucciones huérfanas
 
     async def _async_run(self):
         backoff = _BACKOFF_INIT
