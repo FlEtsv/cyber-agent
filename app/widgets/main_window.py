@@ -12,6 +12,7 @@ from .terminal_panel import TerminalPanel
 from .references_panel import ReferencesDialog
 from .agent_panel import AgentPanel
 from .tools_panel import ToolsPanel
+from .security_panel import SecurityPanel
 from .finetune_dialog import FineTuneDialog
 from .update_dialog import UpdateDialog
 from .mobile_dialog import MobileSubscribeDialog
@@ -472,10 +473,17 @@ class MainWindow(QMainWindow):
         self.tab_tools.setChecked(False)
         self.tab_tools.clicked.connect(lambda: self._switch_tab(3))
 
+        self.tab_security = QPushButton("🛡️  Seguridad")
+        self.tab_security.setObjectName("tab_btn")
+        self.tab_security.setCheckable(True)
+        self.tab_security.setChecked(False)
+        self.tab_security.clicked.connect(lambda: self._switch_tab(4))
+
         tlay.addWidget(self.tab_chat)
         tlay.addWidget(self.tab_terminal)
         tlay.addWidget(self.tab_agent)
         tlay.addWidget(self.tab_tools)
+        tlay.addWidget(self.tab_security)
         tlay.addStretch()
 
         self.model_status = QLabel("● modelo listo")
@@ -507,6 +515,10 @@ class MainWindow(QMainWindow):
         # Page 3: Tools catalog
         self.tools_panel = ToolsPanel()
         self.stack.addWidget(self.tools_panel)
+
+        # Page 4: Seguridad (SEC-003)
+        self.security_panel = SecurityPanel()
+        self.stack.addWidget(self.security_panel)
 
         lay.addWidget(self.stack, 1)
         return container
@@ -588,14 +600,17 @@ class MainWindow(QMainWindow):
         self.tab_terminal.setChecked(idx == 1)
         self.tab_agent.setChecked(idx == 2)
         self.tab_tools.setChecked(idx == 3)
-        tabs = [self.tab_chat, self.tab_terminal, self.tab_agent, self.tab_tools]
+        self.tab_security.setChecked(idx == 4)
+        tabs = [self.tab_chat, self.tab_terminal, self.tab_agent,
+                self.tab_tools, self.tab_security]
         for i, btn in enumerate(tabs):
             btn.setObjectName("tab_btn_active" if i == idx else "tab_btn")
             btn.setStyle(btn.style())
         if idx == 2:
             self.agent_panel.refresh_log()
         if hasattr(self, "workspace_route"):
-            routes = ["Vista: Chat", "Vista: Terminal", "Vista: Agente", "Vista: Herramientas"]
+            routes = ["Vista: Chat", "Vista: Terminal", "Vista: Agente",
+                      "Vista: Herramientas", "Vista: Seguridad"]
             self.workspace_route.setText(routes[idx])
 
     # ════════════════════════════════════════════════════════════════════
