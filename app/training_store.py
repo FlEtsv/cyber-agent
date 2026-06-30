@@ -22,11 +22,11 @@ _lock = threading.Lock()
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
-_DDL = """
+_DDL_TABLE = """
 CREATE TABLE IF NOT EXISTS samples (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     ts          TEXT    NOT NULL,
-    kind        TEXT    NOT NULL,   -- 'interaction'|'approval'|'feedback'|'event'
+    kind        TEXT    NOT NULL,   -- 'interaction'|'approval'|'feedback'|'event'|'security'|'reasoning'|'correction'
     instruction TEXT    NOT NULL,   -- system + user context
     response    TEXT    NOT NULL,   -- assistant output / decision
     signal      REAL    DEFAULT 0,  -- +1 positivo / -1 negativo / 0 neutro
@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS samples (
 CREATE INDEX IF NOT EXISTS idx_ts   ON samples (ts);
 CREATE INDEX IF NOT EXISTS idx_kind ON samples (kind);
 """
+
+_DDL_USED_IDX = "CREATE INDEX IF NOT EXISTS idx_used ON samples (used);"
 
 
 def _conn() -> sqlite3.Connection:
@@ -46,7 +48,12 @@ def _conn() -> sqlite3.Connection:
 
 def _init():
     with _lock, _conn() as c:
-        c.executescript(_DDL)
+        c.executescript(_DDL_TABLE)
+        # AG-06: migrate — add 'used' column if missing (existing DB from previous version)
+        cols = [r[1] for r in c.execute("PRAGMA table_info(samples)").fetchall()]
+        if "used" not in cols:
+            c.execute("ALTER TABLE samples ADD COLUMN used INTEGER DEFAULT 0")
+        c.executescript(_DDL_USED_IDX)
 
 
 _init()
@@ -94,6 +101,18 @@ def record_event(event_type: str, description: str, decision: str, signal: float
     """Captura un evento de seguridad y la decisión tomada."""
     return record("event", f"Evento: {event_type}\n{description}", decision, signal,
                   {"event_type": event_type})
+
+
+# ── AG-06: Marcar muestras como usadas en entrenamiento ──────────────────────
+
+def mark_used(ids: list[int]) -> int:
+    """Marca una lista de sample IDs como usados en entrenamiento. Retorna n filas afectadas."""
+    if not ids:
+        return 0
+    with _lock, _conn() as c:
+        placeholders = ",".join("?" for _ in ids)
+        c.execute(f"UPDATE samples SET used=1 WHERE id IN ({placeholders})", ids)
+        return len(ids)
 
 
 # ── Lectura / stats ───────────────────────────────────────────────────────────

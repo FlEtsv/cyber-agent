@@ -1062,14 +1062,14 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AF · Motor de entrenamiento (pipeline real)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AF-01 | ⬜ | claude | Orquestador: preflight → preparar dataset → lanzar train → evaluar → promover/rollback | `app/training/orchestrator.py` |
-| AF-02 | ⬜ | claude | Preflight: usuario presente + VRAM libre + avisar a seguridad (degradar a nube) + espacio SD | `app/training/preflight.py` |
-| AF-03 | ⬜ | claude | Runner LOCAL QLoRA (modelos que caben; PEFT/bitsandbytes) | `app/training/runner_local.py` |
-| AF-04 | ⬜ | claude | Runner RUNPOD QLoRA (subir dataset, lanzar pod A100, recoger adapter) | `app/training/runner_runpod.py` |
-| AF-05 | ⬜ | claude | Decisor local-vs-runpod por VRAM/tamaño/coste | `app/training/orchestrator.py` |
-| AF-06 | ⬜ | claude | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
+| AF-01 | ✅ | claude | Orquestador: preflight → preparar dataset → lanzar train → evaluar → promover/rollback | `app/training/orchestrator.py` |
+| AF-02 | ✅ | claude | Preflight: usuario presente + VRAM libre + avisar a seguridad (degradar a nube) + espacio SD | `app/training/preflight.py` |
+| AF-03 | ✅ | claude | Runner LOCAL QLoRA (modelos que caben; PEFT/bitsandbytes) | `app/training/runner_local.py` |
+| AF-04 | ✅ | claude | Runner RUNPOD QLoRA (subir dataset, lanzar pod A100, recoger adapter) | `app/training/runner_runpod.py` |
+| AF-05 | ✅ | claude | Decisor local-vs-runpod por VRAM/tamaño/coste | `app/training/orchestrator.py` |
+| AF-06 | ✅ | claude | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
 | AF-07 | ⬜ | claude | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
-| AF-08 | ⬜ | claude | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
+| AF-08 | ✅ | claude | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
 | AF-09 | ⬜ | claude | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
 
 ### AG · Evaluación + promoción + seguridad del proceso
@@ -1077,16 +1077,16 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 |----|---|--------|-------|----------|
 | AG-01 | ⬜ | claude | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
 | AG-02 | ⬜ | claude | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
-| AG-03 | ⬜ | claude | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
+| AG-03 | ✅ | claude | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
 | AG-04 | ⬜ | claude | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
-| AG-05 | ⬜ | claude | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
-| AG-06 | ⬜ | claude | Tras promover: marcar los ejemplos como "usados" (no re-entrenar con lo mismo) | `app/training_store.py` |
-| AG-07 | ⬜ | claude | Notificar resultado por comms (mejoró X%, promovido/descartado) | `app/comms/*` |
+| AG-05 | ✅ | claude | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
+| AG-06 | ✅ | claude | Tras promover: marcar los ejemplos como "usados" (no re-entrenar con lo mismo) | `app/training_store.py` |
+| AG-07 | ✅ | claude | Notificar resultado por comms (mejoró X%, promovido/descartado) | `app/comms/*` |
 
 ### AH · Herramientas/tools por modelo (qué tools refuerza cada uno)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AH-01 | ⬜ | claude | Por cada modelo, registrar QUÉ tools usa más (telemetría de uso de tools) | `app/training/tool_usage.py` |
+| AH-01 | ✅ | claude | Por cada modelo, registrar QUÉ tools usa más (telemetría de uso de tools) | `app/training/tool_usage.py` |
 | AH-02 | ⬜ | claude | Generar ejemplos de tool-use EXITOSO (orquestación correcta) como dato de entrenamiento | `app/training_store.py` |
 | AH-03 | ⬜ | claude | Entrenar al 24b en mejor SELECCIÓN de tools (del tool_router + resultados) | `app/training/data_map.py` |
 | AH-04 | ⬜ | claude | Entrenar al router de tools con sus aciertos/fallos de categoría | `app/training/data_map.py` |

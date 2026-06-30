@@ -420,6 +420,51 @@ async def api_training_estimate(model_id: str, request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.post("/api/training/start")
+async def api_training_start(request: Request):
+    """AF-01: Inicia el pipeline de entrenamiento para un modelo."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        model_id = str(b.get("model_id") or "")
+        if not model_id:
+            return {"ok": False, "error": "model_id requerido"}
+        from app.training.orchestrator import start_training
+        return start_training(model_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/cancel")
+async def api_training_cancel(request: Request):
+    """AF-08: Cancela el entrenamiento en curso."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        model_id = str(b.get("model_id") or "")
+        from app.training.orchestrator import cancel_training
+        return cancel_training(model_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/training/history/{model_id}")
+async def api_training_history(model_id: str, request: Request):
+    """AG-05: Historial de runs de entrenamiento por modelo."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training.audit import get_history
+        return {"ok": True, "history": get_history(model_id)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ── G-01: Vault — listar secretos (enmascarado) + revelar con TOTP ────────────
 
 @app.get("/api/vault/list")
