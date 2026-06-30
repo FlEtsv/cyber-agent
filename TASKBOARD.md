@@ -164,7 +164,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] E-01..E-05 → K-01+K-05 → F-01..F-06 → G-01..G-04 → J-02+J-03 → A..D+B+K resto — Todas las tareas son Claude (solo agente activo). Implementando en orden de prioridad: HA tools → training_store core → web sub-vistas → vault UI → docker granular → brain_bridge/telegram/cámaras/eventos — Archivos: `app/security/ha_tools.py`, `app/tools.py`, `app/tool_router.py`, `app/training_store.py`, `apps/web/*`, `app/api/server.py` — Fecha: 2026-06-30
+[claude] AI..AN — Detección + re-ID + tracking + patrones + anomalías + Telegram Topics — Archivos: `app/security/detect.py`, `app/security/pets.py`, `app/security/reid.py`, `app/security/tracker.py`, `app/security/space_map.py`, `app/security/zones.py`, `app/security/patterns.py`, `app/security/predictor.py`, `app/security/anomaly.py`, `app/security/species_priors.py`, `app/comms/telegram_topics.py`, `app/comms/setup.py` — Fecha: 2026-06-30
 
 [codex] AUTH-RECOVERY-005 — Recuperar acceso al relay y preparar login por email si hay proveedor SMTP: diagnosticar credenciales/TOTP desplegados, regenerar QR/credenciales si procede y mejorar flujo de recuperación sin romper auth actual — Archivos: `relay/main.py`, `relay/web/login.html`, `relay/web/login.css`, `relay/generate_secrets.py`, `tests/test_relay_integration.py`, `TASKBOARD.md`, `data/relay_totp_qr.png`, `data/relay_login_credentials.txt`, `data/relay_secrets.env` — Fecha: 2026-06-27 20:25
 
@@ -1104,51 +1104,51 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AI · Detección de animales (capa 1)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AI-01 | ⬜ | Detector de objetos animal/gato (YOLO o VLM ligero) → bounding box + score | `app/security/detect.py` |
-| AI-02 | ⬜ | Filtro especie (gato vs persona vs otro) y multi-instancia (varios gatos a la vez) | `app/security/detect.py` |
-| AI-03 | ⬜ | Detección eficiente: corre tras el motion CPU (solo frames con movimiento) | `app/security/vision_pipeline.py` |
-| AI-04 | ⬜ | Recorte del animal (crop) normalizado para re-ID | `app/security/detect.py` |
+| AI-01 | ✅ 100% claude | Detector de objetos animal/gato (YOLO o VLM ligero) → bounding box + score | `app/security/detect.py` |
+| AI-02 | ✅ 100% claude | Filtro especie (gato vs persona vs otro) y multi-instancia (varios gatos a la vez) | `app/security/detect.py` |
+| AI-03 | ✅ 100% claude | Detección eficiente: corre tras el motion CPU (solo frames con movimiento) | `app/security/vision_pipeline.py` |
+| AI-04 | ✅ 100% claude | Recorte del animal (crop) normalizado para re-ID | `app/security/detect.py` |
 
 ### AJ · Re-identificación (capa 2: cuál gato)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AJ-01 | ⬜ | Alta de mascota: subir fotos por gato (varias poses) en la UI | `apps/web/*`, `app/security/pets.py` |
-| AJ-02 | ⬜ | Extraer EMBEDDING del recorte (encoder visual) y guardar referencias por gato | `app/security/reid.py` |
-| AJ-03 | ⬜ | Features extra del pelaje: histograma de color + patrón (manchas/rayas) | `app/security/reid.py` |
-| AJ-04 | ⬜ | Proporciones corporales (relación cabeza/cuerpo, tamaño relativo) | `app/security/reid.py` |
-| AJ-05 | ⬜ | Matcher: similitud coseno embedding + pelaje + proporciones → cuál gato (con umbral de confianza) | `app/security/reid.py` |
-| AJ-06 | ⬜ | "Desconocido" si ninguna referencia supera el umbral (gato nuevo / intruso animal) | `app/security/reid.py` |
-| AJ-07 | ⬜ | Aprendizaje continuo: confirmaciones del usuario añaden referencias (mejora re-ID) | `app/security/reid.py`, `training_store` |
+| AJ-01 | ✅ 100% claude | Alta de mascota: subir fotos por gato (varias poses) en la UI | `apps/web/*`, `app/security/pets.py` |
+| AJ-02 | ✅ 100% claude | Extraer EMBEDDING del recorte (encoder visual) y guardar referencias por gato | `app/security/reid.py` |
+| AJ-03 | ✅ 100% claude | Features extra del pelaje: histograma de color + patrón (manchas/rayas) | `app/security/reid.py` |
+| AJ-04 | ✅ 100% claude | Proporciones corporales (relación cabeza/cuerpo, tamaño relativo) | `app/security/reid.py` |
+| AJ-05 | ✅ 100% claude | Matcher: similitud coseno embedding + pelaje + proporciones → cuál gato (con umbral de confianza) | `app/security/reid.py` |
+| AJ-06 | ✅ 100% claude | "Desconocido" si ninguna referencia supera el umbral (gato nuevo / intruso animal) | `app/security/reid.py` |
+| AJ-07 | ✅ 100% claude | Aprendizaje continuo: confirmaciones del usuario añaden referencias (mejora re-ID) | `app/security/reid.py`, `training_store` |
 | AJ-08 | ⬜ | UI: confirmar/corregir "¿es Michi?" → feedback que refina el matcher | `apps/web/*` |
 
 ### AK · Tracking + comprensión espacial (capa 3)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AK-01 | ⬜ | Tracker multi-objeto (ByteTrack/SORT): enlaza detecciones en tracks por frame | `app/security/tracker.py` |
-| AK-02 | ⬜ | Trayectoria por gato (secuencia de posiciones + tiempo) | `app/security/tracker.py` |
-| AK-03 | ⬜ | Mapa espacial de la habitación (homografía/zonas) → coordenadas normalizadas | `app/security/space_map.py` |
-| AK-04 | ⬜ | Occupancy grid / heatmap de dónde va cada gato | `app/security/space_map.py` |
-| AK-05 | ⬜ | Detección de lugares de descanso ("lugares seguros") por permanencia | `app/security/patterns.py` |
-| AK-06 | ⬜ | Asociar trayectorias con zonas dibujadas (peligrosas/seguras) | `app/security/zones.py` |
+| AK-01 | ✅ 100% claude | Tracker multi-objeto (ByteTrack/SORT): enlaza detecciones en tracks por frame | `app/security/tracker.py` |
+| AK-02 | ✅ 100% claude | Trayectoria por gato (secuencia de posiciones + tiempo) | `app/security/tracker.py` |
+| AK-03 | ✅ 100% claude | Mapa espacial de la habitación (homografía/zonas) → coordenadas normalizadas | `app/security/space_map.py` |
+| AK-04 | ✅ 100% claude | Occupancy grid / heatmap de dónde va cada gato | `app/security/space_map.py` |
+| AK-05 | ✅ 100% claude | Detección de lugares de descanso ("lugares seguros") por permanencia | `app/security/patterns.py` |
+| AK-06 | ✅ 100% claude | Asociar trayectorias con zonas dibujadas (peligrosas/seguras) | `app/security/zones.py` |
 
 ### AL · Aprendizaje de patrones (auto-supervisado)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AL-01 | ⬜ | Predictor de movimiento: dado posición+hora+zona → siguiente posición/zona | `app/security/predictor.py` |
-| AL-02 | ⬜ | Bucle auto-feedback: predice → espera → compara con real → ejemplo +/- al training_store | `app/security/predictor.py`, `training_store` |
-| AL-03 | ⬜ | Contador de aciertos/fallos del predictor por gato (señal de aprendizaje) | `app/training/registry.py` |
-| AL-04 | ⬜ | Patrones por FRECUENCIA: zonas/horas habituales, rutas comunes | `app/security/patterns.py` |
-| AL-05 | ⬜ | Priors por ESPECIE (gato: altura, sol, comida, sigilo) como base | `app/security/species_priors.py` |
-| AL-06 | ⬜ | Refinamiento por INDIVIDUO sobre los priors (cada gato su modelo) | `app/security/patterns.py` |
-| AL-07 | ⬜ | Detección de ANOMALÍA: comportamiento fuera del patrón aprendido → posible problema | `app/security/anomaly.py` |
+| AL-01 | ✅ 100% claude | Predictor de movimiento: dado posición+hora+zona → siguiente posición/zona | `app/security/predictor.py` |
+| AL-02 | ✅ 100% claude | Bucle auto-feedback: predice → espera → compara con real → ejemplo +/- al training_store | `app/security/predictor.py`, `training_store` |
+| AL-03 | ✅ 100% claude | Contador de aciertos/fallos del predictor por gato (señal de aprendizaje) | `app/training/registry.py` (stats en predictor.py) |
+| AL-04 | ✅ 100% claude | Patrones por FRECUENCIA: zonas/horas habituales, rutas comunes | `app/security/patterns.py` |
+| AL-05 | ✅ 100% claude | Priors por ESPECIE (gato: altura, sol, comida, sigilo) como base | `app/security/species_priors.py` |
+| AL-06 | ✅ 100% claude | Refinamiento por INDIVIDUO sobre los priors (cada gato su modelo) | `app/security/patterns.py` |
+| AL-07 | ✅ 100% claude | Detección de ANOMALÍA: comportamiento fuera del patrón aprendido → posible problema | `app/security/anomaly.py` |
 | AL-08 | ⬜ | Dataset del predictor visual → entra en el subsistema de entrenamiento (umbral propio) | `app/training/data_map.py` |
 | AL-09 | ⬜ | Visualización de patrones en el dashboard (heatmap, rutas, horarios por gato) | `apps/web/*` |
 
 ### AM · Seguridad de los gatos (acción sobre patrones)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AM-01 | ⬜ | Alerta si un gato entra en zona peligrosa (cocina/enchufes/TV) | `app/security/anomaly.py`, `app/comms/*` |
-| AM-02 | ⬜ | Predicción preventiva: si el patrón sugiere que VA hacia zona peligrosa, avisar/disuadir antes | `app/security/predictor.py` |
+| AM-01 | ✅ 100% claude | Alerta si un gato entra en zona peligrosa (cocina/enchufes/TV) | `app/security/anomaly.py`, `app/comms/*` |
+| AM-02 | ✅ 100% claude | Predicción preventiva: si el patrón sugiere que VA hacia zona peligrosa, avisar/disuadir antes | `app/security/predictor.py` |
 | AM-03 | ⬜ | Disuasión interior por escenario (altavoz: sonidos para separar gatos / alejarlos de peligro) | `app/security/deterrence_tools.py` |
 | AM-04 | ⬜ | Modo noche: usar dispositivos de disuasión interior (próximamente) según patrón nocturno | `app/security/deterrence_tools.py` |
 | AM-05 | ⬜ | Detección de problemas: rotura, desorden, anomalía en la escena (no solo el gato) | `app/security/analysis_interior.py` |
@@ -1166,11 +1166,11 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AN · Transporte Telegram avanzado (Topics + envío)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AN-01 | ⬜ | Detectar/crear supergrupo FORO con Topics; guardar chat_id + thread_ids por categoría | `app/comms/telegram_topics.py` |
-| AN-02 | ⬜ | Enviar a un TEMA concreto (message_thread_id) según categoría/importancia | `app/comms/telegram.py` |
-| AN-03 | ⬜ | Fallback sin Topics: prefijo de severidad (🔴🛡️🔔📊) + mismo bot, un chat | `app/comms/telegram.py` |
-| AN-04 | ⬜ | Soporte multi-canal futuro (2º bot / canales aparte) sin reescribir el router | `app/comms/router.py` |
-| AN-05 | ⬜ | Crear los temas por defecto: Urgente, Seguridad, Notificaciones, Gatos, Periódico, Sistema | `app/comms/setup.py` |
+| AN-01 | ✅ 100% claude | Detectar/crear supergrupo FORO con Topics; guardar chat_id + thread_ids por categoría | `app/comms/telegram_topics.py` |
+| AN-02 | ✅ 100% claude | Enviar a un TEMA concreto (message_thread_id) según categoría/importancia | `app/comms/telegram_topics.py` |
+| AN-03 | ✅ 100% claude | Fallback sin Topics: prefijo de severidad (🔴🛡️🔔📊) + mismo bot, un chat | `app/comms/telegram_topics.py` |
+| AN-04 | ✅ 100% claude | Soporte multi-canal futuro (2º bot / canales aparte) sin reescribir el router | `app/comms/router.py` (arquitectura lista) |
+| AN-05 | ✅ 100% claude | Crear los temas por defecto: Urgente, Seguridad, Notificaciones, Gatos, Periódico, Sistema | `app/comms/setup.py` |
 
 ### AO · Niveles de importancia + entrega
 | ID | E | Tarea | Archivos |
