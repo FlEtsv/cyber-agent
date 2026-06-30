@@ -1280,3 +1280,43 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AX-02 | ⬜ | Confirmación humana para niveles altos (láser/sirena) salvo modo autónomo | `app/security/deterrence.py` |
 | AX-03 | ⬜ | Aviso legal: la narración informa de grabación (cumplimiento) | `app/security/audio/library.py` |
 | AX-04 | ⬜ | Cooldown anti-abuso (no disparar en bucle) | `app/security/deterrence.py` |
+
+---
+
+## 🎛️ MENÚ DISUASIÓN + ACTUADORES POR CÁMARA (visión de Steve)
+> En la vista de cada cámara: menú con los actuadores que TENEMOS (si hay más, más;
+> si no, lo que haya). Por cada actuador se DESCRIBE el comportamiento esperado →
+> el agente designado lo CABLEA y TESTEA → cuando está en VERDE es que funciona y
+> se puede emitir PRUEBA real. Incluye añadir dispositivos inteligentes (casquillos/
+> enchufes) a HA desde el propio menú. Solo añadir tareas.
+
+### AY · Menú de disuasión en la vista de cámara
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AY-01 | ⬜ | Panel "Disuasión" en la vista de cámara: lista de actuadores asignados + estado (rojo/ámbar/verde) | `apps/web/*` |
+| AY-02 | ⬜ | Añadir actuador a la cámara (elegir de los disponibles del sistema) | `apps/web/*`, `actuators/registry` |
+| AY-03 | ⬜ | Por actuador: campo "comportamiento esperado" (texto) que el agente usa para cablear/testear | `apps/web/*`, `cameras_db` |
+| AY-04 | ⬜ | Botón "Cablear/Configurar" → el agente designado conecta el actuador real | `app/security/actuators/wire.py` |
+| AY-05 | ⬜ | Botón "Probar" (emite prueba real: sonido/narración/luz) — habilitado solo si VERDE | `apps/web/*`, `actuators/registry` |
+| AY-06 | ⬜ | Semáforo de estado: ROJO (sin cablear) · ÁMBAR (cableado, sin verificar) · VERDE (test OK) | `app/security/actuators/registry.py` |
+| AY-07 | ⬜ | Editor de niveles: qué actuadores dispara cada nivel de disuasión (1..5) por cámara | `apps/web/*` |
+| AY-08 | ⬜ | Presets rápidos: "narración + ladridos + luces" (lo que Steve quiere de salida) | `apps/web/*`, `deterrence` |
+
+### AZ · Auto-cableado + test por el agente (verde = funciona)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AZ-01 | ⬜ | El agente lee "comportamiento esperado" → genera la integración del actuador | `app/security/actuators/wire.py` |
+| AZ-02 | ⬜ | Auto-test del actuador (dispara y verifica respuesta) → marca VERDE/rojo con evidencia | `app/security/actuators/selftest.py` |
+| AZ-03 | ⬜ | Reporte del test (qué hizo, qué se esperaba, resultado) visible en el menú | `apps/web/*` |
+| AZ-04 | ⬜ | Re-test bajo demanda + auto-test periódico de salud del actuador | `app/security/actuators/selftest.py` |
+| AZ-05 | ⬜ | Si un actuador pasa a ROJO (se desconectó), avisar por comms y degradar | `app/comms/*`, `actuators/registry` |
+
+### BA · Añadir dispositivos inteligentes a HA desde el menú
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| BA-01 | ⬜ | Descubrir entidades HA disponibles (luces, enchufes, switches) y listarlas | `app/security/ha_discovery.py` |
+| BA-02 | ⬜ | "Añadir dispositivo": vincular una entidad HA (casquillo/enchufe inteligente) como actuador | `apps/web/*`, `actuators/ha_light`, `actuators/smart_plug` |
+| BA-03 | ⬜ | Asistente para emparejar un dispositivo NUEVO en HA (guía/llamada a HA) | `app/security/ha_pairing.py` |
+| BA-04 | ⬜ | Probar el dispositivo recién añadido (on/off/parpadeo) desde el menú | `apps/web/*` |
+| BA-05 | ⬜ | Catálogo de tipos soportados (luz, enchufe, sirena, switch) extensible | `app/security/actuators/catalog.py` |
+| BA-06 | ⬜ | Guardar dispositivos añadidos en el vault/config (credenciales HA reutilizadas) | `app/secrets_vault.py`, `cameras_db` |
