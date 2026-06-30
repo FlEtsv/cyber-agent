@@ -190,18 +190,31 @@ def _restart_ollama() -> None:
 class ConnectionService(_Service):
     name = "connection"
     interval = 15.0
-    heal_after = 2
+    heal_after = 1   # acciones idempotentes/seguras; actuamos rápido
+
+    def __init__(self):
+        super().__init__()
+        self._xcheck = 0
 
     def check(self) -> tuple[bool, str]:
         api_up = _port_listening(8765)
-        from app.api.relay_connector import relay_status
+        from app.api.relay_connector import relay_status, relay_remote_sees_us
         rs = relay_status()
-        relay_ok = rs["connected"] or not rs["configured"]
+        if not rs["configured"]:
+            return api_up, f"api:8765={'up' if api_up else 'DOWN'} · relay=sin-config"
+        # ¿El conector cree estar conectado pero la revisión ACTIVA del relay no
+        # nos ve? (WebSocket fijado a una revisión muerta tras un redeploy). Lo
+        # comprobamos por HTTP cada ~45s (no en cada tick) y lo tratamos como fallo.
+        stale = False
+        if rs["connected"]:
+            self._xcheck += 1
+            if self._xcheck % 3 == 0 and relay_remote_sees_us() is False:
+                stale = True
+        relay_ok = rs["connected"] and not stale
         ok = api_up and relay_ok
-        relay_txt = ("conectado" if rs["connected"]
-                     else "sin-config" if not rs["configured"]
-                     else "DESCONECTADO")
-        return ok, f"api:8765={'up' if api_up else 'DOWN'} · relay={relay_txt}"
+        txt = ("conectado" if relay_ok
+               else "FIJADO-A-REV-MUERTA" if stale else "DESCONECTADO")
+        return ok, f"api:8765={'up' if api_up else 'DOWN'} · relay={txt}"
 
     def heal(self) -> None:
         # a) servidor local caído → reenlázalo
@@ -212,17 +225,22 @@ class ConnectionService(_Service):
                 log("INFO", "supervisor", "Servidor local :8765 reenlazado")
             except Exception as e:
                 log("ERROR", "supervisor", f"No se pudo reenlazar :8765: {e}")
-        # b) conector del relay muerto → relánzalo (si está configurado).
-        #    Si solo está desconectado pero el hilo vive, su propio watchdog
-        #    interno ya reconecta; no duplicamos hilos.
         from app.api import relay_connector as rc
         rs = rc.relay_status()
-        if rs["configured"] and not rs["thread_alive"]:
+        if not rs["configured"]:
+            return
+        if not rs["thread_alive"]:
+            # b1) hilo del conector muerto → relánzalo
             try:
                 rc.start_relay_connector()
                 log("INFO", "supervisor", "Conector del relay relanzado")
             except Exception as e:
                 log("ERROR", "supervisor", f"No se pudo relanzar el conector: {e}")
+        elif rs["connected"] and rc.relay_remote_sees_us() is False:
+            # b2) fijado a revisión muerta → fuerza reconexión (thread-safe)
+            if rc.force_relay_reconnect():
+                log("INFO", "supervisor", "Relay fijado a revisión muerta → reconexión forzada")
+        # si está desconectado pero el hilo vive, su bucle ya reconecta solo
 
 
 # ── 4) Watchdog (supervisión mutua) ───────────────────────────────────────────

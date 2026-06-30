@@ -100,7 +100,22 @@ class RelayConnector:
         self._runners.clear()
         self._pending.clear()   # no dejar colas de instrucciones huérfanas
 
+    def force_reconnect(self) -> bool:
+        """Cierra la WebSocket actual de forma THREAD-SAFE para forzar reconexión.
+        Lo usa el supervisor cuando detecta que estamos fijados a una revisión
+        muerta del relay (is_connected()=True pero el relay no nos ve)."""
+        loop = getattr(self, "_loop", None)
+        ws = self._ws
+        if loop is None or ws is None:
+            return False
+        try:
+            loop.call_soon_threadsafe(lambda: asyncio.ensure_future(self._safe_close(ws)))
+            return True
+        except Exception:
+            return False
+
     async def _async_run(self):
+        self._loop = asyncio.get_event_loop()
         backoff = _BACKOFF_INIT
         while self._running:
             try:
@@ -656,3 +671,23 @@ def relay_status() -> dict:
         "thread_alive": bool(c and c._running),
         "connected": bool(c and c.is_connected()),
     }
+
+
+def relay_remote_sees_us():
+    """Pregunta por HTTP a la revisión ACTIVA del relay si nos tiene como host.
+    True/False, o None si no es concluyente (sin conector/error)."""
+    c = _connector
+    if c is None:
+        return None
+    try:
+        r = httpx.get(f"{c.http_url}/api/status", timeout=6.0)
+        if r.status_code != 200:
+            return None
+        return bool(r.json().get("pc_online", False))
+    except Exception:
+        return None
+
+
+def force_relay_reconnect() -> bool:
+    """Fuerza la reconexión del conector (lo llama el supervisor)."""
+    return bool(_connector and _connector.force_reconnect())
