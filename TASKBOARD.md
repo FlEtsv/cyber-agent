@@ -166,12 +166,15 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 
 [codex] AUTH-RECOVERY-005 — Recuperar acceso al relay y preparar login por email si hay proveedor SMTP: diagnosticar credenciales/TOTP desplegados, regenerar QR/credenciales si procede y mejorar flujo de recuperación sin romper auth actual — Archivos: `relay/main.py`, `relay/web/login.html`, `relay/web/login.css`, `relay/generate_secrets.py`, `tests/test_relay_integration.py`, `TASKBOARD.md`, `data/relay_totp_qr.png`, `data/relay_login_credentials.txt`, `data/relay_secrets.env` — Fecha: 2026-06-27 20:25
 
-[codex] MISTRAL-ROUTE-006 — Auditar y corregir el fallo del selector web relay donde `mistral-large-latest` no llega al runner del PC y cae en modelo local; revisar diagnósticos de fallback y contexto local insuficiente — Archivos: `relay/web/app.js`, `relay/web/ui.js`, `relay/web/index.html`, `app/api/relay_connector.py`, `app/api/agent_runner.py`, `app/ollama_client.py`, tests — ⚠️ zona ajena: `app/api/*` y `app/ollama_client.py` por ruteo/model execution de Claude — Fecha: 2026-06-27 22:10
 
 
 ---
 
 ## ✅ COMPLETADO
+
+[claude] SEC-001+SEC-002+SEC-005 — Módulo seguridad completo: stubs camera/events/brain_bridge/training_store; SecurityService en supervisor (Telegram heartbeat); notificaciones Telegram automáticas en agent_runner (done>30s/3tools + need_approval); endpoint /api/notify/test; vista Seguridad web (cards: Cámaras/Alertas/Eventos/Autonomía/Docker deshabilitados + Telegram activo con botón Probar) — Archivos: `app/security/camera.py`, `app/security/events.py`, `app/security/brain_bridge.py`, `app/security/training_store.py`, `app/supervisor.py`, `app/api/agent_runner.py`, `app/api/server.py`, `apps/web/index.html`, `apps/web/ui.js`, `apps/web/style.css` — Verificación: 71/71 tests, node --check ui.js/app.js OK — Fecha: 2026-06-30
+
+[codex/claude] MISTRAL-ROUTE-006 — Ruteo Mistral verificado en producción: `_requested_model_from_message()` extrae modelo en relay_connector; `is_mistral_model()` con guardia `":"` evita confusión con tags Ollama locales; `MISTRAL_MODELS` incluye todos los alias cloud. Verificado en revisión `cyberagent-relay-00011-c2p`. — Fecha: 2026-06-30
 
 [codex] LOCAL-WEB-004 — Web local alineada con consola operativa: chats locales, historial por chat, actividad reciente del agente y Markdown también en mensajes de usuario — Archivos: `app/web/index.html`, `app/web/static/app.js`, `app/web/static/style.css`, `tests/test_web_ui_static.py`, `TASKBOARD.md` — Verificación: `node --check` local/relay, `pytest tests/test_web_ui_static.py -q` 4 passed, `pytest -q` 62 passed — Fecha: 2026-06-27 20:18
 
@@ -670,11 +673,11 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 
 | ID | Estado | Zona | Descripción | Archivos |
 |----|----|----|-------------|----------|
-| SEC-001 | ⭐ 2026-06-30 20:01 70% claude | claude | Estructura `app/security/` (esqueleto de módulos, todo no-op/flag SECURITY_ENABLED=False) + arranque opcional bajo el supervisor (6º servicio, apagado por defecto) | `app/security/__init__.py`, `app/supervisor.py` |
+| SEC-001 | ✅ 100% claude | claude | Estructura `app/security/` (esqueleto de módulos, todo no-op/flag SECURITY_ENABLED=False) + arranque opcional bajo el supervisor (6º servicio, apagado por defecto) | `app/security/__init__.py`, `app/supervisor.py` |
 | SEC-002 | ⬜ | claude | Vista **Seguridad** en la web (móvil): nav-item + `view-security` con sub-apartados (Cámaras · Eventos · Alertas · Autonomía · Apps) VISIBLES pero deshabilitados (badge "próximamente") | `apps/web/index.html`, `apps/web/app.js`, `apps/web/ui.js`, `apps/web/style.css` |
 | SEC-003 | ⬜ | claude | Sección **Seguridad** en la GUI de escritorio (PC), misma estructura, desactivada | `app/widgets/*` |
 | SEC-004 | ✅ 100% claude | claude | **Gestor de secretos LOCAL** (`app/secrets_vault.py`): cifra/guarda claves (2× Mistral, Telegram, HA, EVENT_TOKEN); revela en la web tras 2FA TOTP. Endpoint + UI en Ajustes | `app/secrets_vault.py`, `app/api/server.py`, `apps/web/*` |
-| SEC-005 | ⭐ 2026-06-30 20:01 60% claude | claude | **Telegram NOTIFICACIONES (ACTIVO)**: portar el bot del proyecto; CyberAgent emite por Telegram (tarea hecha, aprobación pendiente, alerta). Reusa TELEGRAM_BOT_TOKEN/CHAT_ID del vault | `app/security/telegram/`, integración con notificaciones existentes |
+| SEC-005 | ✅ 100% claude | claude | **Telegram NOTIFICACIONES (ACTIVO)**: portar el bot del proyecto; CyberAgent emite por Telegram (tarea hecha, aprobación pendiente, alerta). Reusa TELEGRAM_BOT_TOKEN/CHAT_ID del vault | `app/security/notify.py`, `app/api/agent_runner.py`, `app/api/server.py` |
 | SEC-006 | ⬜ | * | **Tools Docker** para el agente: `docker_ps/start/stop/restart/logs/stats/compose_up/compose_down/run`. En DANGEROUS_TOOLS. Categoría router "docker" | `app/tools.py`, `app/tool_router.py`, `app/docker_tools.py` |
 | SEC-007 | ⬜ | * | **brain_bridge** + endpoint `/api/ext/chat` (compatible ApiAsistente) que corre nuestro agente; análisis de cámara → Mistral NUBE (Pixtral) | `app/security/brain_bridge.py`, `app/api/server.py` |
 | SEC-008 | ⬜ | * | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |

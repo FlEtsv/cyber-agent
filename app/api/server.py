@@ -205,6 +205,21 @@ async def api_status():
         return {"ollama": False, "models": []}
 
 
+@app.post("/api/notify/test")
+async def api_notify_test(request: Request):
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.security.notify import notify, available
+        if not available():
+            return {"ok": False, "error": "Telegram no configurado (faltan token/chat_id en el vault)"}
+        result = notify(title="CyberAgent — test de notificación", body="Telegram funcionando correctamente.", emoji="🔔")
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.get("/api/health")
 def api_health():
     """Salud agregada de los 3 servicios guardianes. Lo consume el watchdog

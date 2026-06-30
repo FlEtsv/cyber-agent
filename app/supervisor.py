@@ -255,7 +255,38 @@ class ConnectionService(_Service):
         # si está desconectado pero el hilo vive, su bucle ya reconecta solo
 
 
-# ── 4) Watchdog (supervisión mutua) ───────────────────────────────────────────
+# ── 4) Seguridad (Telegram notifier + módulo de seguridad) ───────────────────
+class SecurityService(_Service):
+    """Vigila que el notificador de Telegram esté accesible.
+    No envía mensajes de prueba; solo verifica que el vault devuelve credenciales.
+    """
+    name = "security"
+    interval = 120.0
+    heal_after = 3
+
+    def check(self) -> tuple[bool, str]:
+        try:
+            from app.security.notify import available, _cfg
+            if not available():
+                return True, "telegram=sin-config (ok)"
+            token, chat = _cfg()
+            # Verificación liviana: endpoint getMe de Telegram (no envía mensajes)
+            import httpx
+            r = httpx.get(
+                f"https://api.telegram.org/bot{token}/getMe",
+                timeout=8.0,
+            )
+            if r.status_code == 200 and r.json().get("ok"):
+                return True, f"telegram=ok (@{r.json()['result'].get('username', '?')})"
+            return False, f"telegram=HTTP {r.status_code}"
+        except Exception as e:
+            return False, f"telegram=error: {e}"
+
+    def heal(self) -> None:
+        log("WARN", "supervisor", "SecurityService: Telegram no responde — nada que curar automáticamente")
+
+
+# ── 5) Watchdog (supervisión mutua) ───────────────────────────────────────────
 def _startup_bat() -> str:
     return os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows",
                         "Start Menu", "Programs", "Startup", "CyberAgentWatchdog.bat")
@@ -308,6 +339,7 @@ class Supervisor:
             PersistenceService(),
             OllamaService(),
             ConnectionService(),
+            SecurityService(),
             WatchdogService(),
         ]
 

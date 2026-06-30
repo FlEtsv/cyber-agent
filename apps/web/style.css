@@ -907,6 +907,28 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
 }
 .view-search:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
 
+/* ── Vista Seguridad ──────────────────────────────────────────────────────── */
+.sec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 8px 22px 22px; }
+.sec-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 16px 14px; position: relative;
+}
+.sec-card.sec-disabled { opacity: 0.55; }
+.sec-card.sec-active { border-color: var(--accent-line); background: var(--accent-soft); }
+.sec-ico { font-size: 24px; line-height: 1; }
+.sec-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.badge-soon {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--surface-2, #1a1d24); color: var(--dim); border: 1px solid var(--border);
+  border-radius: 100px; padding: 2px 7px;
+}
+.badge-ok {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: #0a3020; color: #3ecf8e; border: 1px solid #1a5c3a;
+  border-radius: 100px; padding: 2px 7px;
+}
+
 /* Tools catalogue */
 .tools-grid {
   flex: 1 1 auto; min-height: 0; overflow-y: auto;

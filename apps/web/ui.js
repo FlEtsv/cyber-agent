@@ -61,6 +61,25 @@
   }
   document.querySelectorAll('.nav-item[data-view]').forEach(btn =>
     btn.addEventListener('click', () => showView(btn.dataset.view)));
+
+  // ── Vista Seguridad: botón "Probar" Telegram ──────────────────────────────
+  const secTgTest = $('sec-telegram-test');
+  if (secTgTest) {
+    secTgTest.addEventListener('click', async () => {
+      secTgTest.disabled = true;
+      secTgTest.textContent = '…';
+      try {
+        const r = await fetch('/api/notify/test', { method: 'POST' });
+        const d = await r.json();
+        secTgTest.textContent = d.ok ? '✅ enviado' : '❌ error';
+        if (!d.ok) console.warn('Telegram test error:', d.error);
+      } catch (e) {
+        secTgTest.textContent = '❌ fallo';
+      }
+      setTimeout(() => { secTgTest.disabled = false; secTgTest.textContent = 'Probar'; }, 3000);
+    });
+  }
+
   const navSettings = $('nav-settings');
   if (navSettings) navSettings.addEventListener('click', () => {
     const sb = $('settings-btn'); if (sb) sb.click();

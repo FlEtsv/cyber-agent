@@ -239,6 +239,8 @@ class AgentRunner:
             called_tool_names: set = set()
             empty_tool_turns = 0
             tool_execution_count = 0
+            import time as _time
+            _task_start = _time.monotonic()
 
             def _emit_status(text: str):
                 # Razonamiento/proceso: evento propio (NO se mezcla con la respuesta final)
@@ -436,6 +438,16 @@ class AgentRunner:
                         self._approvals[tid] = ev
                         _emit_status(f"`{name}` necesita aprobación porque puede cambiar el sistema.")
                         self._q.put({"type": "need_approval", "data": event_payload})
+                        try:
+                            from app.security.notify import notify as _tg_notify, available as _tg_avail
+                            if _tg_avail():
+                                _tg_notify(
+                                    title=f"⚠️ Aprobación pendiente: {name}",
+                                    body=f"Herramienta peligrosa esperando tu respuesta (60 s timeout). Args: {str(args)[:200]}",
+                                    emoji="🔐",
+                                )
+                        except Exception:
+                            pass
                         ev.wait(timeout=60)
                         if self._approval_res.get(tid, False):
                             result = execute_tool(name, args)
@@ -542,6 +554,7 @@ class AgentRunner:
 
             # Aviso push al móvil de que la tarea terminó (útil si te alejaste).
             # Solo cuando hubo trabajo real (herramientas) para no spamear.
+            _task_elapsed = _time.monotonic() - _task_start
             if tools_executed and not self._stop_flag:
                 try:
                     from app.api import alert_sender
@@ -553,6 +566,22 @@ class AgentRunner:
                         )
                 except Exception:
                     pass
+                # Telegram: notifica si la tarea duró >30 s o usó muchas herramientas
+                if _task_elapsed > 30 or tool_execution_count >= 3:
+                    try:
+                        from app.security.notify import notify as _tg_notify, available as _tg_avail
+                        if _tg_avail():
+                            mins = int(_task_elapsed // 60)
+                            secs = int(_task_elapsed % 60)
+                            dur  = f"{mins}m {secs}s" if mins else f"{secs}s"
+                            preview = " ".join((full or "").split())[:300] or "Respuesta lista."
+                            _tg_notify(
+                                title=f"Tarea completada ({dur}, {tool_execution_count} herramientas)",
+                                body=preview,
+                                emoji="✅",
+                            )
+                    except Exception:
+                        pass
         except Exception as exc:
             import traceback
             self._q.put({"type": "error", "data": str(exc) + "\n" + traceback.format_exc()})
