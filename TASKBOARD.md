@@ -164,7 +164,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
-[claude] AI..AN — Detección + re-ID + tracking + patrones + anomalías + Telegram Topics — Archivos: `app/security/detect.py`, `app/security/pets.py`, `app/security/reid.py`, `app/security/tracker.py`, `app/security/space_map.py`, `app/security/zones.py`, `app/security/patterns.py`, `app/security/predictor.py`, `app/security/anomaly.py`, `app/security/species_priors.py`, `app/comms/telegram_topics.py`, `app/comms/setup.py` — Fecha: 2026-06-30
+[claude] AO..AX+K-06 — Niveles de importancia, digest, comandos bot, actuadores, audio, disuasión — Fecha: 2026-06-30
 
 [codex] AUTH-RECOVERY-005 — Recuperar acceso al relay y preparar login por email si hay proveedor SMTP: diagnosticar credenciales/TOTP desplegados, regenerar QR/credenciales si procede y mejorar flujo de recuperación sin romper auth actual — Archivos: `relay/main.py`, `relay/web/login.html`, `relay/web/login.css`, `relay/generate_secrets.py`, `tests/test_relay_integration.py`, `TASKBOARD.md`, `data/relay_totp_qr.png`, `data/relay_login_credentials.txt`, `data/relay_secrets.env` — Fecha: 2026-06-27 20:25
 
@@ -201,6 +201,7 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Mover aquí desde EN PROGRESO al terminar.
 > Formato: `[AGENTE] ID — Descripción — Commit: abc1234 — Fecha: YYYY-MM-DD HH:MM`
 
+[claude] AI..AN — Detección+reID+tracking+patrones+anomalías+Telegram Topics (detect.py, pets.py, reid.py, tracker.py, space_map.py, zones.py, patterns.py, predictor.py, anomaly.py, species_priors.py, telegram_topics.py, setup.py) — Commit: 88b9730 — Fecha: 2026-06-30
 [claude] WEBPROD-001 — Web como producto único en `apps/web` (relay invisible; fin duplicación) — Commit: dc1449e — Fecha: 2026-06-29
 [claude] WEBPROD-002 — Identidad de producto PWA (manifest, sw v12, README) — Commit: 847256f — Fecha: 2026-06-29
 [claude] WEBPROD-003 — Modo offline parcial (chats/carpetas/archivos con PC apagado) — Commit: c470b7e — Fecha: 2026-06-29
@@ -814,7 +815,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | K-03 | ✅ | claude | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
 | K-04 | ✅ | claude | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
 | K-05 | ✅ | claude | Export a formato QLoRA (jsonl chat) | `app/training_store.py` |
-| K-06 | ⬜ | claude | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
+| K-06 | ✅ 100% claude | claude | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
 
 ### L · Conciencia del agente
 | ID | E | Agente | Tarea | Archivos |
@@ -1070,7 +1071,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AF-06 | ✅ | claude | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
 | AF-07 | ⬜ | claude | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
 | AF-08 | ✅ | claude | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
-| AF-09 | ⬜ | claude | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
+| AF-09 | ✅ 100% claude | claude | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
 
 ### AG · Evaluación + promoción + seguridad del proceso
 | ID | E | Agente | Tarea | Archivos |
@@ -1175,40 +1176,40 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AO · Niveles de importancia + entrega
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AO-01 | ⬜ | Enum de severidad: CRÍTICA, ALTA, MEDIA, BAJA, PERIÓDICA | `app/comms/levels.py` |
-| AO-02 | ⬜ | Mapear severidad→tema + sonido (disable_notification) + pin | `app/comms/router.py` |
-| AO-03 | ⬜ | CRÍTICA: sonido + pin + (opcional) repetir hasta ACK | `app/comms/router.py` |
-| AO-04 | ⬜ | BAJA/PERIÓDICA: silenciosa + va a DIGEST (no mensaje suelto) | `app/comms/digest.py` |
+| AO-01 | ✅ 100% claude | Enum de severidad: CRÍTICA, ALTA, MEDIA, BAJA, PERIÓDICA | `app/comms/levels.py` |
+| AO-02 | ✅ 100% claude | Mapear severidad→tema + sonido (disable_notification) + pin | `app/comms/router.py` |
+| AO-03 | ✅ 100% claude | CRÍTICA: sonido + pin + (opcional) repetir hasta ACK | `app/comms/router.py` (CRÍTICA nunca silenciada) |
+| AO-04 | ✅ 100% claude | BAJA/PERIÓDICA: silenciosa + va a DIGEST (no mensaje suelto) | `app/comms/digest.py` |
 | AO-05 | ⬜ | Editar-en-sitio: una alerta evoluciona (analizando→resuelto) sin spamear | `app/comms/telegram.py` |
-| AO-06 | ⬜ | Reglas por FUENTE (agente/error/seguridad/gatos) → severidad por defecto editable | `app/comms/rules.py` |
+| AO-06 | ✅ 100% claude | Reglas por FUENTE (agente/error/seguridad/gatos) → severidad por defecto editable | `app/comms/rules.py` |
 
 ### AP · Panel de comandos por mensaje (inline keyboards "en respuesta a")
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AP-01 | ⬜ | Inline keyboard genérico por tipo de alerta (botones de acción) | `app/comms/keyboards.py` |
-| AP-02 | ⬜ | Acciones seguridad: Confirmar · Ignorar · Ver cámara · Silenciar 1h · Escalar · Disuadir | `app/comms/keyboards.py` |
-| AP-03 | ⬜ | Acciones agente: Aprobar · Rechazar · Ver detalle · Reintentar | `app/comms/keyboards.py` |
-| AP-04 | ⬜ | Handler de callback_query: ejecuta la acción y edita el mensaje con el resultado | `app/comms/callbacks.py` |
-| AP-05 | ⬜ | Las acciones peligrosas pasan por aprobación (DANGEROUS) y/o 2FA | `app/comms/callbacks.py` |
-| AP-06 | ⬜ | Confirmaciones de seguridad alimentan training_store (feedback) | `app/comms/callbacks.py`, `training_store` |
+| AP-01 | ✅ 100% claude | Inline keyboard genérico por tipo de alerta (botones de acción) | `app/comms/keyboards.py` |
+| AP-02 | ✅ 100% claude | Acciones seguridad: Confirmar · Ignorar · Ver cámara · Silenciar 1h · Escalar · Disuadir | `app/comms/keyboards.py` |
+| AP-03 | ✅ 100% claude | Acciones agente: Aprobar · Rechazar · Ver detalle · Reintentar | `app/comms/keyboards.py` |
+| AP-04 | ✅ 100% claude | Handler de callback_query: ejecuta la acción y edita el mensaje con el resultado | `app/comms/callbacks.py` |
+| AP-05 | ✅ 100% claude | Las acciones peligrosas pasan por aprobación (DANGEROUS) y/o 2FA | `app/comms/callbacks.py` |
+| AP-06 | ✅ 100% claude | Confirmaciones de seguridad alimentan training_store (feedback) | `app/comms/callbacks.py`, `training_store` |
 
 ### AQ · Digest / agrupación / anti-flood
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AQ-01 | ⬜ | Buffer de notificaciones BAJA/PERIÓDICA → resumen cada N min/horas | `app/comms/digest.py` |
-| AQ-02 | ⬜ | Agrupar repetidas (mismo evento N veces) en una sola con contador | `app/comms/dedup.py` |
+| AQ-01 | ✅ 100% claude | Buffer de notificaciones BAJA/PERIÓDICA → resumen cada N min/horas | `app/comms/digest.py` |
+| AQ-02 | ✅ 100% claude | Agrupar repetidas (mismo evento N veces) en una sola con contador | `app/comms/digest.py` (DigestBuffer con dedup por clave title[:40]) |
 | AQ-03 | ⬜ | Rate-limit (respetar límites de Telegram) + cola con reintento | `app/comms/telegram.py` |
-| AQ-04 | ⬜ | Resumen diario programado (estado casa, gatos, sistema) | `app/comms/digest.py` |
-| AQ-05 | ⬜ | Horario "no molestar" (solo CRÍTICA suena de noche) | `app/comms/rules.py` |
+| AQ-04 | ✅ 100% claude | Resumen diario programado (estado casa, gatos, sistema) | `app/comms/digest.py` (maybe_auto_flush) |
+| AQ-05 | ✅ 100% claude | Horario "no molestar" (solo CRÍTICA suena de noche) | `app/comms/rules.py` |
 
 ### AR · Comandos del bot (menú + control)
 | ID | E | Tarea | Archivos |
 |----|---|-------|----------|
-| AR-01 | ⬜ | Menú de comandos (BotCommands): /estado /resumen /silenciar /modo /camara /ayuda | `app/comms/commands.py` |
-| AR-02 | ⬜ | /silenciar <cat> <tiempo> → muta una categoría temporalmente | `app/comms/commands.py` |
-| AR-03 | ⬜ | /modo <manual|operativa|alto-impacto> → autonomía de seguridad en caliente | `app/comms/commands.py` |
-| AR-04 | ⬜ | /camara <nombre> → snapshot/stream + panel de acciones | `app/comms/commands.py` |
-| AR-05 | ⬜ | /resumen → digest bajo demanda; /estado → salud del sistema | `app/comms/commands.py` |
+| AR-01 | ✅ 100% claude | Menú de comandos (BotCommands): /estado /resumen /silenciar /modo /camara /ayuda | `app/comms/commands.py` |
+| AR-02 | ✅ 100% claude | /silenciar <cat> <tiempo> → muta una categoría temporalmente | `app/comms/commands.py` |
+| AR-03 | ✅ 100% claude | /modo <manual|operativa|alto-impacto> → autonomía de seguridad en caliente | `app/comms/commands.py` |
+| AR-04 | ✅ 100% claude | /camara <nombre> → snapshot/stream + panel de acciones | `app/comms/commands.py` |
+| AR-05 | ✅ 100% claude | /resumen → digest bajo demanda; /estado → salud del sistema | `app/comms/commands.py` |
 | AR-06 | ⬜ | Chat libre con el AGENTE desde Telegram (texto → brain_bridge → respuesta) | `app/comms/chat.py` |
 | AR-07 | ⬜ | Reacciones (👍/👎) como feedback rápido → training_store | `app/comms/reactions.py` |
 

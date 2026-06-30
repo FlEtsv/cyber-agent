@@ -1,5 +1,5 @@
 """
-U-02 + U-03: Router central de mensajes salientes con niveles de importancia.
+U-02 + U-03 + AO-02..AO-04: Router central de mensajes salientes con niveles de importancia.
 
 Fuentes que pueden enviar:
   - Respuestas del agente (INFO)
@@ -10,6 +10,7 @@ Fuentes que pueden enviar:
 
 Niveles: DEBUG < INFO < SUCCESS < WARNING < ERROR < CRITICAL
 Solo pasan mensajes con nivel >= min_level configurado (defecto: INFO).
+AO-02..04: integra topics, silencio en no-molestar, digest para BAJA/PERIÓDICA.
 """
 from __future__ import annotations
 
@@ -63,6 +64,9 @@ def send_message(
     """
     Envía un mensaje por el canal configurado (Telegram) si el nivel lo permite.
 
+    AO-02..04: mensajes BAJA/PERIÓDICA van al digest; CRÍTICA nunca se silencia.
+    AN-02: si hay topics configurados, envía al tema correcto por categoría.
+
     Args:
         title: título del mensaje (negrita)
         body: cuerpo del mensaje
@@ -74,7 +78,48 @@ def send_message(
         if _muted or level < _min_level:
             return {"ok": True, "skipped": True, "reason": "filtered"}
 
+    # AO-04: mensajes de baja importancia van al digest
+    try:
+        from app.comms.levels import from_int, GOES_TO_DIGEST
+        sev = from_int(level)
+        if sev in GOES_TO_DIGEST:
+            from app.comms.digest import add_to_digest
+            add_to_digest(title=title, body=body, source=source)
+            return {"ok": True, "digest": True}
+    except Exception:
+        pass
+
+    # AO-05: comprobar horario no-molestar
+    try:
+        from app.comms.rules import should_silence
+        from app.comms.levels import from_int as _fi
+        disable_notif = should_silence(_fi(level))
+    except Exception:
+        disable_notif = False
+
     used_emoji = emoji or _LEVEL_EMOJIS.get(level, "🔔")
+
+    # AN-02: intentar envío por topic si disponible
+    try:
+        from app.comms.telegram_topics import has_forum_support, send_to_topic
+        from app.secrets_vault import get_secret
+        bot_token = get_secret("SEC_TELEGRAM_BOT_TOKEN") or get_secret("TELEGRAM_BOT_TOKEN")
+        chat_id = get_secret("SEC_TELEGRAM_CHAT_ID") or get_secret("TELEGRAM_CHAT_ID")
+        if bot_token and chat_id and has_forum_support():
+            sent = send_to_topic(
+                bot_token=bot_token,
+                chat_id=chat_id,
+                category=source,
+                title=f"{used_emoji} {title}",
+                body=body,
+                disable_notification=disable_notif,
+            )
+            if sent:
+                return {"ok": True, "topic": True}
+    except Exception:
+        pass
+
+    # Fallback: envío directo por telegram
     try:
         from app.comms.telegram import notify
         return notify(title=title, body=body, emoji=used_emoji)
