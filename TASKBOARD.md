@@ -1010,3 +1010,84 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AA-04 | ⬜ | Si no cabe nada local → Mistral NUBE para todo lo crítico | `app/security/vision_router.py` |
 | AA-05 | ⬜ | Restaurar al salir del juego (recargar modelos, reanudar vigilancia local) | `app/compute/game_mode.py` |
 | AA-06 | ⬜ | Pausar entrenamiento si arranca un juego (libera VRAM) | `app/training/scheduler.py` |
+
+---
+
+## 🎛️ SUBSISTEMA DE ENTRENAMIENTO — menú + pipeline por modelo (visión de Steve)
+> Al llegar el umbral: avisar por TODOS los medios. Menú en Ajustes: elegir modelo
+> y "Entrenar". Cada modelo tiene su FICHA con datos/umbral/destino/versiones.
+> Solo añadir tareas (compañeros activos). Estilo CyberAgent.
+
+### AB · Ficha de modelo entrenable (el "detrás" por modelo)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AB-01 | ⬜ | Esquema "ModelCard" entrenable: id, base, cuantización-train, destino(local/runpod), umbral, plantilla prompt, criticidad, uso | `app/training/model_card.py` |
+| AB-02 | ⬜ | Registrar las fichas: cyberagent-24b, codestral, visión-seguridad, router-tools | `app/training/registry.py` |
+| AB-03 | ⬜ | Mapear QUÉ datos entrenan cada modelo (fuente→modelo): chats→24b, code_specialist→codestral, detecciones→visión, tool_router→router | `app/training/data_map.py` |
+| AB-04 | ⬜ | Hiperparámetros QLoRA por modelo (rank, alpha, lr, epochs, batch) con defaults sensatos | `app/training/hparams.py` |
+| AB-05 | ⬜ | Estimador de recursos/tiempo por modelo (VRAM train, horas RunPod, coste $) | `app/training/estimate.py` |
+
+### AC · Dataset por modelo (preparación + curación)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AC-01 | ⬜ | Builder de dataset por modelo desde training_store (filtra por señal mínima) | `app/training/dataset_builder.py` |
+| AC-02 | ⬜ | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
+| AC-03 | ⬜ | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
+| AC-04 | ⬜ | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
+| AC-05 | ⬜ | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
+| AC-06 | ⬜ | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |
+
+### AD · Umbral + aviso multicanal
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AD-01 | ⬜ | Watcher de umbral por modelo (cuenta alta señal vs threshold; estado "listo") | `app/training/threshold_watcher.py` |
+| AD-02 | ⬜ | Al alcanzar umbral: avisar por COMMS (Telegram) + notificación PC + badge en web | `app/comms/*`, `apps/web/*`, `main.py` |
+| AD-03 | ⬜ | No spamear: avisar una vez por modelo hasta que se entrene o se descarte | `app/training/threshold_watcher.py` |
+| AD-04 | ⬜ | Umbral auto-sugerido y ajustable por el usuario en el menú | `apps/web/*`, `app/training/thresholds.py` |
+
+### AE · Menú Entrenamiento (Ajustes → Entrenamiento)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AE-01 | ⬜ | Sección "Entrenamiento" en Ajustes (web + PC) | `apps/web/*`, `app/widgets/*` |
+| AE-02 | ⬜ | Lista de modelos con barra de progreso (ejemplos/umbral) + estado | `apps/web/*` |
+| AE-03 | ⬜ | Badge "✅ listo para entrenar" cuando supera umbral | `apps/web/*` |
+| AE-04 | ⬜ | Botón "Entrenar <modelo>" → preflight (VRAM/presencia/seguridad/coste) → confirmar | `apps/web/*`, `app/api/*` |
+| AE-05 | ⬜ | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
+| AE-06 | ⬜ | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
+| AE-07 | ⬜ | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
+| AE-08 | ⬜ | Detalle del dataset (abre el editor AC-03) | `apps/web/*` |
+| AE-09 | ⬜ | Ajustes avanzados (hiperparámetros) plegables | `apps/web/*` |
+| AE-10 | ⬜ | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
+
+### AF · Motor de entrenamiento (pipeline real)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AF-01 | ⬜ | Orquestador: preflight → preparar dataset → lanzar train → evaluar → promover/rollback | `app/training/orchestrator.py` |
+| AF-02 | ⬜ | Preflight: usuario presente + VRAM libre + avisar a seguridad (degradar a nube) + espacio SD | `app/training/preflight.py` |
+| AF-03 | ⬜ | Runner LOCAL QLoRA (modelos que caben; PEFT/bitsandbytes) | `app/training/runner_local.py` |
+| AF-04 | ⬜ | Runner RUNPOD QLoRA (subir dataset, lanzar pod A100, recoger adapter) | `app/training/runner_runpod.py` |
+| AF-05 | ⬜ | Decisor local-vs-runpod por VRAM/tamaño/coste | `app/training/orchestrator.py` |
+| AF-06 | ⬜ | Stream de progreso (loss/paso) hacia la UI | `app/training/orchestrator.py` |
+| AF-07 | ⬜ | Merge del adapter → crear nuevo modelo Ollama (Modelfile) | `app/training/merge.py` |
+| AF-08 | ⬜ | Cancelar/pausar entrenamiento (y reanudar vigilancia local) | `app/training/orchestrator.py` |
+| AF-09 | ⬜ | Pausa automática si arranca un juego o el usuario se va (presencia) | `app/training/scheduler.py` |
+
+### AG · Evaluación + promoción + seguridad del proceso
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AG-01 | ⬜ | Suite de evaluación por modelo (holdout + tareas canónicas) | `app/training/evaluate.py` |
+| AG-02 | ⬜ | A/B nuevo-vs-actual; promover SOLO si mejora (umbral de mejora) | `app/training/evaluate.py` |
+| AG-03 | ⬜ | Versionado de adapters/modelos + rollback 1-click | `app/training/versioning.py` |
+| AG-04 | ⬜ | Backup del modelo anterior antes de promover | `app/storage/backup.py` |
+| AG-05 | ⬜ | Registro de cada entrenamiento (qué datos, hparams, métricas) para auditoría | `app/training/audit.py` |
+| AG-06 | ⬜ | Tras promover: marcar los ejemplos como "usados" (no re-entrenar con lo mismo) | `app/training_store.py` |
+| AG-07 | ⬜ | Notificar resultado por comms (mejoró X%, promovido/descartado) | `app/comms/*` |
+
+### AH · Herramientas/tools por modelo (qué tools refuerza cada uno)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| AH-01 | ⬜ | Por cada modelo, registrar QUÉ tools usa más (telemetría de uso de tools) | `app/training/tool_usage.py` |
+| AH-02 | ⬜ | Generar ejemplos de tool-use EXITOSO (orquestación correcta) como dato de entrenamiento | `app/training_store.py` |
+| AH-03 | ⬜ | Entrenar al 24b en mejor SELECCIÓN de tools (del tool_router + resultados) | `app/training/data_map.py` |
+| AH-04 | ⬜ | Entrenar al router de tools con sus aciertos/fallos de categoría | `app/training/data_map.py` |
+| AH-05 | ⬜ | Métricas: tasa de tool correcta antes/después de entrenar (medir mejora real) | `app/training/evaluate.py` |
