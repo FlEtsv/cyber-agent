@@ -1353,6 +1353,29 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
   cursor: pointer; font-size: 12.5px; font-weight: 600;
 }
 .fb-save-correction:hover { background: rgba(70,209,138,.28); }
+
+/* AE: Training section in settings */
+.training-model-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.training-loading { font-size: 13px; color: var(--text-dim,#9aa6b2); font-style: italic; }
+.training-model-row {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.training-model-ready { border-color: rgba(70,209,138,.5); background: rgba(70,209,138,.04); }
+.training-model-header { display: flex; align-items: center; gap: 8px; }
+.training-model-name { font-size: 14px; font-weight: 700; color: var(--text,#e6edf3); }
+.training-badge-ready { font-size: 11px; font-weight: 700; color: #46d18a; }
+.training-progress-bar-wrap {
+  background: var(--bg,#0d1117); border-radius: 999px; height: 6px; overflow: hidden;
+}
+.training-progress-bar {
+  height: 100%; background: linear-gradient(90deg, #46d18a, #2fa86a); border-radius: 999px;
+  transition: width .4s ease;
+}
+.training-model-meta { font-size: 11px; color: var(--text-dim,#9aa6b2); }
+.training-train-btn { margin-top: 4px; align-self: flex-start; }
+.training-actions { margin-top: 8px; }
+
 .cost-modal { display: flex; flex-direction: column; gap: 4px; min-width: min(260px, 78vw); max-width: 92vw; }
 .cost-sec-title {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;

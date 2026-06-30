@@ -370,6 +370,56 @@ async def api_camera_stream(cam_id: int, request: Request):
             "note": "stream proxy pendiente (N-08)"}
 
 
+# ── AE-01..AE-04: Training menu API ────────────────────────────────────────────
+
+@app.get("/api/training/models")
+async def api_training_models(request: Request):
+    """Lista modelos con estado del dataset (progreso hacia el umbral)."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training.threshold_watcher import check
+        from app.training.registry import all_ids
+        results = []
+        for model_id in all_ids():
+            results.append(check(model_id, notify=False))
+        return {"ok": True, "models": results}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/check")
+async def api_training_check(request: Request):
+    """Comprueba un modelo específico y envía notificación si está listo."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        model_id = str(b.get("model_id") or "")
+        from app.training.threshold_watcher import check
+        return check(model_id, notify=True)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/training/estimate/{model_id}")
+async def api_training_estimate(model_id: str, request: Request):
+    """Estimación de recursos/tiempo/coste para entrenar un modelo."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training.estimate import estimate
+        from app.training.threshold_watcher import check
+        status = check(model_id, notify=False)
+        est = estimate(model_id, n_samples=status.get("count", 500))
+        return {"ok": True, **est, "status": status}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ── G-01: Vault — listar secretos (enmascarado) + revelar con TOTP ────────────
 
 @app.get("/api/vault/list")

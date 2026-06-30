@@ -284,9 +284,75 @@
     } catch (e) { if (camModalErr) { camModalErr.textContent = String(e); camModalErr.style.display = ''; } }
   });
 
+  // ── AE-01..AE-03: Training model list in settings ───────────────────────────
+  async function _loadTrainingModels() {
+    const list = $('training-model-list');
+    if (!list) return;
+    list.innerHTML = '<div class="training-loading">Cargando…</div>';
+    try {
+      const r = await fetch('/api/training/models');
+      if (!r.ok) { list.innerHTML = '<div class="training-loading">Error cargando modelos</div>'; return; }
+      const d = await r.json();
+      if (!d.ok || !d.models) { list.innerHTML = '<div class="training-loading">Sin datos</div>'; return; }
+      list.innerHTML = '';
+      d.models.forEach(m => {
+        const row = document.createElement('div');
+        row.className = 'training-model-row' + (m.ready ? ' training-model-ready' : '');
+        const pct = m.progress_pct || 0;
+        const badge = m.ready ? '<span class="training-badge-ready">✅ Listo</span>' : '';
+        row.innerHTML = `
+          <div class="training-model-header">
+            <span class="training-model-name">${escHtml(m.model_id)}</span>
+            ${badge}
+          </div>
+          <div class="training-progress-bar-wrap">
+            <div class="training-progress-bar" style="width:${pct}%"></div>
+          </div>
+          <div class="training-model-meta">${m.count || 0} / ${m.threshold || '?'} ejemplos · ${pct}%</div>`;
+        if (m.ready) {
+          const trainBtn = document.createElement('button');
+          trainBtn.className = 'mini-btn training-train-btn';
+          trainBtn.textContent = `Entrenar ${m.model_id}`;
+          trainBtn.addEventListener('click', async () => {
+            trainBtn.textContent = 'Calculando…';
+            try {
+              const er = await fetch(`/api/training/estimate/${encodeURIComponent(m.model_id)}`);
+              const ed = await er.json();
+              if (ed.ok) {
+                const msg = `Estimación para ${m.model_id}:\n• VRAM: ${ed.vram_train_gb} GB\n• Tiempo: ~${ed.hours_estimate}h\n• GPU: ${ed.gpu_recommended}\n• Coste RunPod: $${ed.runpod_cost_usd}\n\n¿Iniciar entrenamiento?`;
+                if (confirm(msg)) {
+                  trainBtn.textContent = '⏳ Iniciando…';
+                  // AE-04: llamar al endpoint de entrenamiento (AF section)
+                  const tr = await fetch('/api/training/start', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({model_id: m.model_id}),
+                  });
+                  const td = await tr.json();
+                  trainBtn.textContent = td.ok ? '🚀 Iniciado' : ('Error: ' + td.error);
+                }
+              }
+            } catch (e) {
+              trainBtn.textContent = 'Error: ' + e.message;
+            }
+          });
+          row.appendChild(trainBtn);
+        }
+        list.appendChild(row);
+      });
+    } catch (e) {
+      list.innerHTML = '<div class="training-loading">Error: ' + escHtml(String(e)) + '</div>';
+    }
+  }
+
+  const trainingRefreshBtn = $('training-refresh-btn');
+  if (trainingRefreshBtn) trainingRefreshBtn.addEventListener('click', _loadTrainingModels);
+
   // Cargar vault cuando se abre el panel de ajustes
   const settingsBtn2 = $('settings-btn');
-  if (settingsBtn2) settingsBtn2.addEventListener('click', () => setTimeout(_loadVault, 200));
+  if (settingsBtn2) settingsBtn2.addEventListener('click', () => {
+    setTimeout(_loadVault, 200);
+    setTimeout(_loadTrainingModels, 300);
+  });
 
   const navSettings = $('nav-settings');
   if (navSettings) navSettings.addEventListener('click', () => {

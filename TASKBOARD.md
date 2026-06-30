@@ -1021,37 +1021,37 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### AB · Ficha de modelo entrenable (el "detrás" por modelo)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AB-01 | ⬜ | claude | Esquema "ModelCard" entrenable: id, base, cuantización-train, destino(local/runpod), umbral, plantilla prompt, criticidad, uso | `app/training/model_card.py` |
-| AB-02 | ⬜ | claude | Registrar las fichas: cyberagent-24b, codestral, visión-seguridad, router-tools | `app/training/registry.py` |
-| AB-03 | ⬜ | claude | Mapear QUÉ datos entrenan cada modelo (fuente→modelo): chats→24b, code_specialist→codestral, detecciones→visión, tool_router→router | `app/training/data_map.py` |
-| AB-04 | ⬜ | claude | Hiperparámetros QLoRA por modelo (rank, alpha, lr, epochs, batch) con defaults sensatos | `app/training/hparams.py` |
-| AB-05 | ⬜ | claude | Estimador de recursos/tiempo por modelo (VRAM train, horas RunPod, coste $) | `app/training/estimate.py` |
+| AB-01 | ✅ | claude | Esquema "ModelCard" entrenable: id, base, cuantización-train, destino(local/runpod), umbral, plantilla prompt, criticidad, uso | `app/training/model_card.py` |
+| AB-02 | ✅ | claude | Registrar las fichas: cyberagent-24b, codestral, visión-seguridad, router-tools | `app/training/registry.py` |
+| AB-03 | ✅ | claude | Mapear QUÉ datos entrenan cada modelo (fuente→modelo): chats→24b, code_specialist→codestral, detecciones→visión, tool_router→router | `app/training/data_map.py` |
+| AB-04 | ✅ | claude | Hiperparámetros QLoRA por modelo (rank, alpha, lr, epochs, batch) con defaults sensatos | `app/training/hparams.py` |
+| AB-05 | ✅ | claude | Estimador de recursos/tiempo por modelo (VRAM train, horas RunPod, coste $) | `app/training/estimate.py` |
 
 ### AC · Dataset por modelo (preparación + curación)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AC-01 | ⬜ | claude | Builder de dataset por modelo desde training_store (filtra por señal mínima) | `app/training/dataset_builder.py` |
-| AC-02 | ⬜ | claude | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
+| AC-01 | ✅ | claude | Builder de dataset por modelo desde training_store (filtra por señal mínima) | `app/training/dataset_builder.py` |
+| AC-02 | ✅ | claude | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
 | AC-03 | ⬜ | claude | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
-| AC-04 | ⬜ | claude | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
+| AC-04 | ✅ | claude | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
 | AC-05 | ⬜ | claude | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
-| AC-06 | ⬜ | claude | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |
+| AC-06 | ✅ | claude | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |
 
 ### AD · Umbral + aviso multicanal
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AD-01 | ⬜ | claude | Watcher de umbral por modelo (cuenta alta señal vs threshold; estado "listo") | `app/training/threshold_watcher.py` |
-| AD-02 | ⬜ | claude | Al alcanzar umbral: avisar por COMMS (Telegram) + notificación PC + badge en web | `app/comms/*`, `apps/web/*`, `main.py` |
-| AD-03 | ⬜ | claude | No spamear: avisar una vez por modelo hasta que se entrene o se descarte | `app/training/threshold_watcher.py` |
+| AD-01 | ✅ | claude | Watcher de umbral por modelo (cuenta alta señal vs threshold; estado "listo") | `app/training/threshold_watcher.py` |
+| AD-02 | ✅ | claude | Al alcanzar umbral: avisar por COMMS (Telegram) + notificación PC + badge en web | `app/comms/*`, `apps/web/*`, `main.py` |
+| AD-03 | ✅ | claude | No spamear: avisar una vez por modelo hasta que se entrene o se descarte | `app/training/threshold_watcher.py` |
 | AD-04 | ⬜ | claude | Umbral auto-sugerido y ajustable por el usuario en el menú | `apps/web/*`, `app/training/thresholds.py` |
 
 ### AE · Menú Entrenamiento (Ajustes → Entrenamiento)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| AE-01 | ⬜ | claude | Sección "Entrenamiento" en Ajustes (web + PC) | `apps/web/*`, `app/widgets/*` |
-| AE-02 | ⬜ | claude | Lista de modelos con barra de progreso (ejemplos/umbral) + estado | `apps/web/*` |
-| AE-03 | ⬜ | claude | Badge "✅ listo para entrenar" cuando supera umbral | `apps/web/*` |
-| AE-04 | ⬜ | claude | Botón "Entrenar <modelo>" → preflight (VRAM/presencia/seguridad/coste) → confirmar | `apps/web/*`, `app/api/*` |
+| AE-01 | ✅ | claude | Sección "Entrenamiento" en Ajustes (web + PC) | `apps/web/*`, `app/widgets/*` |
+| AE-02 | ✅ | claude | Lista de modelos con barra de progreso (ejemplos/umbral) + estado | `apps/web/*` |
+| AE-03 | ✅ | claude | Badge "✅ listo para entrenar" cuando supera umbral | `apps/web/*` |
+| AE-04 | ✅ | claude | Botón "Entrenar <modelo>" → preflight (VRAM/presencia/seguridad/coste) → confirmar | `apps/web/*`, `app/api/*` |
 | AE-05 | ⬜ | claude | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
 | AE-06 | ⬜ | claude | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
 | AE-07 | ⬜ | claude | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
