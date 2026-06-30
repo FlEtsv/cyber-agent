@@ -6,7 +6,7 @@ streams results back through the relay.
 NOTA: El relay está expuesto a través de Cloudflare (Proxy DNS activado).
       Cloudflare inyecta headers como CF-Connecting-IP (IP real del cliente).
 """
-import asyncio, inspect, json, os, threading, logging
+import asyncio, inspect, json, os, threading, time, logging
 from urllib.parse import quote
 import websockets
 
@@ -140,10 +140,32 @@ class RelayConnector:
         except Exception as e:
             log.error(f"[relay] No se pudieron enviar modelos: {e}")
 
+    async def _connection_watchdog(self, ws):
+        """El relay envía un ping de aplicación cada 15s. Si dejan de llegar
+        mensajes durante >45s, la conexión está muerta o MEDIO-ABIERTA (típico
+        tras un redeploy del relay: el TCP sigue vivo por el balanceador pero el
+        contenedor nuevo no nos tiene registrados → 'pc_online' falso para
+        siempre). La cerramos para forzar la reconexión automática."""
+        try:
+            while True:
+                await asyncio.sleep(10)
+                if time.time() - self._last_rx > 45:
+                    log.warning("[relay] sin tráfico del relay 45s → cierro para reconectar")
+                    try:
+                        await ws.close()
+                    except Exception:
+                        pass
+                    return
+        except asyncio.CancelledError:
+            pass
+
     async def _handle_connection(self, ws):
         """Main loop: receive messages from relay, spawn runners."""
+        self._last_rx = time.time()
+        watchdog = asyncio.create_task(self._connection_watchdog(ws))
         try:
             async for raw in ws:
+                self._last_rx = time.time()   # cualquier mensaje (incl. ping) = conexión viva
                 try:
                     msg = json.loads(raw)
                 except json.JSONDecodeError:
@@ -199,6 +221,7 @@ class RelayConnector:
         except Exception as e:
             log.error(f"[relay] Error en conexión: {e}")
         finally:
+            watchdog.cancel()
             self._stop_all_runners()
 
     async def _handle_generate_image(self, ws, msg: dict):
