@@ -46,8 +46,10 @@ def build(
     with _lock, _conn() as c:
         for kind, kind_min_signal in sources:
             eff_min = kind_min_signal if min_signal is None else max(min_signal, kind_min_signal)
+            # AC-03: excluir las muestras marcadas como excluidas por el usuario.
             rows = c.execute(
-                "SELECT * FROM samples WHERE kind=? AND signal>=? ORDER BY signal DESC LIMIT ?",
+                "SELECT * FROM samples WHERE kind=? AND signal>=? "
+                "AND COALESCE(excluded,0)=0 ORDER BY signal DESC LIMIT ?",
                 (kind, eff_min, max_samples),
             ).fetchall()
             per_kind[kind] = [dict(r) for r in rows]

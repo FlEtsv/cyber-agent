@@ -286,6 +286,36 @@ async def api_training_estimate(model_id: str, request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/api/training/samples")
+async def api_training_samples(request: Request):
+    """AC-03: lista muestras del dataset para el editor (revisar/excluir)."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        from app.training_store import list_samples
+        kind = request.query_params.get("kind") or None
+        limit = int(request.query_params.get("limit", 100))
+        offset = int(request.query_params.get("offset", 0))
+        return {"ok": True, "samples": list_samples(kind, limit, offset)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/samples/exclude")
+async def api_training_sample_exclude(request: Request):
+    """AC-03: excluir/incluir una muestra del dataset."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.training_store import set_excluded
+        return set_excluded(int(b.get("id")), bool(b.get("excluded", True)))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/training/threshold")
 async def api_training_threshold(request: Request):
     """AD-04: ajustar el umbral de entrenamiento de un modelo (override del usuario)."""
@@ -598,6 +628,228 @@ async def api_vision_metrics(request: Request):
         except Exception:
             pass
         return out
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── AJ-08 + AL-09 + AS + zones: Nuevos endpoints seguridad ───────────────────
+
+@app.post("/api/security/cat-feedback")
+async def api_cat_feedback(request: Request):
+    """AJ-08: Confirmar/corregir identificación de gato → alimenta training_store."""
+    g = _gate(request)
+    if g: return g
+    try:
+        b = await request.json()
+        cam_id = str(b.get("cam_id") or "")
+        confirmed = bool(b.get("confirmed", True))
+        correct_pet = str(b.get("correct_pet") or "")
+        signal = float(b.get("signal", 1.0 if confirmed else -1.0))
+        from app.training_store import record
+        rid = record(
+            kind="feedback",
+            instruction=f"Re-ID en cámara {cam_id}: {'correcto' if confirmed else 'incorrecto'}",
+            response=correct_pet or "confirmado",
+            signal=signal,
+        )
+        return {"ok": True, "id": rid, "cam_id": cam_id, "confirmed": confirmed}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/security/pets")
+async def api_pets_list(request: Request):
+    """Lista mascotas registradas para re-ID."""
+    g = _gate(request)
+    if g: return g
+    try:
+        from app.security.pets import list_pets
+        return {"ok": True, "pets": list_pets()}
+    except Exception as e:
+        return {"ok": False, "pets": [], "error": str(e)}
+
+
+@app.get("/api/security/heatmap")
+async def api_heatmap(request: Request):
+    """AL-09: Datos de heatmap de movimiento de gatos."""
+    g = _gate(request)
+    if g: return g
+    cat_id = request.query_params.get("cat_id", "")
+    try:
+        from app.security.space_map import get_heatmap_data
+        data = get_heatmap_data(pet_id=cat_id or None)
+        return {"ok": True, **data}
+    except Exception as e:
+        return {"ok": False, "points": [], "schedules": [], "routes": [], "error": str(e)}
+
+
+@app.get("/api/security/events")
+async def api_security_events(request: Request):
+    """Lista eventos de seguridad con filtro por cámara."""
+    g = _gate(request)
+    if g: return g
+    try:
+        cam_id = request.query_params.get("cam_id", "")
+        n = int(request.query_params.get("n", "20"))
+        from app.security.events import recent
+        evts = recent(n=n, cam_id=cam_id or None)
+        return {"ok": True, "events": evts, "count": len(evts)}
+    except Exception as e:
+        return {"ok": False, "events": [], "error": str(e)}
+
+
+@app.get("/api/security/zones")
+async def api_zones_list(request: Request):
+    """Q-06: Lista zonas de vigilancia por cámara."""
+    g = _gate(request)
+    if g: return g
+    cam_id = request.query_params.get("cam_id", "")
+    try:
+        from app.security.zones import list_zones
+        zones = list_zones(cam_id)
+        return {"ok": True, "cam_id": cam_id, "zones": [
+            {"id": z.id, "cam_id": z.cam_id, "name": z.name, "zone_type": z.zone_type,
+             "polygon": z.polygon, "enabled": z.enabled} for z in zones
+        ]}
+    except Exception as e:
+        return {"ok": False, "zones": [], "error": str(e)}
+
+
+@app.post("/api/security/zones")
+async def api_zones_add(request: Request):
+    """Q-06: Añade una zona de vigilancia."""
+    g = _gate(request)
+    if g: return g
+    try:
+        b = await request.json()
+        from app.security.zones import add_zone
+        return add_zone(
+            cam_id=str(b.get("cam_id") or ""),
+            name=str(b.get("name") or ""),
+            zone_type=str(b.get("zone_type") or "warning"),
+            polygon=b.get("polygon") or [],
+        )
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.delete("/api/security/zones/{zone_id}")
+async def api_zones_delete(zone_id: int, request: Request):
+    """Q-06: Elimina una zona."""
+    g = _gate(request)
+    if g: return g
+    try:
+        from app.security.zones import delete_zone
+        return delete_zone(zone_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/security/recordings")
+async def api_recordings_list(request: Request):
+    """P-02: Lista todas las grabaciones."""
+    g = _gate(request)
+    if g: return g
+    try:
+        cam_id = request.query_params.get("cam_id") or None
+        limit = int(request.query_params.get("limit", "50"))
+        from app.security.recorder import list_recordings
+        return {"ok": True, "recordings": list_recordings(cam_id=cam_id, limit=limit)}
+    except Exception as e:
+        return {"ok": False, "recordings": [], "error": str(e)}
+
+
+# ── AS-01..AS-05: Comms config endpoints ─────────────────────────────────────
+
+@app.get("/api/comms/config")
+async def api_comms_config(request: Request):
+    """AS-01: Configuración actual de canales de comms."""
+    g = _gate(request)
+    if g: return g
+    try:
+        from app.comms.rules import get_rules
+        from app.comms.router import get_config
+        return {"ok": True, "channels": get_config()}
+    except Exception as e:
+        return {"ok": False, "channels": [], "error": str(e)}
+
+
+@app.get("/api/comms/templates")
+async def api_comms_templates(request: Request):
+    """AS-04: Plantillas de mensajes por tipo."""
+    g = _gate(request)
+    if g: return g
+    try:
+        # Plantillas hardcoded por defecto (futuro: editables)
+        templates = [
+            {"type": "alert", "template": "🚨 *{title}*\n📷 Cámara: {cam_id}\n🎯 {description}"},
+            {"type": "cat_detect", "template": "🐱 *Gato detectado*\n📷 {cam_id}\n🏷️ {pet_name}"},
+            {"type": "system", "template": "⚙️ *Sistema*\n{message}"},
+            {"type": "digest", "template": "📊 *Resumen* — {period}\n{items}"},
+        ]
+        return {"ok": True, "templates": templates}
+    except Exception as e:
+        return {"ok": False, "templates": [], "error": str(e)}
+
+
+@app.post("/api/comms/no-disturb")
+async def api_comms_no_disturb(request: Request):
+    """AS-01: Configura horario sin alertas."""
+    g = _gate(request)
+    if g: return g
+    try:
+        b = await request.json()
+        from app.comms.rules import set_no_disturb_schedule
+        set_no_disturb_schedule(b.get("from", "22:00"), b.get("to", "08:00"))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/comms/digest-config")
+async def api_comms_digest_config(request: Request):
+    """AS-03: Configura intervalo del digest."""
+    g = _gate(request)
+    if g: return g
+    try:
+        b = await request.json()
+        from app.comms.digest import set_interval
+        set_interval(int(b.get("interval_minutes", 30)))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/comms/digest-flush")
+async def api_comms_digest_flush(request: Request):
+    """AS-01: Fuerza el envío del digest ahora."""
+    g = _gate(request)
+    if g: return g
+    try:
+        from app.comms.digest import flush
+        flush()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/comms/test")
+async def api_comms_test(request: Request):
+    """AS-05: Envía una notificación de prueba."""
+    g = _gate(request)
+    if g: return g
+    try:
+        b = await request.json()
+        topic = str(b.get("topic") or "notifications")
+        from app.comms.router import send
+        from app.comms.levels import Severity
+        result = send(
+            title="Test desde CyberAgent",
+            body=f"Prueba de notificación al tema '{topic}'.",
+            severity=Severity.BAJA,
+            topic=topic,
+        )
+        return {"ok": True, "result": result}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

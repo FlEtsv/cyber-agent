@@ -1035,7 +1035,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 |----|---|--------|-------|----------|
 | AC-01 | ✅ | claude | Builder de dataset por modelo desde training_store (filtra por señal mínima) | `app/training/dataset_builder.py` |
 | AC-02 | ✅ | claude | Dedup + balanceo (no sobre-representar un tipo de ejemplo) | `app/training/dataset_builder.py` |
-| AC-03 | ⬜ | claude | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
+| AC-03 | OK 100% claude | claude | Editor/revisor de dataset en la UI: ver, excluir, etiquetar ejemplos antes de entrenar | `apps/web/*` |
 | AC-04 | ✅ | claude | Split train/eval (holdout para la evaluación A/B) | `app/training/dataset_builder.py` |
 | AC-05 | ✅ 100% claude | claude | Export a jsonl chat (formato del entrenador) comprimido, versionado en la SD | `app/storage/datasets.py` |
 | AC-06 | ✅ | claude | Anonimizar/limpiar PII sensible antes de entrenar | `app/training/sanitize.py` |

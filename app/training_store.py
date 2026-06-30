@@ -53,6 +53,9 @@ def _init():
         cols = [r[1] for r in c.execute("PRAGMA table_info(samples)").fetchall()]
         if "used" not in cols:
             c.execute("ALTER TABLE samples ADD COLUMN used INTEGER DEFAULT 0")
+        # AC-03: columna 'excluded' para el editor de dataset (excluir ejemplos)
+        if "excluded" not in cols:
+            c.execute("ALTER TABLE samples ADD COLUMN excluded INTEGER DEFAULT 0")
         c.executescript(_DDL_USED_IDX)
 
 
@@ -113,6 +116,40 @@ def mark_used(ids: list[int]) -> int:
         placeholders = ",".join("?" for _ in ids)
         c.execute(f"UPDATE samples SET used=1 WHERE id IN ({placeholders})", ids)
         return len(ids)
+
+
+# ── AC-03: editor de dataset (listar / excluir ejemplos) ─────────────────────
+
+def list_samples(kind: str | None = None, limit: int = 100, offset: int = 0,
+                 include_excluded: bool = True) -> list[dict]:
+    """Lista muestras (para el editor de dataset). Recorta los textos largos."""
+    q = "SELECT id, ts, kind, instruction, response, signal, used, excluded FROM samples"
+    conds, params = [], []
+    if kind:
+        conds.append("kind=?")
+        params.append(kind)
+    if not include_excluded:
+        conds.append("COALESCE(excluded,0)=0")
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
+    q += " ORDER BY id DESC LIMIT ? OFFSET ?"
+    params += [int(limit), int(offset)]
+    with _lock, _conn() as c:
+        rows = c.execute(q, params).fetchall()
+    out = []
+    for r in rows:
+        out.append({"id": r[0], "ts": r[1], "kind": r[2],
+                    "instruction": (r[3] or "")[:400], "response": (r[4] or "")[:400],
+                    "signal": r[5], "used": bool(r[6]), "excluded": bool(r[7])})
+    return out
+
+
+def set_excluded(sample_id: int, excluded: bool = True) -> dict:
+    """Excluye/incluye una muestra del dataset de entrenamiento."""
+    with _lock, _conn() as c:
+        c.execute("UPDATE samples SET excluded=? WHERE id=?",
+                  (1 if excluded else 0, int(sample_id)))
+    return {"ok": True, "id": int(sample_id), "excluded": bool(excluded)}
 
 
 # ── Lectura / stats ───────────────────────────────────────────────────────────
