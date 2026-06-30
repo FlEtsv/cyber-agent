@@ -747,16 +747,39 @@ class CyberAgent {
     const footer = document.createElement('div');
     footer.className = 'msg-feedback';
 
+    // W-01+W-08: botones 👍/👎 con captura en training_store
+    const _sendFeedback = (positive) => {
+      const instruction = this._lastUserText || '';
+      const response = bubble.contentEl ? bubble.contentEl.innerText : '';
+      fetch('/api/training/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction, response, positive }),
+      }).catch(() => {});
+      this._recordReportEvent('feedback', { useful: positive, model: model || 'local' });
+    };
+
     const useful = document.createElement('button');
     useful.className = 'fb-btn fb-useful';
     useful.type = 'button';
-    useful.innerHTML = '<span class="fb-ic">✓</span> ¿Es útil?';
-    useful.title = 'Marca esta respuesta como útil';
+    useful.innerHTML = '👍';
+    useful.title = 'Respuesta útil — guarda en training store';
     useful.addEventListener('click', () => {
-      footer.innerHTML = '<span class="fb-thanks">✓ Gracias por el feedback</span>';
-      this._recordReportEvent('feedback', { useful: true, model: model || 'local' });
+      footer.innerHTML = '<span class="fb-thanks">👍 Guardado</span>';
+      _sendFeedback(true);
     });
     footer.appendChild(useful);
+
+    const notUseful = document.createElement('button');
+    notUseful.className = 'fb-btn fb-not-useful';
+    notUseful.type = 'button';
+    notUseful.innerHTML = '👎';
+    notUseful.title = 'Respuesta no útil — guarda señal negativa en training store';
+    notUseful.addEventListener('click', () => {
+      footer.innerHTML = '<span class="fb-thanks">👎 Guardado</span>';
+      _sendFeedback(false);
+    });
+    footer.appendChild(notUseful);
 
     if (target) {
       const esc = document.createElement('button');
@@ -767,6 +790,45 @@ class CyberAgent {
       esc.addEventListener('click', () => this._escalate(target, footer));
       footer.appendChild(esc);
     }
+
+    // W-05: botón "✏️ Corregir" — abre textarea para enviar la corrección correcta
+    const editBtn = document.createElement('button');
+    editBtn.className = 'fb-btn fb-edit';
+    editBtn.type = 'button';
+    editBtn.innerHTML = '✏️';
+    editBtn.title = 'La respuesta era incorrecta: escribe la correcta para entrenar al modelo';
+    editBtn.addEventListener('click', () => {
+      if (footer.querySelector('.fb-correction-box')) return;
+      const box = document.createElement('div');
+      box.className = 'fb-correction-box';
+      const ta = document.createElement('textarea');
+      ta.className = 'fb-correction-ta';
+      ta.placeholder = 'Escribe la respuesta correcta…';
+      ta.rows = 3;
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'fb-btn fb-save-correction';
+      saveBtn.type = 'button';
+      saveBtn.textContent = 'Guardar corrección';
+      saveBtn.addEventListener('click', () => {
+        const correction = ta.value.trim();
+        if (!correction) return;
+        fetch('/api/training/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instruction: this._lastUserText || '',
+            response: correction,
+            positive: true,
+            kind: 'correction',
+          }),
+        }).catch(() => {});
+        footer.innerHTML = '<span class="fb-thanks">✏️ Corrección guardada</span>';
+      });
+      box.appendChild(ta);
+      box.appendChild(saveBtn);
+      footer.appendChild(box);
+    });
+    footer.appendChild(editBtn);
 
     // WEBPROD-009: botón de gasto ($) de esta respuesta.
     if (this._pendingCost) {
@@ -782,6 +844,54 @@ class CyberAgent {
     }
 
     body.appendChild(footer);
+
+    // W-02: feedback sobre el RAZONAMIENTO (separado de la respuesta)
+    if (bubble._reasoning && bubble._reasoning.trim()) {
+      const rfooter = document.createElement('div');
+      rfooter.className = 'msg-feedback msg-feedback-reasoning';
+
+      const rlabel = document.createElement('span');
+      rlabel.className = 'fb-reasoning-label';
+      rlabel.textContent = '¿Razonamiento correcto?';
+      rfooter.appendChild(rlabel);
+
+      const _sendReasoningFb = (positive) => {
+        fetch('/api/training/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instruction: this._lastUserText || '',
+            response: bubble._reasoning,
+            positive,
+            kind: 'reasoning',
+          }),
+        }).catch(() => {});
+      };
+
+      const rOk = document.createElement('button');
+      rOk.className = 'fb-btn fb-r-ok';
+      rOk.type = 'button';
+      rOk.innerHTML = '🧠✓';
+      rOk.title = 'El razonamiento fue correcto';
+      rOk.addEventListener('click', () => {
+        rfooter.innerHTML = '<span class="fb-thanks">🧠 Guardado</span>';
+        _sendReasoningFb(true);
+      });
+      rfooter.appendChild(rOk);
+
+      const rBad = document.createElement('button');
+      rBad.className = 'fb-btn fb-r-bad';
+      rBad.type = 'button';
+      rBad.innerHTML = '🧠✗';
+      rBad.title = 'El razonamiento fue incorrecto';
+      rBad.addEventListener('click', () => {
+        rfooter.innerHTML = '<span class="fb-thanks">🧠 Señal negativa guardada</span>';
+        _sendReasoningFb(false);
+      });
+      rfooter.appendChild(rBad);
+
+      body.appendChild(rfooter);
+    }
   }
 
   _showCostModal(cost) {

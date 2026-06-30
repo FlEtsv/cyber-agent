@@ -232,6 +232,53 @@ async def api_training_stats(request: Request):
         return {"ok": False, "error": str(e)}
 
 
+@app.post("/api/training/feedback")
+async def api_training_feedback(request: Request):
+    """W-01: captura feedback 👍/👎 desde la web → training_store."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        positive = bool(b.get("positive", True))
+        instruction = str(b.get("instruction") or "")[:2000]
+        response = str(b.get("response") or "")[:4000]
+        kind = str(b.get("kind") or "feedback")
+        from app.training_store import record_feedback, record
+        if kind == "feedback":
+            row_id = record_feedback(instruction, response, positive)
+        else:
+            # W-02: reasoning feedback o cualquier otro kind custom
+            row_id = record(kind=kind, instruction=instruction, response=response,
+                            signal=1 if positive else -1)
+        return {"ok": True, "id": row_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/security/feedback")
+async def api_security_feedback(request: Request):
+    """W-06: feedback de detección de seguridad (correcto/falso pos/neg)."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.security.feedback import record_detection_feedback
+        row_id = record_detection_feedback(
+            event_description=str(b.get("event_description") or "")[:1000],
+            model_decision=str(b.get("model_decision") or "")[:500],
+            correct=bool(b.get("correct", False)),
+            false_positive=bool(b.get("false_positive", False)),
+            false_negative=bool(b.get("false_negative", False)),
+            camera_id=b.get("camera_id"),
+            zone=b.get("zone"),
+        )
+        return {"ok": True, "id": row_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/training/export")
 async def api_training_export(request: Request):
     g = _gate(request)

@@ -559,6 +559,19 @@ class AgentRunner:
 
             self._q.put({"type": "done", "data": full})
 
+            # W-03: registrar interacción en training_store con modelo etiquetado
+            try:
+                from app.training_store import record
+                record(
+                    kind="interaction",
+                    instruction=last_user,
+                    response=full,
+                    signal=0,
+                    meta={"model": self.model, "tool_count": tool_execution_count},
+                )
+            except Exception:
+                pass
+
             # Aviso push al móvil de que la tarea terminó (útil si te alejaste).
             # Solo cuando hubo trabajo real (herramientas) para no spamear.
             _task_elapsed = _time.monotonic() - _task_start

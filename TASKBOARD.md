@@ -810,8 +810,8 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | K-01 | ✅ | claude | Esquema training_store (instrucción/respuesta/señal) | `app/training_store.py` |
-| K-02 | ⬜ | claude | Hook: capturar decisión a resultado de eventos | `app/security/events.py` |
-| K-03 | ⬜ | claude | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
+| K-02 | ✅ | claude | Hook: capturar decisión a resultado de eventos | `app/security/events.py` |
+| K-03 | ✅ | claude | Hook: capturar feedback mas/menos | `app/security/feedback.py` |
 | K-04 | ✅ | claude | Hook: capturar aprobaciones/rechazos del agente | `app/api/agent_runner.py` |
 | K-05 | ✅ | claude | Export a formato QLoRA (jsonl chat) | `app/training_store.py` |
 | K-06 | ⬜ | claude | Pipeline de entrenamiento en RunPod (script + doc) | `integrations/training/runpod_qlora.md` |
@@ -960,8 +960,8 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | W-03 | ✅ | claude | Etiquetar QUÉ MODELO generó cada respuesta (para entrenar al correcto) | `app/api/agent_runner.py` |
 | W-04 | ✅ | claude | Capturar aprobaciones/rechazos de tools como señal de preferencia | `app/api/agent_runner.py` |
 | W-05 | ✅ | claude | Capturar CORRECCIONES del usuario (reescribe/corrige) → par instrucción→buena-respuesta | `app/training_store.py` |
-| W-06 | ⬜ | claude | Feedback de seguridad (detección amenaza correcta? falso pos/neg) → dataset del modelo de visión | `app/security/feedback.py` |
-| W-07 | ⬜ | claude | Normalizar todo a formato entrenamiento (chat jsonl con peso/señal) | `app/training_store.py` |
+| W-06 | ✅ | claude | Feedback de seguridad (detección amenaza correcta? falso pos/neg) → dataset del modelo de visión | `app/security/feedback.py` |
+| W-07 | ✅ | claude | Normalizar todo a formato entrenamiento (chat jsonl con peso/señal) | `app/training_store.py` |
 | W-08 | ✅ | claude | UI: botones de feedback de razonamiento (correcto/incorrecto) en cada respuesta | `apps/web/*` |
 
 ### X · Auto-entrenamiento por modelo (umbral, scheduling, QLoRA)

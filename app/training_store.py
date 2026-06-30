@@ -175,7 +175,16 @@ def export(
                 messages.append({"role": "assistant", "content": response.strip()})
 
             if len(messages) >= 2:
-                f.write(json.dumps({"messages": messages}, ensure_ascii=False) + "\n")
+                # W-07: incluir señal normalizada como weight para fine-tuning
+                signal = float(row["signal"] or 0.0)
+                weight = max(0.0, (signal + 1.0) / 2.0)  # [-1,1] → [0,1]
+                meta = json.loads(row["meta"] or "{}")
+                entry: dict = {"messages": messages, "weight": round(weight, 4)}
+                if meta.get("model"):
+                    entry["model"] = meta["model"]
+                if row["kind"]:
+                    entry["kind"] = row["kind"]
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
                 written += 1
 
     return out_path
