@@ -923,3 +923,21 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | U-04 | ⬜ | (futuro) múltiples chats/canales por tipo; de momento un solo chat | `app/comms/*` |
 | U-05 | ⬜ | Comandos del módulo de comunicación (config, silenciar, filtrar) | `app/comms/commands.py` |
 | U-06 | ⬜ | Plan de presentación de mensajes (formato por tipo/importancia) | `docs/COMMS_PLAN.md` |
+
+---
+
+## ⚖️ V · COORDINACIÓN DE VRAM/GPU (usuario vs seguridad) — 16 GB compartidos
+> Estrategia: vigilancia continua en CPU (0 VRAM); GPU/nube solo con movimiento;
+> usuario tiene prioridad de GPU, seguridad cae a NUBE cuando la GPU está ocupada.
+> Así la seguridad NUNCA bloquea al usuario y el usuario NUNCA ciega la seguridad.
+
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| V-01 | ⬜ | Capa 0: detección de MOVIMIENTO en CPU (OpenCV/ffmpeg) por cámara, sin GPU | `app/security/motion_cpu.py` |
+| V-02 | ⬜ | Árbitro de GPU (broker): estado "GPU ocupada por usuario" consultable; seguridad lo respeta | `app/security/gpu_broker.py` |
+| V-03 | ⬜ | Router de visión: GPU libre→VLM local; GPU ocupada→Pixtral nube; amenaza→siempre nube | `app/security/vision_router.py` |
+| V-04 | ⬜ | Prioridad: la inferencia del usuario NUNCA espera por seguridad (seguridad degrada a nube) | `app/security/gpu_broker.py`, `app/ollama_client.py` |
+| V-05 | ⬜ | Co-residencia: cerbero 24B Q3 (~11GB) + VLM triage (~2.5GB) caben juntos; validar VRAM real | `docs/VISION_MODEL.md` |
+| V-06 | ⬜ | Backpressure/cola: si llegan muchos frames con movimiento, descartar/encolar sin saturar | `app/security/vision_pipeline.py` |
+| V-07 | ⬜ | Métricas: cuánto se usó CPU vs GPU vs nube (coste/latencia) en el dashboard | `apps/web/*`, `app/security/*` |
+| V-08 | ⬜ | Modo "no molestar visión local" cuando el usuario está en tarea pesada (juego/render) | `app/security/gpu_broker.py` |
