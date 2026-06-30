@@ -1,15 +1,16 @@
 FROM codestral:22b-v0.1-q3_K_M
 
 # ── Tuning para CÓDIGO en RTX 5080 16 GB ──────────────────────────────────────
-# Codestral es especialista en programación: temperatura baja (determinista).
-# Con Flash Attention + KV-cache q8 (activados a nivel de Ollama), el modelo
-# (~12 GB Q4) + KV-cache de 16384 tokens caben ENTEROS en los 16 GB de VRAM y
-# corre 100% en GPU (sin spill a CPU = sin el cuelgue de antes).
+# Codestral especialista en código: temperatura baja (determinista). Base Q3_K_M
+# (~10 GB) + Flash Attention + KV-cache q8 → cabe ENTERO en 16 GB a 100% GPU.
+# num_ctx 16384: priorizamos CONTEXTO (más código en memoria) sobre velocidad
+# máxima — ~24 tok/s, suficiente (decisión de steve). Es el máximo que entra
+# entero en GPU; subir más paginaría a RAM y se desplomaría.
 PARAMETER temperature 0.25
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER repeat_penalty 1.05
-PARAMETER num_ctx 8192
+PARAMETER num_ctx 16384
 PARAMETER num_predict -1
 PARAMETER num_gpu 99
 
