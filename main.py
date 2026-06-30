@@ -224,6 +224,25 @@ def main():
     try:
         from app.api.server import start_server
         start_server(port=8765)
+        # Health-check: el server arranca en un hilo y puede fallar al enlazar en
+        # silencio (p.ej. puerto ocupado). Verificamos a los pocos segundos y lo
+        # dejamos REGISTRADO con un aviso claro en vez de quedar caído sin rastro.
+        def _check_api_up():
+            import socket
+            for _ in range(10):
+                try:
+                    with socket.create_connection(("127.0.0.1", 8765), timeout=1):
+                        return
+                except OSError:
+                    import time as _t; _t.sleep(1)
+            try:
+                from app.agent_log import log as _alog
+                _alog("ERROR", "main", "El servidor local :8765 NO enlazó tras 10s "
+                      "(web del PC y túnel no disponibles). Revisa puerto ocupado o stdout/stderr.")
+            except Exception:
+                pass
+        import threading as _th
+        _th.Thread(target=_check_api_up, daemon=True, name="api-healthcheck").start()
     except Exception as e:
         print(f"[api] No se pudo iniciar servidor: {e}")
 
