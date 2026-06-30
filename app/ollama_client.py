@@ -111,6 +111,36 @@ def unload_model(model: str) -> bool:
         return False
 
 
+def _norm_model(name: str) -> str:
+    """'x' y 'x:latest' son el mismo modelo a efectos de comparación."""
+    name = (name or "").strip()
+    return name[:-7] if name.endswith(":latest") else name
+
+
+def ensure_single_local_model(target: str) -> None:
+    """Garantiza que SOLO `target` esté cargado en GPU: descarga cualquier OTRO
+    modelo local antes de cargar el nuevo. En 16 GB no caben dos modelos grandes
+    a la vez — sin esto, cambiar de modelo revienta la VRAM (paginación/OOM).
+    Idempotente: si `target` ya está cargado (o no hay nada), no hace nada."""
+    target = (target or "").strip()
+    if not target:
+        return
+    try:
+        r = httpx.get("http://localhost:11434/api/ps", timeout=4.0)
+        loaded = [m.get("name", "") for m in r.json().get("models", [])]
+    except Exception:
+        return
+    tgt = _norm_model(target)
+    for name in loaded:
+        if name and _norm_model(name) != tgt:
+            try:
+                unload_model(name)
+                log("INFO", "ollama", "Modelo descargado para liberar VRAM",
+                    {"unloaded": name, "loading": target})
+            except Exception:
+                pass
+
+
 def _build_base_prompt() -> str:
     from datetime import datetime
     return f"""Eres CyberAgent, el agente personal de Steve. {datetime.now().strftime("%d/%m/%Y %H:%M")}
@@ -824,6 +854,11 @@ class AgentWorker(QThread):
             "options":  {"num_ctx": num_ctx, "temperature": 0.3, "top_p": 0.95,
                          "repeat_penalty": 1.05, "top_k": 40},
         }
+
+        # Antes de cargar este modelo, descarga cualquier OTRO modelo local de la
+        # GPU: en 16 GB no caben dos grandes a la vez (sin esto, cambiar de modelo
+        # revienta la VRAM). Idempotente si ya está cargado el correcto.
+        ensure_single_local_model(self.model)
 
         # 300s read: cubre carga del modelo desde disco (14GB GGUF → 2-4 min en NVMe)
         _t = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=5.0)
