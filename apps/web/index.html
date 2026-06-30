@@ -279,25 +279,52 @@
         </div>
       </div>
 
-      <!-- Panel: Cámaras (F-01 — DESACTIVADO) -->
+      <!-- Panel: Cámaras (N-01..N-06 — CRUD activo, stream PENDIENTE) -->
       <div class="sec-panel" id="sec-panel-cameras">
-        <div class="sec-disabled-overlay">
-          <span class="sec-lock">🔒</span>
-          <span>Módulo desactivado — <code>SECURITY_ENABLED=0</code></span>
-        </div>
-        <div class="sec-panel-header sec-blurred">
+        <div class="sec-panel-header">
           <span class="sec-panel-ico">📷</span>
           <div>
             <div class="sec-panel-title">Cámaras</div>
-            <div class="sec-panel-sub">Grid de cámaras IP / HA · snapshots · seguimiento RTSP</div>
+            <div class="sec-panel-sub">Gestión de cámaras · CRUD activo · stream requiere SECURITY_ENABLED=1</div>
           </div>
-          <span class="badge-soon">próximamente</span>
+          <button class="mini-btn" id="cam-back-btn" style="display:none">← Volver</button>
         </div>
-        <div class="sec-cam-grid sec-blurred">
-          <div class="sec-cam-placeholder"><span>CAM-01</span><div class="sec-cam-thumb"></div></div>
-          <div class="sec-cam-placeholder"><span>CAM-02</span><div class="sec-cam-thumb"></div></div>
-          <div class="sec-cam-placeholder"><span>CAM-03</span><div class="sec-cam-thumb"></div></div>
-          <div class="sec-cam-placeholder"><span>CAM-04</span><div class="sec-cam-thumb"></div></div>
+        <!-- N-03: barra de acciones del dashboard -->
+        <div class="cam-actions">
+          <button class="mini-btn" id="cam-add-btn">+ Añadir cámara</button>
+          <button class="mini-btn cam-refresh-btn" id="cam-refresh-btn">↻ Actualizar</button>
+        </div>
+        <!-- N-01: grid de cámaras -->
+        <div class="sec-cam-grid" id="cam-grid">
+          <div class="sec-cam-placeholder cam-loading">Cargando cámaras…</div>
+        </div>
+
+        <!-- N-03: modal añadir cámara (oculto por defecto) -->
+        <div class="cam-modal-backdrop" id="cam-modal" style="display:none">
+          <div class="cam-modal">
+            <div class="cam-modal-title">Añadir cámara</div>
+            <label>Nombre <input class="settings-input" id="cam-f-name" placeholder="Ej: Jardín Norte"></label>
+            <label>Tipo
+              <select class="settings-input" id="cam-f-kind">
+                <option value="interior">Interior</option>
+                <option value="exterior">Exterior</option>
+              </select>
+            </label>
+            <label>Fuente
+              <select class="settings-input" id="cam-f-source-type">
+                <option value="ha">Home Assistant entity</option>
+                <option value="rtsp">RTSP</option>
+                <option value="usb">USB local</option>
+              </select>
+            </label>
+            <label>URL / Entity ID <input class="settings-input" id="cam-f-source-url" placeholder="camera.entrada o rtsp://…"></label>
+            <label>Ubicación <input class="settings-input" id="cam-f-location" placeholder="Descripción de la ubicación"></label>
+            <div class="cam-modal-actions">
+              <button class="mini-btn" id="cam-modal-cancel">Cancelar</button>
+              <button class="mini-btn cam-modal-save" id="cam-modal-save">Guardar</button>
+            </div>
+            <div id="cam-modal-err" class="cam-modal-err" style="display:none"></div>
+          </div>
         </div>
       </div>
 

@@ -293,6 +293,83 @@ async def api_training_export(request: Request):
         return {"ok": False, "error": str(e)}
 
 
+# ── N-07: Cameras CRUD ────────────────────────────────────────────────────────
+
+@app.get("/api/cameras")
+async def api_cameras_list(request: Request):
+    """Lista todas las cámaras registradas."""
+    g = _gate(request)
+    if g:
+        return g
+    from app.security.cameras_db import list_cameras
+    kind = request.query_params.get("kind")
+    enabled_only = request.query_params.get("enabled_only", "").lower() == "true"
+    return {"ok": True, "cameras": list_cameras(kind=kind or None, enabled_only=enabled_only)}
+
+
+@app.post("/api/cameras")
+async def api_cameras_add(request: Request):
+    """Añade una cámara."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.security.cameras_db import add_camera
+        return add_camera(
+            name=str(b.get("name") or ""),
+            kind=str(b.get("kind") or "interior"),
+            source_type=str(b.get("source_type") or "ha"),
+            source_url=str(b.get("source_url") or ""),
+            location=str(b.get("location") or ""),
+            zones=b.get("zones") or [],
+            tools=b.get("tools") or [],
+        )
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.put("/api/cameras/{cam_id}")
+async def api_cameras_update(cam_id: int, request: Request):
+    """Actualiza una cámara existente."""
+    g = _gate(request)
+    if g:
+        return g
+    try:
+        b = await request.json()
+        from app.security.cameras_db import update_camera
+        return update_camera(cam_id, **b)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.delete("/api/cameras/{cam_id}")
+async def api_cameras_delete(cam_id: int, request: Request):
+    """Elimina una cámara."""
+    g = _gate(request)
+    if g:
+        return g
+    from app.security.cameras_db import delete_camera
+    return delete_camera(cam_id)
+
+
+# ── N-08: Stream proxy stub ────────────────────────────────────────────────────
+
+@app.get("/api/cameras/{cam_id}/stream")
+async def api_camera_stream(cam_id: int, request: Request):
+    """N-08: proxy de stream de cámara (stub — requiere go2rtc/ffmpeg)."""
+    g = _gate(request)
+    if g:
+        return g
+    from app.security.cameras_db import get_camera
+    cam = get_camera(cam_id=cam_id)
+    if not cam:
+        return {"ok": False, "error": "Cámara no encontrada"}
+    # Stub: devuelve la URL de origen para que el cliente la use directamente
+    return {"ok": True, "cam_id": cam_id, "source_url": cam["source_url"],
+            "note": "stream proxy pendiente (N-08)"}
+
+
 # ── G-01: Vault — listar secretos (enmascarado) + revelar con TOTP ────────────
 
 @app.get("/api/vault/list")

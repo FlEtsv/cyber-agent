@@ -992,7 +992,7 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
 .sec-lock { font-size: 28px; }
 .sec-blurred { filter: blur(3px); pointer-events: none; user-select: none; }
 
-/* Grid de cámaras placeholder */
+/* Grid de cámaras */
 .sec-cam-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 22px;
 }
@@ -1001,10 +1001,46 @@ input[type=color].modal-input { height: 38px; padding: 3px; cursor: pointer; }
   display: flex; flex-direction: column; gap: 6px; padding: 10px;
   font-size: 11px; font-weight: 600; color: var(--dim);
 }
+.cam-loading { opacity: 0.6; font-style: italic; }
 .sec-cam-thumb {
   width: 100%; padding-top: 56%; background: var(--bg); border-radius: 4px;
   border: 1px dashed var(--border); position: relative;
 }
+.sec-cam-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; overflow: hidden;
+}
+.sec-cam-card:hover { border-color: var(--accent-line, #3a4a63); }
+.sec-cam-thumb-real {
+  width: 100%; padding-top: 56%; background: var(--bg); border-radius: 4px;
+  border: 1px solid var(--border); position: relative; display: flex; align-items: center; justify-content: center;
+}
+.sec-cam-no-stream {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 28px; opacity: 0.3;
+}
+.sec-cam-info { display: flex; flex-direction: column; gap: 2px; }
+.sec-cam-name { font-size: 13px; font-weight: 600; color: var(--text, #e6edf3); }
+.sec-cam-meta { font-size: 11px; color: var(--text-dim, #9aa6b2); }
+.sec-cam-status { font-size: 11px; font-weight: 600; }
+.sec-cam-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.cam-actions { display: flex; gap: 8px; padding: 0 22px 10px; }
+
+/* Modal de cámara */
+.cam-modal-backdrop {
+  position: absolute; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+  border-radius: var(--r);
+}
+.cam-modal {
+  background: var(--bg2, #161b22); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 22px; display: flex; flex-direction: column; gap: 10px; min-width: min(320px, 90vw);
+}
+.cam-modal-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.cam-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.cam-modal-save { background: rgba(70,209,138,.15); color: #46d18a; border-color: rgba(70,209,138,.4); }
+.cam-modal-save:hover { background: rgba(70,209,138,.28); }
+.cam-modal-err { color: #f08080; font-size: 12px; margin-top: 4px; }
 
 /* Timeline de eventos */
 .sec-timeline { display: flex; flex-direction: column; gap: 0; padding: 16px 22px; }

@@ -840,14 +840,14 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### N · Dashboard de Cámaras (rejilla principal)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| N-01 | ⬜ | claude | Layout dashboard de cámaras (grid responsive, web + PC) | `apps/web/*`, `app/widgets/*` |
+| N-01 | ✅ | claude | Layout dashboard de cámaras (grid responsive, web + PC) | `apps/web/*`, `app/widgets/*` |
 | N-02 | ⬜ | claude | Tarjeta de cámara con stream EN TIEMPO REAL (HA camera_proxy / RTSP a WebRTC-HLS-MJPEG) | `apps/web/*`, `app/security/stream.py` |
-| N-03 | ⬜ | claude | Botón "Añadir cámara" (modal: nombre, tipo exterior/interior, RTSP/HA entity, ubicación) | `apps/web/*` |
-| N-04 | ⬜ | claude | Botón "Volver a CyberAgent" | `apps/web/*` |
-| N-05 | ⬜ | claude | Botón "Abrir agente con contexto de cámara" (seleccionar cámara a chat contextualizado) | `apps/web/*`, `app/api/*` |
-| N-06 | ⬜ | claude | Estado por cámara (online/offline, IA activa, última detección) | `apps/web/*` |
-| N-07 | ⬜ | claude | Backend: CRUD de cámaras en DB (tipo, fuente, ubicación, zonas, tools asignadas) | `app/security/cameras_db.py` |
-| N-08 | ⬜ | claude | Backend: proxy de stream en vivo (go2rtc o ffmpeg RTSP a WebRTC) | `app/security/stream.py` |
+| N-03 | ✅ | claude | Botón "Añadir cámara" (modal: nombre, tipo exterior/interior, RTSP/HA entity, ubicación) | `apps/web/*` |
+| N-04 | ✅ | claude | Botón "Volver a CyberAgent" | `apps/web/*` |
+| N-05 | ✅ | claude | Botón "Abrir agente con contexto de cámara" (seleccionar cámara a chat contextualizado) | `apps/web/*`, `app/api/*` |
+| N-06 | ✅ | claude | Estado por cámara (online/offline, IA activa, última detección) | `apps/web/*` |
+| N-07 | ✅ | claude | Backend: CRUD de cámaras en DB (tipo, fuente, ubicación, zonas, tools asignadas) | `app/security/cameras_db.py` |
+| N-08 | ✅ | claude | Backend: proxy de stream en vivo (go2rtc o ffmpeg RTSP a WebRTC) | `app/security/stream.py` |
 
 ### O · Vista de cámara individual (IA en vivo)
 | ID | E | Agente | Tarea | Archivos |

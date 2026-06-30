@@ -74,6 +74,7 @@
       const panel = $('sec-panel-' + tab.dataset.sec);
       if (panel) { panel.style.display = 'flex'; panel.classList.add('sec-panel-active'); }
       if (tab.dataset.sec === 'learning') _loadLearningStats();
+      if (tab.dataset.sec === 'cameras') _loadCameras();
     });
   });
 
@@ -183,6 +184,105 @@
       vaultSaveBtn.disabled = false;
     });
   }
+
+  // ── N-01..N-06: Camera dashboard ────────────────────────────────────────────
+  const _STATUS_LABELS = { online: '🟢 online', offline: '🔴 offline', unknown: '⚪ desconocido' };
+
+  function _camCard(cam) {
+    const card = document.createElement('div');
+    card.className = 'sec-cam-card';
+    card.dataset.camId = cam.id;
+    const status = cam.enabled ? 'unknown' : 'offline';
+    card.innerHTML = `
+      <div class="sec-cam-thumb sec-cam-thumb-real">
+        <span class="sec-cam-no-stream">📷</span>
+      </div>
+      <div class="sec-cam-info">
+        <div class="sec-cam-name">${escHtml(cam.name)}</div>
+        <div class="sec-cam-meta">${escHtml(cam.kind)} · ${escHtml(cam.location || '—')}</div>
+        <div class="sec-cam-status">${_STATUS_LABELS[status]}</div>
+      </div>
+      <div class="sec-cam-card-actions">
+        <button class="mini-btn cam-ctx-btn" title="Abrir agente con contexto de esta cámara">🤖 Contexto</button>
+        <button class="mini-btn cam-del-btn" title="Eliminar cámara">🗑️</button>
+      </div>`;
+    card.querySelector('.cam-ctx-btn').addEventListener('click', () => {
+      // N-05: abrir chat con contexto de la cámara
+      const msg = `Analiza la cámara "${cam.name}" (${cam.kind}, fuente: ${cam.source_url || '—'}, ubicación: ${cam.location || '—'}).`;
+      if (window._cyberApp && window._cyberApp.sendMessage) {
+        window._cyberApp.sendMessage(msg);
+      } else {
+        const input = document.getElementById('user-input');
+        if (input) { input.value = msg; input.focus(); }
+      }
+      // N-04: volver a la vista principal del agente
+      const navHome = document.querySelector('[data-view="view-chat"]');
+      if (navHome) navHome.click();
+    });
+    card.querySelector('.cam-del-btn').addEventListener('click', async () => {
+      if (!confirm(`¿Eliminar cámara "${cam.name}"?`)) return;
+      await fetch(`/api/cameras/${cam.id}`, { method: 'DELETE' });
+      _loadCameras();
+    });
+    return card;
+  }
+
+  async function _loadCameras() {
+    const grid = $('cam-grid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="sec-cam-placeholder cam-loading">Cargando…</div>';
+    try {
+      const r = await fetch('/api/cameras');
+      if (!r.ok) { grid.innerHTML = '<div class="sec-cam-placeholder">Error cargando cámaras</div>'; return; }
+      const d = await r.json();
+      grid.innerHTML = '';
+      if (!d.cameras || d.cameras.length === 0) {
+        grid.innerHTML = '<div class="sec-cam-placeholder">Sin cámaras registradas — usa "+ Añadir cámara"</div>';
+        return;
+      }
+      d.cameras.forEach(cam => grid.appendChild(_camCard(cam)));
+    } catch (e) {
+      grid.innerHTML = '<div class="sec-cam-placeholder">Error: ' + escHtml(String(e)) + '</div>';
+    }
+  }
+
+  const camRefreshBtn = $('cam-refresh-btn');
+  if (camRefreshBtn) camRefreshBtn.addEventListener('click', _loadCameras);
+
+  // N-03: modal añadir cámara
+  const camAddBtn = $('cam-add-btn');
+  const camModal = $('cam-modal');
+  const camModalCancel = $('cam-modal-cancel');
+  const camModalSave = $('cam-modal-save');
+  const camModalErr = $('cam-modal-err');
+
+  if (camAddBtn) camAddBtn.addEventListener('click', () => {
+    if (camModal) camModal.style.display = 'flex';
+  });
+  if (camModalCancel) camModalCancel.addEventListener('click', () => {
+    if (camModal) camModal.style.display = 'none';
+    if (camModalErr) camModalErr.style.display = 'none';
+  });
+  if (camModalSave) camModalSave.addEventListener('click', async () => {
+    const name = ($('cam-f-name') || {}).value || '';
+    const kind = ($('cam-f-kind') || {}).value || 'interior';
+    const source_type = ($('cam-f-source-type') || {}).value || 'ha';
+    const source_url = ($('cam-f-source-url') || {}).value || '';
+    const location = ($('cam-f-location') || {}).value || '';
+    if (!name.trim()) { if (camModalErr) { camModalErr.textContent = 'El nombre es obligatorio'; camModalErr.style.display = ''; } return; }
+    try {
+      const r = await fetch('/api/cameras', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, kind, source_type, source_url, location }),
+      });
+      const d = await r.json();
+      if (!d.ok) { if (camModalErr) { camModalErr.textContent = d.error || 'Error'; camModalErr.style.display = ''; } return; }
+      if (camModal) camModal.style.display = 'none';
+      if (camModalErr) camModalErr.style.display = 'none';
+      ['cam-f-name', 'cam-f-source-url', 'cam-f-location'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+      _loadCameras();
+    } catch (e) { if (camModalErr) { camModalErr.textContent = String(e); camModalErr.style.display = ''; } }
+  });
 
   // Cargar vault cuando se abre el panel de ajustes
   const settingsBtn2 = $('settings-btn');
