@@ -164,6 +164,8 @@ cable invisible. Coste Cloud Run mínimo. Desglose y estado en el BACKLOG → se
 > Formato: `[AGENTE] ID — Qué voy a hacer — Archivos: x, y — Fecha: YYYY-MM-DD HH:MM`
 > Si tocas zona ajena: añadir `⚠️ zona ajena: motivo`
 
+[claude] E-01..E-05 → K-01+K-05 → F-01..F-06 → G-01..G-04 → J-02+J-03 → A..D+B+K resto — Todas las tareas son Claude (solo agente activo). Implementando en orden de prioridad: HA tools → training_store core → web sub-vistas → vault UI → docker granular → brain_bridge/telegram/cámaras/eventos — Archivos: `app/security/ha_tools.py`, `app/tools.py`, `app/tool_router.py`, `app/training_store.py`, `apps/web/*`, `app/api/server.py` — Fecha: 2026-06-30
+
 [codex] AUTH-RECOVERY-005 — Recuperar acceso al relay y preparar login por email si hay proveedor SMTP: diagnosticar credenciales/TOTP desplegados, regenerar QR/credenciales si procede y mejorar flujo de recuperación sin romper auth actual — Archivos: `relay/main.py`, `relay/web/login.html`, `relay/web/login.css`, `relay/generate_secrets.py`, `tests/test_relay_integration.py`, `TASKBOARD.md`, `data/relay_totp_qr.png`, `data/relay_login_credentials.txt`, `data/relay_secrets.env` — Fecha: 2026-06-27 20:25
 
 
@@ -825,3 +827,99 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | M-02 | ⬜ | claude | Tests por módulo de seguridad | `tests/test_security_*.py` |
 | M-03 | ⬜ | claude | Doc docs/SECURITY_MODULE.md (arquitectura final) | `docs/` |
 | M-04 | ✅ | claude | Wiring notif: tarea-hecha / aprobación-pendiente a Telegram [ACTIVO] | `app/api/agent_runner.py` |
+
+---
+
+## 📹 DESGLOSE GRANULAR — DASHBOARD DE CÁMARAS + IA DE VIGILANCIA (visión de Steve)
+> Ingeniería jefe Steve + Claude. Marca estrella al empezar. Todo en módulo seguridad
+> (gateado SECURITY_ENABLED), estilo CyberAgent. Modelo visión: ver grupo T.
+> Objetivo: mantener a salvo la casa y los gatos, con trabajo IMPECABLE (es seguridad).
+
+### N · Dashboard de Cámaras (rejilla principal)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| N-01 | ⬜ | Layout dashboard de cámaras (grid responsive, web + PC) | `apps/web/*`, `app/widgets/*` |
+| N-02 | ⬜ | Tarjeta de cámara con stream EN TIEMPO REAL (HA camera_proxy / RTSP a WebRTC-HLS-MJPEG) | `apps/web/*`, `app/security/stream.py` |
+| N-03 | ⬜ | Botón "Añadir cámara" (modal: nombre, tipo exterior/interior, RTSP/HA entity, ubicación) | `apps/web/*` |
+| N-04 | ⬜ | Botón "Volver a CyberAgent" | `apps/web/*` |
+| N-05 | ⬜ | Botón "Abrir agente con contexto de cámara" (seleccionar cámara a chat contextualizado) | `apps/web/*`, `app/api/*` |
+| N-06 | ⬜ | Estado por cámara (online/offline, IA activa, última detección) | `apps/web/*` |
+| N-07 | ⬜ | Backend: CRUD de cámaras en DB (tipo, fuente, ubicación, zonas, tools asignadas) | `app/security/cameras_db.py` |
+| N-08 | ⬜ | Backend: proxy de stream en vivo (go2rtc o ffmpeg RTSP a WebRTC) | `app/security/stream.py` |
+
+### O · Vista de cámara individual (IA en vivo)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| O-01 | ⬜ | Layout vista de UNA cámara (video grande + panel IA) | `apps/web/*` |
+| O-02 | ⬜ | Panel "Lo que la IA ve y razona" EN VIVO (stream de razonamiento) | `apps/web/*`, `app/security/live_brain.py` |
+| O-03 | ⬜ | Lista de DETECCIONES (timestamp, tipo, confianza, recorte) | `apps/web/*` |
+| O-04 | ⬜ | ACTIVIDADES IGNORADAS (lo que la IA descartó) + por qué | `apps/web/*` |
+| O-05 | ⬜ | Línea de tiempo de eventos de esa cámara | `apps/web/*` |
+| O-06 | ⬜ | Backend: stream del razonamiento IA por cámara (SSE/WS) | `app/security/live_brain.py` |
+
+### P · Grabación / reproducción / exportación
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| P-01 | ⬜ | Grabar clip (manual + automático en evento) | `app/security/recorder.py` |
+| P-02 | ⬜ | Almacén de videos por cámara (DB índice + ficheros) | `app/security/recorder.py` |
+| P-03 | ⬜ | Reproductor con controles nativos (play/pause/seek/velocidad) | `apps/web/*` |
+| P-04 | ⬜ | Saltar a MOMENTOS de actividad (marcadores en la timeline) | `apps/web/*` |
+| P-05 | ⬜ | Recorte de video (trim in/out) | `apps/web/*`, `app/security/recorder.py` |
+| P-06 | ⬜ | Descarga / exportación de clips | `app/api/*` |
+| P-07 | ⬜ | Exportar el RAZONAMIENTO de la IA (por qué fue amenaza, si notificó, si lo descartó) en informe | `app/security/report.py` |
+| P-08 | ⬜ | Retención/limpieza de grabaciones (política + espacio) | `app/security/recorder.py` |
+
+### Q · Zonas de vigilancia (áreas dibujables)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| Q-01 | ⬜ | Editor de zonas sobre el frame (dibujar polígonos) | `apps/web/*` |
+| Q-02 | ⬜ | Tipos de zona: WARNING/amenaza y SEGURA (colorear cada una) | `apps/web/*` |
+| Q-03 | ⬜ | Solapamiento: prevalece la de MAYOR riesgo | `app/security/zones.py` |
+| Q-04 | ⬜ | Solo notificar si la amenaza está DENTRO de zona de vigilancia | `app/security/zones.py` |
+| Q-05 | ⬜ | Cuadrícula "lo que la IA debe vigilar" (regiones de interés) | `apps/web/*` |
+| Q-06 | ⬜ | Backend: persistir zonas por cámara + punto-en-polígono | `app/security/zones.py` |
+| Q-07 | ⬜ | La IA recibe las zonas como contexto al analizar | `app/security/live_brain.py` |
+
+### R · Cámara EXTERIOR
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| R-01 | ⬜ | Tipo exterior (config + eventos esperados: intrusión, merodeo, persona) | `app/security/camera_types.py` |
+| R-02 | ⬜ | Análisis de personas: etnia, vestimenta, acción, aspecto, puntos clave (descripción policial) | `app/security/analysis_exterior.py` |
+| R-03 | ⬜ | Mejora de imagen (resolución/nitidez/enfoque) para capturar lo importante | `app/security/imaging.py` |
+| R-04 | ⬜ | Lógica de DISUASIÓN (la IA decide disuadir vs alertar) | `app/security/deterrence.py` |
+| R-05 | ⬜ | Tools de disuasión exterior (HA + externos): luz potente/láser/linterna BT, altavoz con retransmisión de video en curso | `app/security/deterrence_tools.py` |
+| R-06 | ⬜ | Contexto de la cámara (ubicación, qué vigilar) editable | `apps/web/*`, `cameras_db` |
+| R-07 | ⬜ | Catálogo de herramientas disuasorias asignables por cámara | `apps/web/*`, `app/security/*` |
+| R-08 | ⬜ | Escalado de amenaza (disuadir a alertar usuario a emergencia) | `app/security/deterrence.py` |
+
+### S · Cámara INTERIOR (protección de gatos)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| S-01 | ⬜ | Tipo interior (hereda genérico, NO exterior) | `app/security/camera_types.py` |
+| S-02 | ⬜ | Gestión de mascotas (añadir gato + fotos para reconocimiento) | `apps/web/*`, `app/security/pets.py` |
+| S-03 | ⬜ | Reconocimiento/re-identificación de gatos por las fotos | `app/security/pets.py` |
+| S-04 | ⬜ | Modo trayectoria (seguir el recorrido del gato) | `app/security/motion.py` |
+| S-05 | ⬜ | Zonas peligrosas para el animal (cocina, enchufes, TV…) dibujables | `apps/web/*`, `zones` |
+| S-06 | ⬜ | Detección de peligros (gato en zona peligrosa, rotura, desorden, anomalía) | `app/security/analysis_interior.py` |
+| S-07 | ⬜ | Aprendizaje de lugares seguros/patrones de los gatos | `app/security/pets.py`, `training_store` |
+| S-08 | ⬜ | Tools de disuasión interior (altavoz potente, sonidos por escenario para separar gatos) | `app/security/deterrence_tools.py` |
+| S-09 | ⬜ | Modo noche (conectar a dispositivos de disuasión interior — próximamente) | `app/security/deterrence_tools.py` |
+| S-10 | ⬜ | Preconfigurar 3 cámaras de interior | `cameras_db` |
+
+### T · Modelo de visión local rápido (+ nube)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| T-01 | ⬜ | Evaluar VLM local ligero/rápido (Moondream2 ~1.8B vs Qwen2.5-VL 3B) para triage continuo | `docs/VISION_MODEL.md` |
+| T-02 | ⬜ | Integrar el VLM de triage (presencia/movimiento/¿persona o gato?) en Ollama | `app/security/vision_local.py` |
+| T-03 | ⬜ | Análisis profundo bajo demanda a Mistral NUBE (Pixtral) cuando el triage dispara | `app/security/brain_bridge.py` |
+| T-04 | ⬜ | Pipeline eficiente (frame sampling, no cada frame; cola; backpressure) | `app/security/vision_pipeline.py` |
+
+### U · Comunicaciones/Notificaciones CENTRALIZADAS (CyberAgent general, NO submódulo)
+| ID | E | Tarea | Archivos |
+|----|---|-------|----------|
+| U-01 | ⬜ | Módulo `app/comms/` central (Telegram canal); seguridad solo lo USA | `app/comms/__init__.py`, `app/comms/telegram.py` |
+| U-02 | ⬜ | Fuentes unificadas: respuestas de agentes, ERRORES del sistema, amenazas ext/int | `app/comms/router.py` |
+| U-03 | ⬜ | Niveles de IMPORTANCIA + filtros de mensajes | `app/comms/router.py` |
+| U-04 | ⬜ | (futuro) múltiples chats/canales por tipo; de momento un solo chat | `app/comms/*` |
+| U-05 | ⬜ | Comandos del módulo de comunicación (config, silenciar, filtrar) | `app/comms/commands.py` |
+| U-06 | ⬜ | Plan de presentación de mensajes (formato por tipo/importancia) | `docs/COMMS_PLAN.md` |
