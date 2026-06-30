@@ -623,6 +623,15 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 > de seguridad de CyberAgent).** El cerebro es nuestro modelo local; la centralita
 > son los sentidos/manos. Posible reparto con **Codex** → tareas discretas + zonas.
 
+## ⭐ PROTOCOLO DE PROGRESO (coordinación Claude <-> Codex)
+- **Fuente real:** `E:\APiComuni` (USB HA_TRANSFER, con secretos + Docker). NO el clon de GitHub.
+- Al **empezar** una tarea, marca su fila: `⭐ progress claude · YYYY-MM-DD HH:MM · NN%`.
+  Al **terminar**: `100%`. Así el otro NO la coge si está ⭐ en curso, y vemos el avance.
+- **Estilo final = CyberAgent LLM.** El estilo de APiComuni se ELIMINA/adapta.
+- **Objetivo:** master (los dos unidos) **funcional** hoy: UI visible (desactivada) +
+  Telegram-notif + vault operativos; cámaras/eventos entran desactivados.
+- **iOS:** se cablea también la seccion Seguridad en el modulo iOS (lo siguiente a atacar).
+
 ## Decisiones de arquitectura (FIJAS)
 - **Cerebro:** CyberAgent local (`cyberagent-24b`) dirige todo. La IA externa de
   APiComuni (`ApiAsistente:8082 → /api/ext/chat`) se **reemplaza** por nuestro agente.
@@ -671,6 +680,7 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 | SEC-008 | ⬜ | * | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |
 | SEC-009 | ⬜ | * | Portar `event_handler`+`event_store`+`action_executor`+`autonomy` (DESACTIVADO); autonomía → mapear a aprobaciones | `app/security/events.py`, `actions.py` |
 | SEC-010 | ⬜ | * | **Conciencia del agente**: system prompt + tools docs reflejan 2 claves Mistral, cámaras, HA, Docker | `app/ollama_client.py` (system), schemas |
+| SEC-012 | ⬜ | * | Cablear seccion **Seguridad** en el modulo **iOS** (vista + theme cyberagent), desactivada | `ios/CyberAgent/*` |
 | SEC-011 | ⬜ | * | **training_store** (grifo de datos QLoRA): captura decisión→resultado, feedback 👍/👎, aprobaciones, en formato instrucción/respuesta/señal | `app/training_store.py` |
 
 > **Reglas de reparto:** Claude toma SEC-001..005 (estructura + UI + secretos +
