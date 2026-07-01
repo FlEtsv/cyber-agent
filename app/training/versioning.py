@@ -27,6 +27,7 @@ def _load(model_id: str) -> list[dict]:
 
 def _save(model_id: str, versions: list[dict]) -> None:
     p = _versions_path(model_id)
+    p.parent.mkdir(parents=True, exist_ok=True)   # robusto ante cualquier ruta
     p.write_text(json.dumps(versions, indent=2, ensure_ascii=False))
 
 
