@@ -192,6 +192,7 @@
     const card = document.createElement('div');
     card.className = 'sec-cam-card';
     card.dataset.camId = cam.id;
+    card._camData = cam; // M-1 fix: needed by click→_openCamDetail
     const status = cam.enabled ? 'unknown' : 'offline';
     card.innerHTML = `
       <div class="sec-cam-thumb sec-cam-thumb-real">
@@ -212,7 +213,7 @@
       if (window._cyberApp && window._cyberApp.sendMessage) {
         window._cyberApp.sendMessage(msg);
       } else {
-        const input = document.getElementById('user-input');
+        const input = document.getElementById('input');
         if (input) { input.value = msg; input.focus(); }
       }
       // N-04: volver a la vista principal del agente
@@ -1495,12 +1496,23 @@
         list.innerHTML = '<div class="comms-loading">Sin actuadores registrados</div>';
         return;
       }
-      list.innerHTML = d.actuators.map(function(a) {
-        return '<div class="actuator-row"><span class="actuator-name">' + a.name + '</span>' +
-          '<span class="actuator-status ' + (a.available ? 'status-green' : 'status-red') + '">' +
-          (a.available ? 'OK' : 'OFF') + '</span>' +
-          '<button class="mini-btn" onclick="testActuator(\'' + a.name + '\')">Test</button></div>';
-      }).join('');
+      list.innerHTML = '';
+      d.actuators.forEach(function(a) {
+        const row = document.createElement('div');
+        row.className = 'actuator-row';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'actuator-name';
+        nameEl.textContent = a.name;
+        const stEl = document.createElement('span');
+        stEl.className = 'actuator-status ' + (a.available ? 'status-green' : 'status-red');
+        stEl.textContent = a.available ? 'OK' : 'OFF';
+        const btn = document.createElement('button');
+        btn.className = 'mini-btn';
+        btn.textContent = 'Test';
+        btn.onclick = () => window.testActuator(a.name);
+        row.appendChild(nameEl); row.appendChild(stEl); row.appendChild(btn);
+        list.appendChild(row);
+      });
     }
 
     refreshBtn.onclick = loadActuators;
@@ -1541,15 +1553,20 @@
         list.innerHTML = '<div class="comms-loading">No se encontraron entidades HA</div>';
         return;
       }
-      list.innerHTML = d.entities.map(function(e) {
-        return '<div class="ha-entity-row">' +
-          '<span class="ha-entity-id">' + e.entity_id + '</span>' +
-          '<span class="ha-entity-name">' + e.name + '</span>' +
-          '<span class="ha-entity-state">' + e.state + '</span>' +
-          '<button class="mini-btn" onclick="addHAActuator(\'' + e.entity_id + '\',\'' + e.name + '\')">+ Anadir</button>' +
-          '<button class="mini-btn" onclick="testHADevice(\'' + e.entity_id + '\')">Test</button>' +
-          '</div>';
-      }).join('');
+      list.innerHTML = '';
+      d.entities.forEach(function(e) {
+        const row = document.createElement('div');
+        row.className = 'ha-entity-row';
+        const idEl = document.createElement('span'); idEl.className = 'ha-entity-id'; idEl.textContent = e.entity_id;
+        const nmEl = document.createElement('span'); nmEl.className = 'ha-entity-name'; nmEl.textContent = e.name;
+        const stEl = document.createElement('span'); stEl.className = 'ha-entity-state'; stEl.textContent = e.state;
+        const addBtn = document.createElement('button'); addBtn.className = 'mini-btn'; addBtn.textContent = '+ Añadir';
+        addBtn.onclick = () => window.addHAActuator(e.entity_id, e.name);
+        const testBtn = document.createElement('button'); testBtn.className = 'mini-btn'; testBtn.textContent = 'Test';
+        testBtn.onclick = () => window.testHADevice(e.entity_id);
+        row.appendChild(idEl); row.appendChild(nmEl); row.appendChild(stEl); row.appendChild(addBtn); row.appendChild(testBtn);
+        list.appendChild(row);
+      });
     };
 
     window.addHAActuator = async function(entityId, name) {

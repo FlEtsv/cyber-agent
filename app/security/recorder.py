@@ -20,8 +20,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_DB_PATH = Path("data/recordings.db")
-_CLIPS_DIR = Path("data/clips")
+_DB_PATH = Path(__file__).parent.parent.parent / "data" / "recordings.db"
+_CLIPS_DIR = Path(__file__).parent.parent.parent / "data" / "clips"
 _lock = threading.Lock()
 _active_recordings: dict[str, subprocess.Popen] = {}
 

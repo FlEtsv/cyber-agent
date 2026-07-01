@@ -365,9 +365,18 @@ async def delete_camera_zone(
 @router.post("/ha/webhook")
 async def ha_webhook(request: Request) -> JSONResponse:
     """
-    Recibe webhooks de Home Assistant (sin token — HA llama con URL secreta).
-    Valida la URL secreta en el path o un header alternativo.
+    Recibe webhooks de Home Assistant. HA debe enviar el token en el header
+    X-HA-Webhook-Token (configurado en HA como dato del webhook).
     """
+    # Validar token del webhook via header o query param
+    expected = os.environ.get("SEC_HA_WEBHOOK_TOKEN", "")
+    if expected:
+        provided = (
+            request.headers.get("X-HA-Webhook-Token", "")
+            or request.query_params.get("token", "")
+        )
+        if provided != expected:
+            return JSONResponse({"ok": False, "error": "token inválido"}, status_code=403)
     data = await request.json()
     try:
         from app.security.events import handle_ha_event

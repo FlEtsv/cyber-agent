@@ -516,88 +516,6 @@ async def api_camera_stream(cam_id: int, request: Request):
             "note": "stream proxy pendiente (N-08)"}
 
 
-# ── AE-01..AE-04: Training menu API ────────────────────────────────────────────
-
-@app.get("/api/training/models")
-async def api_training_models(request: Request):
-    """Lista modelos con estado del dataset (progreso hacia el umbral)."""
-    g = _gate(request)
-    if g:
-        return g
-    try:
-        from app.training.threshold_watcher import check
-        from app.training.registry import all_ids
-        results = []
-        for model_id in all_ids():
-            results.append(check(model_id, notify=False))
-        return {"ok": True, "models": results}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-@app.post("/api/training/check")
-async def api_training_check(request: Request):
-    """Comprueba un modelo específico y envía notificación si está listo."""
-    g = _gate(request)
-    if g:
-        return g
-    try:
-        b = await request.json()
-        model_id = str(b.get("model_id") or "")
-        from app.training.threshold_watcher import check
-        return check(model_id, notify=True)
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-@app.get("/api/training/estimate/{model_id}")
-async def api_training_estimate(model_id: str, request: Request):
-    """Estimación de recursos/tiempo/coste para entrenar un modelo."""
-    g = _gate(request)
-    if g:
-        return g
-    try:
-        from app.training.estimate import estimate
-        from app.training.threshold_watcher import check
-        status = check(model_id, notify=False)
-        est = estimate(model_id, n_samples=status.get("count", 500))
-        return {"ok": True, **est, "status": status}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-@app.post("/api/training/start")
-async def api_training_start(request: Request):
-    """AF-01: Inicia el pipeline de entrenamiento para un modelo."""
-    g = _gate(request)
-    if g:
-        return g
-    try:
-        b = await request.json()
-        model_id = str(b.get("model_id") or "")
-        if not model_id:
-            return {"ok": False, "error": "model_id requerido"}
-        from app.training.orchestrator import start_training
-        return start_training(model_id)
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-@app.post("/api/training/cancel")
-async def api_training_cancel(request: Request):
-    """AF-08: Cancela el entrenamiento en curso."""
-    g = _gate(request)
-    if g:
-        return g
-    try:
-        b = await request.json()
-        model_id = str(b.get("model_id") or "")
-        from app.training.orchestrator import cancel_training
-        return cancel_training(model_id)
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
 @app.get("/api/training/history/{model_id}")
 async def api_training_history(model_id: str, request: Request):
     """AG-05: Historial de runs de entrenamiento por modelo."""
@@ -708,8 +626,8 @@ async def api_zones_list(request: Request):
         from app.security.zones import list_zones
         zones = list_zones(cam_id)
         return {"ok": True, "cam_id": cam_id, "zones": [
-            {"id": z.id, "cam_id": z.cam_id, "name": z.name, "zone_type": z.zone_type,
-             "polygon": z.polygon, "enabled": z.enabled} for z in zones
+            {"id": z.id, "cam_id": z.cam_id, "name": z.name, "type": z.type,
+             "points": z.points, "color": z.color, "active": z.active} for z in zones
         ]}
     except Exception as e:
         return {"ok": False, "zones": [], "error": str(e)}
@@ -726,8 +644,8 @@ async def api_zones_add(request: Request):
         return add_zone(
             cam_id=str(b.get("cam_id") or ""),
             name=str(b.get("name") or ""),
-            zone_type=str(b.get("zone_type") or "warning"),
-            polygon=b.get("polygon") or [],
+            zone_type=str(b.get("zone_type") or b.get("type") or "warning"),
+            points=b.get("points") or b.get("polygon") or [],
         )
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -769,11 +687,14 @@ async def api_cam_discarded(cam_id: str, request: Request):
     try:
         limit = int(request.query_params.get("limit", "20"))
         from app.security.cameras_db import get_db
-        with get_db() as db:
+        db = get_db()
+        try:
             rows = db.execute(
                 "SELECT ts, label, reason FROM discarded_events WHERE cam_id=? ORDER BY ts DESC LIMIT ?",
                 (cam_id, limit)
             ).fetchall()
+        finally:
+            db.close()
         discarded = [{"ts": r[0], "label": r[1], "reason": r[2]} for r in rows]
         return {"ok": True, "cam_id": cam_id, "discarded": discarded}
     except Exception as e:
@@ -790,8 +711,11 @@ async def api_cam_roi_get(cam_id: str, request: Request):
     try:
         import json as _json
         from app.security.cameras_db import get_db
-        with get_db() as db:
+        db = get_db()
+        try:
             row = db.execute("SELECT roi_grid FROM camera_roi WHERE cam_id=?", (cam_id,)).fetchone()
+        finally:
+            db.close()
         grid = _json.loads(row[0]) if row and row[0] else None
         return {"ok": True, "cam_id": cam_id, "grid": grid}
     except Exception as e:
@@ -808,11 +732,15 @@ async def api_cam_roi_set(cam_id: str, request: Request):
         body = await request.json()
         grid = body.get("grid")
         from app.security.cameras_db import get_db
-        with get_db() as db:
+        db = get_db()
+        try:
             db.execute(
                 "INSERT INTO camera_roi(cam_id, roi_grid) VALUES(?,?) ON CONFLICT(cam_id) DO UPDATE SET roi_grid=excluded.roi_grid",
                 (cam_id, _json.dumps(grid))
             )
+            db.commit()
+        finally:
+            db.close()
         return {"ok": True, "cam_id": cam_id}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -826,25 +754,31 @@ async def api_recordings_trim(request: Request):
     g = _gate(request)
     if g: return g
     try:
-        import subprocess, tempfile, os, pathlib
+        import subprocess, pathlib
         body = await request.json()
         src_path = body.get("path", "")
         trim_in = float(body.get("trim_in", 0))
         trim_out = float(body.get("trim_out", 0))
-        if not src_path or not pathlib.Path(src_path).exists():
+        # Validar que la ruta esté dentro del directorio de clips (evita path traversal)
+        _CLIPS_DIR = pathlib.Path("data/clips").resolve()
+        src = pathlib.Path(src_path).resolve()
+        if not src.exists():
             return {"ok": False, "error": "Archivo no encontrado"}
-        out_dir = pathlib.Path(src_path).parent
-        out_name = f"trim_{int(trim_in)}_{int(trim_out)}_{pathlib.Path(src_path).name}"
-        out_path = out_dir / out_name
+        try:
+            src.relative_to(_CLIPS_DIR)
+        except ValueError:
+            return {"ok": False, "error": "Ruta fuera del directorio de clips"}
+        out_name = f"trim_{int(trim_in)}_{int(trim_out)}_{src.name}"
+        out_path = _CLIPS_DIR / out_name
         duration = trim_out - trim_in if trim_out > trim_in else None
-        cmd = ["ffmpeg", "-y", "-ss", str(trim_in), "-i", str(src_path)]
+        cmd = ["ffmpeg", "-y", "-ss", str(trim_in), "-i", str(src)]
         if duration:
             cmd += ["-t", str(duration)]
         cmd += ["-c", "copy", str(out_path)]
         proc = subprocess.run(cmd, capture_output=True, timeout=60)
         if proc.returncode != 0:
             return {"ok": False, "error": "ffmpeg error: " + proc.stderr.decode(errors="replace")[-200:]}
-        download_url = "/download/" + out_name
+        download_url = f"/download/{out_name}"
         return {"ok": True, "download_url": download_url, "out_path": str(out_path)}
     except FileNotFoundError:
         return {"ok": False, "error": "ffmpeg no instalado"}

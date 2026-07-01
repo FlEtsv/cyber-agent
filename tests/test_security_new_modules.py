@@ -130,6 +130,25 @@ class TestCamerasDbExtended:
 # ── hparams: update_hparams ───────────────────────────────────────────────────
 
 class TestHparams:
+    def setup_method(self):
+        from dataclasses import asdict
+        import app.training.hparams as hp_mod
+        from unittest.mock import patch
+        self._hp_mod = hp_mod
+        # Snapshot global state and redirect disk I/O to a temp file
+        self._orig_hparams = {k: asdict(v) for k, v in hp_mod._HPARAMS.items()}
+        self._patch = patch.object(hp_mod, "_OVERRIDES_PATH", __import__("pathlib").Path(__import__("tempfile").mktemp(suffix=".json")))
+        self._patch.start()
+
+    def teardown_method(self):
+        from app.training.hparams import HParams
+        self._patch.stop()
+        # Restore original values
+        hp = self._hp_mod._HPARAMS
+        hp.clear()
+        for k, v in self._orig_hparams.items():
+            hp[k] = HParams(**v)
+
     def test_get_defaults(self):
         from app.training.hparams import get
         h = get("cyberagent-24b")

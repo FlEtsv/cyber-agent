@@ -292,13 +292,13 @@ _HA_CONTAINER_NAMES = ("homeassistant", "home-assistant", "apicomunicaciones", "
 
 class DockerHAService(_Service):
     """Verifica que el contenedor HA/comunicaciones esté corriendo.
-    Solo actúa si CYBERAGENT_SECURITY_ENABLED=1. En heal, intenta start."""
+    Solo actúa si SECURITY_ENABLED=1. En heal, intenta start."""
     name = "docker_ha"
     interval = 60.0
     heal_after = 2
 
     def check(self) -> tuple[bool, str]:
-        if os.environ.get("CYBERAGENT_SECURITY_ENABLED", "0") != "1":
+        if os.environ.get("SECURITY_ENABLED", "0") != "1":
             return True, "ha_docker=skipped (SECURITY_ENABLED=0)"
         try:
             from app.docker_tools import available, run
@@ -315,7 +315,7 @@ class DockerHAService(_Service):
             return False, f"ha_docker=error: {e}"
 
     def heal(self) -> None:
-        if os.environ.get("CYBERAGENT_SECURITY_ENABLED", "0") != "1":
+        if os.environ.get("SECURITY_ENABLED", "0") != "1":
             return
         try:
             from app.docker_tools import available, run
