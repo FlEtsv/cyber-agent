@@ -909,6 +909,108 @@
     _loadCamZones(camId);
   });
 
+  // O-04: Descartes de la IA (actividades ignoradas + razón)
+  const camIgnoredLoad = $('cam-ignored-load');
+  if (camIgnoredLoad) camIgnoredLoad.addEventListener('click', async () => {
+    if (!_currentCamDetail) return;
+    const camId = _currentCamDetail.name || _currentCamDetail.id;
+    const list = $('cam-ignored-list');
+    if (!list) return;
+    list.innerHTML = '<div class="comms-loading">Cargando…</div>';
+    try {
+      const r = await fetch(`/api/security/cameras/${encodeURIComponent(camId)}/discarded?limit=20`);
+      const d = await r.json();
+      const items = d.discarded || [];
+      if (items.length === 0) { list.innerHTML = '<span class="cam-ignored-empty">Sin descartes recientes</span>'; return; }
+      list.innerHTML = '';
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'cam-ignored-item';
+        const ts = item.ts ? new Date(item.ts * 1000).toLocaleTimeString() : '—';
+        el.innerHTML = `<span class="cam-ignored-ts">${ts}</span><span class="cam-ignored-label">${escHtml(item.label || '?')}</span><span class="cam-ignored-why">${escHtml(item.reason || '—')}</span>`;
+        list.appendChild(el);
+      });
+    } catch {
+      list.innerHTML = '<span class="cam-ignored-empty">Sin datos disponibles</span>';
+    }
+  });
+
+  // Q-05: Cuadrícula ROI (regiones de interés)
+  const camRoiToggle = $('cam-roi-toggle');
+  const camRoiEditor = $('cam-roi-editor');
+  const camRoiCanvas = $('cam-roi-canvas');
+  let _roiGrid = null; // 8x6 boolean grid
+
+  function _initRoiGrid(cols, rows) {
+    _roiGrid = Array.from({length: rows}, () => Array(cols).fill(false));
+  }
+
+  function _drawRoi() {
+    if (!camRoiCanvas || !_roiGrid) return;
+    const ctx = camRoiCanvas.getContext('2d');
+    const cols = _roiGrid[0].length, rows = _roiGrid.length;
+    const cw = camRoiCanvas.width / cols, ch = camRoiCanvas.height / rows;
+    ctx.clearRect(0, 0, camRoiCanvas.width, camRoiCanvas.height);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = _roiGrid[r][c] ? 'rgba(0,200,100,0.45)' : 'rgba(255,255,255,0.07)';
+        ctx.fillRect(c * cw + 1, r * ch + 1, cw - 2, ch - 2);
+        ctx.strokeStyle = '#444';
+        ctx.strokeRect(c * cw, r * ch, cw, ch);
+      }
+    }
+  }
+
+  if (camRoiToggle && camRoiEditor) {
+    camRoiToggle.addEventListener('click', async () => {
+      const hidden = camRoiEditor.style.display === 'none';
+      camRoiEditor.style.display = hidden ? '' : 'none';
+      if (hidden && _currentCamDetail) {
+        const camId = _currentCamDetail.name || _currentCamDetail.id;
+        const cols = 8, rows = 6;
+        _initRoiGrid(cols, rows);
+        try {
+          const r = await fetch(`/api/security/cameras/${encodeURIComponent(camId)}/roi`);
+          if (r.ok) {
+            const d = await r.json();
+            if (d.grid) _roiGrid = d.grid;
+          }
+        } catch {}
+        _drawRoi();
+      }
+    });
+    if (camRoiCanvas) camRoiCanvas.addEventListener('click', e => {
+      if (!_roiGrid) return;
+      const rect = camRoiCanvas.getBoundingClientRect();
+      const cols = _roiGrid[0].length, rows = _roiGrid.length;
+      const cx = Math.floor((e.clientX - rect.left) / rect.width * cols);
+      const cy = Math.floor((e.clientY - rect.top) / rect.height * rows);
+      if (cy >= 0 && cy < rows && cx >= 0 && cx < cols) {
+        _roiGrid[cy][cx] = !_roiGrid[cy][cx];
+        _drawRoi();
+      }
+    });
+    const camRoiSave = $('cam-roi-save');
+    if (camRoiSave) camRoiSave.addEventListener('click', async () => {
+      if (!_currentCamDetail || !_roiGrid) return;
+      const camId = _currentCamDetail.name || _currentCamDetail.id;
+      try {
+        await fetch(`/api/security/cameras/${encodeURIComponent(camId)}/roi`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({grid: _roiGrid}),
+        });
+        camRoiSave.textContent = '✓ Guardado';
+        setTimeout(() => { camRoiSave.textContent = 'Guardar ROI'; }, 2000);
+      } catch {}
+    });
+    const camRoiClear = $('cam-roi-clear');
+    if (camRoiClear) camRoiClear.addEventListener('click', () => {
+      if (!_roiGrid) return;
+      _roiGrid = _roiGrid.map(row => row.map(() => false));
+      _drawRoi();
+    });
+  }
+
   // Conectar el click en tarjeta de cámara para abrir detalle
   const origCamCard = typeof _camCard !== 'undefined' ? _camCard : null;
   document.addEventListener('click', e => {
@@ -989,7 +1091,71 @@
       const ts = rec.started_at ? new Date(rec.started_at * 1000).toLocaleString() : '—';
       meta.textContent = `${rec.cam_id || '—'} · ${ts} · ${rec.trigger || '—'}`;
     }
+    // P-04: Render activity markers from rec.events
+    _renderRecMarkers(rec);
+    // P-05: Reset trim inputs
+    const trimIn = $('rec-trim-in'), trimOut = $('rec-trim-out');
+    if (trimIn) trimIn.value = '';
+    if (trimOut) trimOut.value = '';
+    if ($('rec-trim-status')) $('rec-trim-status').textContent = '';
   }
+
+  // P-04: Activity markers on the timeline bar
+  function _renderRecMarkers(rec) {
+    const bar = $('rec-markers-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    const events = rec.events || [];
+    const duration = rec.duration || 0;
+    if (!events.length || !duration) { bar.innerHTML = '<span style="color:var(--fg2);font-size:0.75rem">Sin marcadores</span>'; return; }
+    events.forEach(ev => {
+      const offset = (ev.ts_offset || 0) / duration;
+      const marker = document.createElement('button');
+      marker.className = 'rec-marker';
+      marker.style.left = (offset * 100).toFixed(1) + '%';
+      marker.title = ev.label || ev.type || 'Evento';
+      marker.addEventListener('click', () => {
+        const video = $('rec-video');
+        if (video) { video.currentTime = ev.ts_offset || 0; video.play().catch(() => {}); }
+      });
+      bar.appendChild(marker);
+    });
+  }
+
+  // P-05: Trim in/out buttons
+  const trimSetIn = $('rec-trim-set-in'), trimSetOut = $('rec-trim-set-out');
+  if (trimSetIn) trimSetIn.addEventListener('click', () => {
+    const video = $('rec-video');
+    if (video && $('rec-trim-in')) $('rec-trim-in').value = video.currentTime.toFixed(1);
+  });
+  if (trimSetOut) trimSetOut.addEventListener('click', () => {
+    const video = $('rec-video');
+    if (video && $('rec-trim-out')) $('rec-trim-out').value = video.currentTime.toFixed(1);
+  });
+  const trimExport = $('rec-trim-export');
+  if (trimExport) trimExport.addEventListener('click', async () => {
+    const video = $('rec-video');
+    const trimIn = parseFloat($('rec-trim-in').value || '0');
+    const trimOut = parseFloat($('rec-trim-out').value || (video ? String(video.duration) : '0'));
+    const statusEl = $('rec-trim-status');
+    if (!video || !video.src) { if (statusEl) statusEl.textContent = 'Sin video activo'; return; }
+    const srcPath = decodeURIComponent(video.src.replace(location.origin + '/served/', ''));
+    if (statusEl) statusEl.textContent = 'Solicitando recorte…';
+    try {
+      const r = await fetch('/api/security/recordings/trim', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({path: srcPath, trim_in: trimIn, trim_out: trimOut}),
+      });
+      const d = await r.json();
+      if (d.ok && d.download_url) {
+        if (statusEl) statusEl.innerHTML = `<a href="${escHtml(d.download_url)}" download>⬇ Descargar recorte</a>`;
+      } else {
+        if (statusEl) statusEl.textContent = d.error || 'Error al recortar';
+      }
+    } catch (err) {
+      if (statusEl) statusEl.textContent = 'Error: ' + String(err);
+    }
+  });
 
   const recCloseBtn = $('rec-close-btn');
   if (recCloseBtn) recCloseBtn.addEventListener('click', () => {
@@ -1459,6 +1625,50 @@
       } else {
         el.innerHTML = '<div class="comms-loading">Sin trabajo activo</div>';
       }
+    };
+
+    // AE-08: Dataset detail
+    const datasetBtn = $('train-dataset-load');
+    if (datasetBtn) datasetBtn.onclick = async () => {
+      const modelId = $('train-model-select').value;
+      const el = $('train-dataset-stats');
+      if (!el) return;
+      el.innerHTML = '<div class="comms-loading">Cargando…</div>';
+      try {
+        const r = await fetch('/api/training/dataset-stats/' + encodeURIComponent(modelId));
+        const d = await r.json();
+        if (!d.ok) { el.innerHTML = '<div class="comms-loading">Error: ' + (d.error||'?') + '</div>'; return; }
+        const s = d.stats || {};
+        el.innerHTML = '<div class="train-dataset-card">' +
+          '<span>Total ejemplos: <b>' + (s.total||0) + '</b></span>' +
+          '<span>Alta señal (≥0.5): <b>' + (s.high_signal||0) + '</b></span>' +
+          '<span>Tipos: ' + Object.entries(s.by_kind||{}).map(function(e){return '<code>'+e[0]+'</code>×'+e[1];}).join(' ') + '</span>' +
+          '<span>Señal media: <b>' + ((s.avg_signal||0).toFixed(2)) + '</b></span>' +
+          '</div>';
+      } catch(e) { el.innerHTML = '<div class="comms-loading">Error de red</div>'; }
+    };
+
+    // AE-09: Save hyperparameters
+    const hpSaveBtn = $('hp-save-btn');
+    if (hpSaveBtn) hpSaveBtn.onclick = async () => {
+      const modelId = $('train-model-select').value;
+      const hparams = {
+        rank: parseInt($('hp-rank').value) || 16,
+        alpha: parseInt($('hp-alpha').value) || 32,
+        lr: parseFloat($('hp-lr').value) || 0.0002,
+        epochs: parseInt($('hp-epochs').value) || 3,
+        batch_size: parseInt($('hp-batch').value) || 4,
+        dropout: parseFloat($('hp-dropout').value) || 0.05,
+      };
+      try {
+        const r = await fetch('/api/training/hparams/' + encodeURIComponent(modelId), {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(hparams),
+        });
+        const d = await r.json();
+        const st = $('hp-save-status');
+        if (st) { st.style.display='inline'; st.textContent = d.ok ? '✓ Guardado' : '✗ Error'; setTimeout(()=>{ st.style.display='none'; },2000); }
+      } catch(e) { console.warn('hparams save error', e); }
     };
   }
 

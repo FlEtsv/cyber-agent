@@ -759,6 +759,99 @@ async def api_recordings_list(request: Request):
         return {"ok": False, "recordings": [], "error": str(e)}
 
 
+# ── O-04: Descartes de la IA por cámara ──────────────────────────────────────
+
+@app.get("/api/security/cameras/{cam_id}/discarded")
+async def api_cam_discarded(cam_id: str, request: Request):
+    """O-04: Eventos que la IA descartó con su razón, por cámara."""
+    g = _gate(request)
+    if g: return g
+    try:
+        limit = int(request.query_params.get("limit", "20"))
+        from app.security.cameras_db import get_db
+        with get_db() as db:
+            rows = db.execute(
+                "SELECT ts, label, reason FROM discarded_events WHERE cam_id=? ORDER BY ts DESC LIMIT ?",
+                (cam_id, limit)
+            ).fetchall()
+        discarded = [{"ts": r[0], "label": r[1], "reason": r[2]} for r in rows]
+        return {"ok": True, "cam_id": cam_id, "discarded": discarded}
+    except Exception as e:
+        return {"ok": True, "cam_id": cam_id, "discarded": [], "note": str(e)}
+
+
+# ── Q-05: ROI grid por cámara ─────────────────────────────────────────────────
+
+@app.get("/api/security/cameras/{cam_id}/roi")
+async def api_cam_roi_get(cam_id: str, request: Request):
+    """Q-05: Obtiene la cuadrícula de regiones de interés de una cámara."""
+    g = _gate(request)
+    if g: return g
+    try:
+        import json as _json
+        from app.security.cameras_db import get_db
+        with get_db() as db:
+            row = db.execute("SELECT roi_grid FROM camera_roi WHERE cam_id=?", (cam_id,)).fetchone()
+        grid = _json.loads(row[0]) if row and row[0] else None
+        return {"ok": True, "cam_id": cam_id, "grid": grid}
+    except Exception as e:
+        return {"ok": True, "cam_id": cam_id, "grid": None, "note": str(e)}
+
+
+@app.post("/api/security/cameras/{cam_id}/roi")
+async def api_cam_roi_set(cam_id: str, request: Request):
+    """Q-05: Guarda la cuadrícula de regiones de interés de una cámara."""
+    g = _gate(request)
+    if g: return g
+    try:
+        import json as _json
+        body = await request.json()
+        grid = body.get("grid")
+        from app.security.cameras_db import get_db
+        with get_db() as db:
+            db.execute(
+                "INSERT INTO camera_roi(cam_id, roi_grid) VALUES(?,?) ON CONFLICT(cam_id) DO UPDATE SET roi_grid=excluded.roi_grid",
+                (cam_id, _json.dumps(grid))
+            )
+        return {"ok": True, "cam_id": cam_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── P-05: Trim/recorte de video ───────────────────────────────────────────────
+
+@app.post("/api/security/recordings/trim")
+async def api_recordings_trim(request: Request):
+    """P-05: Genera un subclip (trim_in..trim_out) de una grabación."""
+    g = _gate(request)
+    if g: return g
+    try:
+        import subprocess, tempfile, os, pathlib
+        body = await request.json()
+        src_path = body.get("path", "")
+        trim_in = float(body.get("trim_in", 0))
+        trim_out = float(body.get("trim_out", 0))
+        if not src_path or not pathlib.Path(src_path).exists():
+            return {"ok": False, "error": "Archivo no encontrado"}
+        out_dir = pathlib.Path(src_path).parent
+        out_name = f"trim_{int(trim_in)}_{int(trim_out)}_{pathlib.Path(src_path).name}"
+        out_path = out_dir / out_name
+        duration = trim_out - trim_in if trim_out > trim_in else None
+        cmd = ["ffmpeg", "-y", "-ss", str(trim_in), "-i", str(src_path)]
+        if duration:
+            cmd += ["-t", str(duration)]
+        cmd += ["-c", "copy", str(out_path)]
+        proc = subprocess.run(cmd, capture_output=True, timeout=60)
+        if proc.returncode != 0:
+            return {"ok": False, "error": "ffmpeg error: " + proc.stderr.decode(errors="replace")[-200:]}
+        download_url = "/download/" + out_name
+        return {"ok": True, "download_url": download_url, "out_path": str(out_path)}
+    except FileNotFoundError:
+        return {"ok": False, "error": "ffmpeg no instalado"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ── AS-01..AS-05: Comms config endpoints ─────────────────────────────────────
 
 @app.get("/api/comms/config")
@@ -1635,6 +1728,43 @@ def api_training_rollback(model_id: str):
     try:
         from app.training.versioning import rollback
         return rollback(model_id)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/training/dataset-stats/{model_id}")
+def api_training_dataset_stats(model_id: str):
+    """AE-08: Estadísticas del dataset de un modelo (total, señal, tipos)."""
+    try:
+        from app.training_store import stats as ts_stats
+        from app.training.data_map import get_sources
+        all_stats = ts_stats()
+        sources = get_sources(model_id)
+        kinds = {s[0] for s in sources}
+        by_kind = {k: v for k, v in all_stats.get("by_kind", {}).items() if k in kinds}
+        total = sum(by_kind.values())
+        return {
+            "ok": True,
+            "model_id": model_id,
+            "stats": {
+                "total": total,
+                "high_signal": all_stats.get("high_signal_by_kind", {}).get(model_id, 0),
+                "by_kind": by_kind,
+                "avg_signal": all_stats.get("avg_signal", 0.0),
+            },
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/training/hparams/{model_id}")
+async def api_training_save_hparams(model_id: str, req: Request):
+    """AE-09: Guardar hiperparámetros avanzados para un modelo."""
+    try:
+        body = await req.json()
+        from app.training.hparams import update_hparams
+        update_hparams(model_id, **body)
+        return {"ok": True, "model_id": model_id, "hparams": body}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

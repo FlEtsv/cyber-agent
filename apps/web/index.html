@@ -498,10 +498,33 @@
           <div class="cam-section-title">Eventos de esta cámara</div>
           <div id="cam-timeline-list" class="sec-timeline"></div>
         </div>
-        <!-- Q-01..Q-05: Editor de zonas básico -->
+        <!-- O-04: Actividades ignoradas (lo que la IA descartó + por qué) -->
+        <div class="cam-detail-ignored">
+          <div class="cam-section-title">
+            Descartes de la IA
+            <button class="mini-btn" id="cam-ignored-load">Ver descartes</button>
+          </div>
+          <div id="cam-ignored-list" class="cam-ignored-list">
+            <span class="cam-ignored-empty">Sin descartes recientes</span>
+          </div>
+        </div>
+        <!-- Q-01..Q-05: Editor de zonas + Q-05 cuadrícula ROI -->
         <div class="cam-detail-zones">
           <div class="cam-section-title">Zonas de vigilancia <button class="mini-btn" id="cam-zone-add">+ Zona</button></div>
           <div id="cam-zones-list" class="cam-zones-list"></div>
+          <!-- Q-05: Cuadrícula de regiones de interés -->
+          <div class="cam-section-title" style="margin-top:10px">
+            Regiones de interés (ROI)
+            <button class="mini-btn" id="cam-roi-toggle">Editar cuadrícula</button>
+          </div>
+          <div id="cam-roi-editor" class="cam-roi-editor" style="display:none">
+            <canvas id="cam-roi-canvas" class="cam-roi-canvas" width="320" height="180"></canvas>
+            <div class="cam-roi-actions">
+              <span class="cam-roi-hint">Clic para activar/desactivar celdas. Las celdas activas son vigiladas.</span>
+              <button class="mini-btn" id="cam-roi-save">Guardar ROI</button>
+              <button class="mini-btn" id="cam-roi-clear">Limpiar</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -526,6 +549,25 @@
             <button class="mini-btn" id="rec-close-btn">✕ Cerrar</button>
             <video id="rec-video" controls style="width:100%;border-radius:8px;background:#000"></video>
             <div class="rec-player-meta" id="rec-player-meta"></div>
+            <!-- P-04: Marcadores de actividad (saltar a momentos) -->
+            <div class="rec-markers-wrap" id="rec-markers-wrap">
+              <div class="rec-markers-label">Momentos de actividad:</div>
+              <div class="rec-markers-bar" id="rec-markers-bar">
+                <!-- markers injected by JS -->
+              </div>
+            </div>
+            <!-- P-05: Recorte de video (trim in/out) -->
+            <div class="rec-trim-wrap">
+              <div class="rec-trim-label">Recortar clip:</div>
+              <div class="rec-trim-row">
+                <label>Desde <input type="number" id="rec-trim-in" class="settings-input rec-trim-input" min="0" step="0.1" placeholder="0.0" style="width:70px"> s</label>
+                <label>Hasta <input type="number" id="rec-trim-out" class="settings-input rec-trim-input" min="0" step="0.1" placeholder="fin" style="width:70px"> s</label>
+                <button class="mini-btn" id="rec-trim-set-in">Marcar entrada</button>
+                <button class="mini-btn" id="rec-trim-set-out">Marcar salida</button>
+                <button class="mini-btn" id="rec-trim-export">Exportar recorte</button>
+              </div>
+              <div id="rec-trim-status" class="rec-trim-status"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -754,6 +796,27 @@
           <div class="comms-row">
             <button class="mini-btn" id="train-refresh-job">↺ Actualizar</button>
           </div>
+          <!-- AE-08: Dataset detail / editor -->
+          <div class="cam-section-title">Dataset <button class="mini-btn" id="train-dataset-load">Ver ejemplos</button></div>
+          <div id="train-dataset-stats" class="train-dataset-stats">
+            <div class="comms-loading">Pulsa "Ver ejemplos" para ver el dataset del modelo seleccionado</div>
+          </div>
+          <!-- AE-09: Ajustes avanzados (hiperparámetros) plegables -->
+          <details class="train-hparams-details">
+            <summary class="cam-section-title">⚙ Hiperparámetros avanzados</summary>
+            <div class="train-hparams-grid">
+              <label>Rank (r)<input type="number" id="hp-rank" class="settings-input" value="16" min="4" max="128" step="4"></label>
+              <label>Alpha<input type="number" id="hp-alpha" class="settings-input" value="32" min="4" max="256" step="4"></label>
+              <label>LR<input type="number" id="hp-lr" class="settings-input" value="0.0002" min="0.00001" max="0.01" step="0.00001"></label>
+              <label>Epochs<input type="number" id="hp-epochs" class="settings-input" value="3" min="1" max="10" step="1"></label>
+              <label>Batch<input type="number" id="hp-batch" class="settings-input" value="4" min="1" max="32" step="1"></label>
+              <label>Dropout<input type="number" id="hp-dropout" class="settings-input" value="0.05" min="0" max="0.5" step="0.01"></label>
+            </div>
+            <div class="comms-row">
+              <button class="mini-btn" id="hp-save-btn">Guardar hiperparámetros</button>
+              <span id="hp-save-status" class="train-badge" style="display:none">Guardado</span>
+            </div>
+          </details>
         </div>
       </div>
 

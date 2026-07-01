@@ -35,7 +35,37 @@ CREATE TABLE IF NOT EXISTS cameras (
 );
 CREATE INDEX IF NOT EXISTS idx_cam_kind ON cameras (kind);
 CREATE INDEX IF NOT EXISTS idx_cam_enabled ON cameras (enabled);
+CREATE TABLE IF NOT EXISTS camera_roi (
+    cam_id      TEXT    PRIMARY KEY,
+    roi_grid    TEXT    NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS discarded_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    cam_id      TEXT    NOT NULL,
+    ts          REAL    NOT NULL,
+    label       TEXT    NOT NULL DEFAULT '',
+    reason      TEXT    NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_disc_cam ON discarded_events (cam_id, ts DESC);
 """
+
+
+def get_db() -> sqlite3.Connection:
+    """Devuelve una conexión a la DB de cámaras (para uso directo en endpoints)."""
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+    c.row_factory = sqlite3.Row
+    return c
+
+
+def log_discarded(cam_id: str, label: str, reason: str) -> None:
+    """O-04: Registra una detección descartada por la IA."""
+    import time
+    with _lock, _conn() as c:
+        c.execute(
+            "INSERT INTO discarded_events(cam_id, ts, label, reason) VALUES(?,?,?,?)",
+            (cam_id, time.time(), label, reason)
+        )
 
 
 def _conn() -> sqlite3.Connection:
@@ -162,6 +192,65 @@ def get_camera_by_name(name: str) -> dict | None:
 def get_all_cameras() -> list[dict]:
     """Alias para list_cameras() — compatibilidad con security_routes.py."""
     return list_cameras()
+
+
+# ── S-10: Preconfigurar 3 cámaras de interior ────────────────────────────────
+
+_DEFAULT_INTERIOR_CAMERAS = [
+    {
+        "name": "salon",
+        "kind": "interior",
+        "source_type": "ha",
+        "source_url": "camera.salon",
+        "location": "Salón principal — sofá + zona de paso",
+    },
+    {
+        "name": "cocina",
+        "kind": "interior",
+        "source_type": "ha",
+        "source_url": "camera.cocina",
+        "location": "Cocina — zona de peligro para los gatos (fogones, enchufes)",
+    },
+    {
+        "name": "dormitorio",
+        "kind": "interior",
+        "source_type": "ha",
+        "source_url": "camera.dormitorio",
+        "location": "Dormitorio — zona segura habitual de los gatos",
+    },
+]
+
+
+def seed_interior_cameras(force: bool = False) -> dict:
+    """
+    S-10: Preconfigura las 3 cámaras de interior por defecto.
+
+    Args:
+        force: Si True, borra y recrea las cámaras aunque ya existan.
+
+    Returns:
+        dict con 'created', 'skipped', 'cameras'.
+    """
+    created = []
+    skipped = []
+    for spec in _DEFAULT_INTERIOR_CAMERAS:
+        existing = get_camera(name=spec["name"])
+        if existing and not force:
+            skipped.append(spec["name"])
+            continue
+        if existing and force:
+            delete_camera(existing["id"])
+        result = add_camera(**spec)
+        if result.get("ok"):
+            created.append(spec["name"])
+        else:
+            skipped.append(f"{spec['name']} ({result.get('error', '?')})")
+    return {
+        "ok": True,
+        "created": created,
+        "skipped": skipped,
+        "cameras": list_cameras(kind="interior"),
+    }
 
 
 def update_camera_context(cam_id_or_name: str, context: str) -> dict:

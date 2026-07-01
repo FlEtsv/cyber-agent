@@ -44,3 +44,12 @@ def get(model_id: str) -> HParams:
 def get_dict(model_id: str) -> dict:
     h = get(model_id)
     return {k: v for k, v in h.__dict__.items()}
+
+
+def update_hparams(model_id: str, **kwargs) -> HParams:
+    """AE-09: Actualiza hiperparámetros para un modelo (en memoria)."""
+    hp = _HPARAMS.setdefault(model_id, HParams())
+    for k, v in kwargs.items():
+        if hasattr(hp, k):
+            setattr(hp, k, type(getattr(hp, k))(v))
+    return hp

@@ -1499,6 +1499,35 @@ html { touch-action: manipulation; }
 .recording-player { margin-top: 12px; background: #161b22; border-radius: 8px; padding: 12px; }
 .rec-player-meta { font-size: 12px; color: #8b949e; margin-top: 6px; }
 
+/* P-04: Marcadores de actividad */
+.rec-markers-wrap { margin-top: 10px; }
+.rec-markers-label { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+.rec-markers-bar { position: relative; height: 20px; background: rgba(255,255,255,0.05); border-radius: 4px; }
+.rec-marker { position: absolute; top: 0; bottom: 0; width: 3px; background: #f0883e; border: none; border-radius: 2px; cursor: pointer; padding: 0; transform: translateX(-50%); }
+.rec-marker:hover { background: #ff9f50; width: 5px; }
+
+/* P-05: Trim */
+.rec-trim-wrap { margin-top: 10px; padding-top: 10px; border-top: 1px solid #21262d; }
+.rec-trim-label { font-size: 11px; color: #8b949e; margin-bottom: 6px; }
+.rec-trim-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.rec-trim-input { width: 70px !important; padding: 3px 6px !important; }
+.rec-trim-status { margin-top: 6px; font-size: 12px; color: #58a6ff; }
+
+/* O-04: Descartes de la IA */
+.cam-detail-ignored { padding: 12px 0; border-top: 1px solid #21262d; }
+.cam-ignored-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.cam-ignored-item { display: flex; gap: 8px; font-size: 12px; padding: 5px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+.cam-ignored-ts { color: #8b949e; min-width: 60px; }
+.cam-ignored-label { font-weight: 600; color: #e6edf3; min-width: 80px; }
+.cam-ignored-why { color: #8b949e; flex: 1; }
+.cam-ignored-empty { font-size: 12px; color: #8b949e; padding: 6px 0; }
+
+/* Q-05: ROI grid */
+.cam-roi-editor { margin-top: 8px; }
+.cam-roi-canvas { width: 100%; max-width: 320px; height: auto; border-radius: 6px; background: #0d1117; cursor: crosshair; border: 1px solid #21262d; display: block; }
+.cam-roi-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.cam-roi-hint { font-size: 11px; color: #8b949e; flex: 1; min-width: 120px; }
+
 /* AL-09: Heatmap */
 .heatmap-container { text-align: center; }
 .heatmap-canvas { border-radius: 8px; max-width: 100%; }

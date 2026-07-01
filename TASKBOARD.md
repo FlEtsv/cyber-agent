@@ -858,11 +858,11 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### O · Vista de cámara individual (IA en vivo)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| O-01 | ⬜ | claude | Layout vista de UNA cámara (video grande + panel IA) | `apps/web/*` |
+| O-01 | ✅ 100% claude | claude | Layout vista de UNA cámara (video grande + panel IA) | `apps/web/index.html` (#sec-panel-cam-detail) |
 | O-02 | ✅ 100% claude | claude | Panel "Lo que la IA ve y razona" EN VIVO (stream de razonamiento) | `apps/web/*`, `app/security/live_brain.py` |
-| O-03 | ⬜ | claude | Lista de DETECCIONES (timestamp, tipo, confianza, recorte) | `apps/web/*` |
-| O-04 | ⬜ | claude | ACTIVIDADES IGNORADAS (lo que la IA descartó) + por qué | `apps/web/*` |
-| O-05 | ⬜ | claude | Línea de tiempo de eventos de esa cámara | `apps/web/*` |
+| O-03 | ✅ 100% claude | claude | Lista de DETECCIONES (timestamp, tipo, confianza, recorte) | `apps/web/index.html` (#cam-detections-list) |
+| O-04 | ✅ 100% claude | claude | ACTIVIDADES IGNORADAS (lo que la IA descartó) + por qué | `apps/web/*`, `app/api/server.py` GET /api/security/cameras/{id}/discarded, `app/security/cameras_db.py` log_discarded |
+| O-05 | ✅ 100% claude | claude | Línea de tiempo de eventos de esa cámara | `apps/web/index.html` (#cam-timeline-list) |
 | O-06 | ✅ 100% claude | claude | Backend: stream del razonamiento IA por cámara (SSE/WS) | `app/security/live_brain.py` |
 
 ### P · Grabación / reproducción / exportación
@@ -871,8 +871,8 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | P-01 | ✅ 100% claude | claude | Grabar clip (manual + automático en evento) | `app/security/recorder.py` |
 | P-02 | ✅ 100% claude | claude | Almacén de videos por cámara (DB índice + ficheros) | `app/security/recorder.py` |
 | P-03 | ✅ 100% claude | claude | Reproductor con controles nativos (play/pause/seek/velocidad) | `apps/web/index.html` (native `<video>` controls) |
-| P-04 | ⬜ | claude | Saltar a MOMENTOS de actividad (marcadores en la timeline) | `apps/web/*` |
-| P-05 | ⬜ | claude | Recorte de video (trim in/out) | `apps/web/*`, `app/security/recorder.py` |
+| P-04 | ✅ 100% claude | claude | Saltar a MOMENTOS de actividad (marcadores en la timeline) | `apps/web/ui.js` _renderRecMarkers, `apps/web/index.html` rec-markers-bar |
+| P-05 | ✅ 100% claude | claude | Recorte de video (trim in/out) | `apps/web/ui.js` trimExport, `app/api/server.py` POST /api/security/recordings/trim (ffmpeg) |
 | P-06 | ✅ 100% claude | claude | Descarga / exportación de clips | `app/api/security_routes.py` GET /recordings/{id}/download |
 | P-07 | ✅ 100% claude | claude | Exportar el RAZONAMIENTO de la IA (por qué fue amenaza, si notificó, si lo descartó) en informe | `app/api/security_routes.py` GET /recordings/{id}/report |
 | P-08 | ✅ 100% claude | claude | Retención/limpieza de grabaciones (política + espacio) | `app/storage/retention.py` |
@@ -884,7 +884,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | Q-02 | ✅ 100% claude | claude | Tipos de zona: WARNING/amenaza y SEGURA (colorear cada una) | `app/security/zones.py` Zone.type + color |
 | Q-03 | ✅ 100% claude | claude | Solapamiento: prevalece la de MAYOR riesgo | `app/security/zones.py` |
 | Q-04 | ✅ 100% claude | claude | Solo notificar si la amenaza está DENTRO de zona de vigilancia | `app/security/zones.py` |
-| Q-05 | ⬜ | claude | Cuadrícula "lo que la IA debe vigilar" (regiones de interés) | `apps/web/*` |
+| Q-05 | ✅ 100% claude | claude | Cuadrícula "lo que la IA debe vigilar" (regiones de interés) | `apps/web/ui.js` Q-05 ROI editor, `app/api/server.py` GET/POST /cameras/{id}/roi, `app/security/cameras_db.py` camera_roi table |
 | Q-06 | ✅ 100% claude | claude | Backend: persistir zonas por cámara + punto-en-polígono | `app/security/zones.py` |
 | Q-07 | ✅ 100% claude | claude | La IA recibe las zonas como contexto al analizar | `app/security/live_brain.py` |
 
@@ -912,7 +912,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | S-07 | ✅ 100% claude | claude | Aprendizaje de lugares seguros/patrones de los gatos | `app/security/pets.py`, `app/security/patterns.py` |
 | S-08 | ✅ 100% claude | claude | Tools de disuasión interior (altavoz potente, sonidos por escenario para separar gatos) | `app/security/deterrence_tools.py` |
 | S-09 | ✅ 100% claude | claude | Modo noche (conectar a dispositivos de disuasión interior — próximamente) | `app/security/deterrence_tools.py` |
-| S-10 | ⬜ | claude | Preconfigurar 3 cámaras de interior | `cameras_db` |
+| S-10 | ✅ 100% claude | claude | Preconfigurar 3 cámaras de interior | `app/security/cameras_db.py` `seed_interior_cameras()` |
 
 ### T · Modelo de visión local rápido (+ nube)
 | ID | E | Agente | Tarea | Archivos |
@@ -989,7 +989,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | Y-01 | ✅ 100% claude | claude | Estructura en la SD: /models /datasets /videos /backups, con config de ruta base | `app/storage/layout.py` |
-| Y-02 | ⬜ | claude | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
+| Y-02 | ✅ 100% claude | claude | Mover/configurar modelos de Ollama a la SD (espacio) sin romper inferencia | `docs/STORAGE.md` |
 | Y-03 | ✅ 100% claude | claude | Almacén de VIDEO por cámara eficiente (H.265, segmentos cortos, índice) | `app/security/recorder.py` |
 | Y-04 | ✅ 100% claude | claude | **Retención LEGAL 15 días** del video (auto-borrado de lo más viejo) | `app/storage/retention.py` |
 | Y-05 | ✅ 100% claude | claude | Gestión de ESPACIO (cuota por categoría, alertas si se llena, limpieza) | `app/storage/layout.py` (StorageLayout.info) |
@@ -1061,8 +1061,8 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | AE-05 | ✅ 100% claude | claude | Vista de progreso del entrenamiento en vivo (loss, paso, ETA, logs) | `apps/web/*` |
 | AE-06 | ✅ 100% claude | claude | Historial de versiones por modelo (fecha, ejemplos, métricas, activo) | `apps/web/*` |
 | AE-07 | ✅ 100% claude | claude | Comparativa A/B y botón "promover" / "rollback" | `apps/web/*` |
-| AE-08 | ⬜ | claude | Detalle del dataset (abre el editor AC-03) | `apps/web/*` |
-| AE-09 | ⬜ | claude | Ajustes avanzados (hiperparámetros) plegables | `apps/web/*` |
+| AE-08 | ✅ 100% claude | claude | Detalle del dataset (abre el editor AC-03) | `apps/web/index.html` #train-dataset-stats, `apps/web/ui.js` initTrainingAdv, `app/api/server.py` GET /api/training/dataset-stats/{model_id} |
+| AE-09 | ✅ 100% claude | claude | Ajustes avanzados (hiperparámetros) plegables | `apps/web/index.html` train-hparams-details, `apps/web/ui.js`, `app/api/server.py` POST /api/training/hparams/{model_id}, `app/training/hparams.py` update_hparams |
 | AE-10 | OK 100% claude | claude | Solo en instancia PC (por seguridad/VRAM): el menú en móvil muestra estado pero "Entrenar" lo lanza el PC | `apps/web/*`, `app/api/relay_connector.py` |
 
 ### AF · Motor de entrenamiento (pipeline real)
