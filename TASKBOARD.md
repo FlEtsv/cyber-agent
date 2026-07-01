@@ -832,7 +832,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
 | M-01 | ✅ 100% claude | claude | Adaptar nombres/estilo APiComuni a cyberllm | `app/security/__init__.py`, `notify.py` |
-| M-02 | ⬜ | claude | Tests por módulo de seguridad | `tests/test_security_*.py` |
+| M-02 | OK 100% claude | claude | Tests por módulo de seguridad | `tests/test_security_*.py` |
 | M-03 | ✅ 100% claude | claude | Doc docs/SECURITY_MODULE.md (arquitectura final) | `docs/SECURITY_MODULE.md` |
 | M-04 | ✅ | claude | Wiring notif: tarea-hecha / aprobación-pendiente a Telegram [ACTIVO] | `app/api/agent_runner.py` |
 
