@@ -697,7 +697,7 @@ Cuando un agente se quede sin tokens/límite de contexto durante una tarea:
 | SEC-008 | ✅ 100% claude | claude | Portar `camera_client` + `motion_tracker` (DESACTIVADO; solo estructura + config) | `app/security/camera.py`, `app/security/motion.py` |
 | SEC-009 | ✅ 100% claude | claude | Portar `event_handler`+`event_store`+`action_executor`+`autonomy` (DESACTIVADO); autonomía → mapear a aprobaciones | `app/security/events.py`, `actions.py` |
 | SEC-010 | ✅ 100% claude | claude | **Conciencia del agente**: system prompt + tools docs reflejan 2 claves Mistral, cámaras, HA, Docker | `app/ollama_client.py` |
-| SEC-012 | ⬜ | * | Cablear seccion **Seguridad** en el modulo **iOS** (vista + theme cyberagent), desactivada | `ios/CyberAgent/*` |
+| SEC-012 | OK 100% claude | * | Cablear seccion **Seguridad** en el modulo **iOS** (vista + theme cyberagent), desactivada | `ios/CyberAgent/*` |
 | SEC-011 | ✅ 100% claude | claude | **training_store** (grifo de datos QLoRA): captura decisión→resultado, feedback 👍/👎, aprobaciones, en formato instrucción/respuesta/señal | `app/training_store.py` |
 
 > **Reglas de reparto:** Claude toma SEC-001..005 (estructura + UI + secretos +
@@ -802,7 +802,7 @@ tools actuales. El módulo de seguridad se acopla, gateado por `SECURITY_ENABLED
 ### I · iOS (lo siguiente a atacar)
 | ID | E | Agente | Tarea | Archivos |
 |----|---|--------|-------|----------|
-| I-01 | ⬜ | codex | Vista Seguridad (SwiftUI) theme cyberagent, desactivada | `ios/CyberAgent/Security/SecurityView.swift` |
+| I-01 | OK 100% claude | codex | Vista Seguridad (SwiftUI) theme cyberagent, desactivada | `ios/CyberAgent/Security/SecurityView.swift` |
 | I-02 | ✅ 100% claude | claude | Cliente de notificaciones push (recibir alertas) | `ios/CyberAgent/Security/PushManager.swift` |
 
 ### J · Docker (más granular)

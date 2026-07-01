@@ -19,6 +19,14 @@ struct RootView: View {
                 Label("Dispositivos", systemImage: "bolt.horizontal")
             }
 
+            // SEC-012 / I-01: sección Seguridad (desactivada, estilo cyberagent).
+            NavigationStack {
+                SecurityView()
+            }
+            .tabItem {
+                Label("Seguridad", systemImage: "shield.lefthalf.filled")
+            }
+
             NavigationStack {
                 SettingsView()
             }
