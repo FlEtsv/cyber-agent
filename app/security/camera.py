@@ -183,11 +183,13 @@ def snapshot_by_name(name: str) -> dict:
         if not cam:
             return {"ok": False, "error": f"Cámara '{name}' no encontrada"}
 
+        # cameras_db guarda la fuente en 'source_url' (RTSP URL o HA entity_id).
         source = cam.get("source_type", "ha")
+        src = cam.get("source_url") or cam.get("rtsp_url") or cam.get("entity_id") or ""
         if source == "rtsp":
-            return snapshot_rtsp(cam["rtsp_url"])
+            return snapshot_rtsp(src)
         else:
-            return snapshot(cam["entity_id"])
+            return snapshot(src)
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
