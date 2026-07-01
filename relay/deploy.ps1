@@ -5,10 +5,11 @@ param(
     [string]$Project,
     [string]$Region = "us-central1",
     [string]$ServiceName = "cyberagent-relay",
-    # 1 = una instancia siempre caliente (sin cold-starts ni cortes de conexión al
-    # redesplegar; ~unos pocos $/mes). 0 = escala a cero (gratis en reposo pero con
-    # cold-starts y reconexiones tras redeploy, mitigadas por el self-check del PC).
-    [int]$MinInstances = 1
+    # 0 = escala a cero (RECOMENDADO): ~0€ en reposo, CPU solo se factura al procesar.
+    #     Los cold-starts (~2s) y las reconexiones tras redeploy ya los maneja el
+    #     self-check del conector (supervisor). min=1 costaba ~2€/día por tener la
+    #     instancia encendida 24/7 → NO usar salvo que quieras 0 cold-starts.
+    [int]$MinInstances = 0
 )
 
 $ErrorActionPreference = "Stop"
